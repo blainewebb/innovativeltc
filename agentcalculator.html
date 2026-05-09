@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Agent Earnings Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .dashboard {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 20px;
+        }
+        @media (max-width: 850px) { .dashboard { grid-template-columns: 1fr; } }
+        
+        .card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        h2 { margin-top: 0; font-size: 1.25rem; color: #475569; }
+        
+        .input-section { display: flex; flex-direction: column; gap: 20px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .stat-card {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; color: var(--text); display: block; margin-top: 5px; }
+        .stat-value.highlight { color: var(--success); }
+
+        .tier-indicator {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 700;
+            background: var(--primary);
+            color: white;
+        }
+
+        .chart-container { height: 300px; position: relative; }
+    </style>
+</head>
+<body>
+
+<div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="margin-bottom: 5px;">Agent Quarterly Earnings</h1>
+    <p style="color: #64748b;">Projected Sales & Residuals Model</p>
+</div>
+
+<div class="dashboard">
+    <div class="input-section">
+        <div class="card">
+            <h2>Projection Inputs</h2>
+            <div class="input-group">
+                <label>Quarterly Written Premium ($)</label>
+                <input type="number" id="premium" value="26500" oninput="updateUI('premium')">
+            </div>
+            <div style="text-align: center; margin: 10px 0; color: #94a3b8; font-size: 0.8rem;">— OR —</div>
+            <div class="input-group">
+                <label>Number of Sales ($2.5k avg)</label>
+                <input type="number" id="sales" value="10.6" step="0.1" oninput="updateUI('sales')">
+            </div>
+
+            <div id="tierBox" class="tier-indicator">Level 2: Pro</div>
+
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Agent Split</span>
+                    <span id="splitVal" class="stat-value">55%</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">1st Year Payout</span>
+                    <span id="payoutVal" class="stat-value">$10,203</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Annual Residual</span>
+                    <span id="residualVal" class="stat-value">$1,020</span>
+                </div>
+                <div class="stat-card" style="background: #ecfdf5;">
+                    <span class="stat-label">Total Comp</span>
+                    <span id="totalVal" class="stat-value highlight">$11,223</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Income Breakdown</h2>
+            <div class="chart-container">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Earnings Growth Projection</h2>
+        <div class="chart-container" style="height: 500px;">
+            <canvas id="lineChart"></canvas>
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 15px;">
+            * 1st Year Payout is calculated as Premium × Split % × 70%. <br>
+            * Annual Residual is 10% of the 1st Year Payout.
+        </p>
+    </div>
+</div>
+
+<script>
+    let lineChart, pieChart;
+
+    function calculateData(premium) {
+        let split = 0.40;
+        let tier = "Level 1: Launch";
+        let color = "#3b82f6";
+
+        if (premium >= 27500) {
+            tier = "Level 3: Partner";
+            split = 0.70;
+            color = "#8b5cf6";
+        } else if (premium >= 12500) {
+            tier = "Level 2: Pro";
+            split = 0.55;
+            color = "#10b981";
+        }
+
+        const payout = premium * split * 0.70;
+        const residual = payout * 0.10;
+        const total = payout + residual;
+
+        return { premium, tier, split, payout, residual, total, color };
+    }
+
+    function updateUI(source) {
+        const premInput = document.getElementById('premium');
+        const salesInput = document.getElementById('sales');
+        
+        let premium = parseFloat(premInput.value) || 0;
+        if (source === 'sales') {
+            premium = (parseFloat(salesInput.value) || 0) * 2500;
+            premInput.value = premium.toFixed(0);
+        } else {
+            salesInput.value = (premium / 2500).toFixed(1);
+        }
+
+        const data = calculateData(premium);
+
+        // Update Labels
+        document.getElementById('tierBox').innerText = data.tier;
+        document.getElementById('tierBox').style.background = data.color;
+        document.getElementById('splitVal').innerText = (data.split * 100) + "%";
+        document.getElementById('payoutVal').innerText = "$" + Math.round(data.payout).toLocaleString();
+        document.getElementById('residualVal').innerText = "$" + Math.round(data.residual).toLocaleString();
+        document.getElementById('totalVal').innerText = "$" + Math.round(data.total).toLocaleString();
+
+        updateCharts(data);
+    }
+
+    function initCharts() {
+        const ctxLine = document.getElementById('lineChart').getContext('2d');
+        lineChart = new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 21}, (_, i) => i * 2500),
+                datasets: [{
+                    label: 'Total Compensation',
+                    data: [],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } },
+                    x: { title: { display: true, text: 'Quarterly Premium ($)' } }
+                }
+            }
+        });
+
+        const ctxPie = document.getElementById('pieChart').getContext('2d');
+        pieChart = new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: ['Upfront Payout', 'Residuals'],
+                datasets: [{
+                    data: [90, 10],
+                    backgroundColor: ['#2563eb', '#10b981']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        updateUI('premium');
+    }
+
+    function updateCharts(currentData) {
+        // Update Line Chart Data
+        const labels = [];
+        const points = [];
+        for (let p = 0; p <= 60000; p += 2500) {
+            labels.push(p);
+            points.push(calculateData(p).total);
+        }
+        lineChart.data.labels = labels;
+        lineChart.data.datasets[0].data = points;
+        lineChart.update();
+
+        // Update Pie Chart
+        pieChart.data.datasets[0].data = [currentData.payout, currentData.residual];
+        pieChart.update();
+    }
+
+    window.onload = initCharts;
+</script>
+
+</body>
+</html>
