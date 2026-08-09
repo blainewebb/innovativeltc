@@ -280,6 +280,15 @@
       </div>
     </div>
 
+    <div class="card" id="plantCard">
+      <div class="water-head" style="margin-bottom:10px;">
+        <div class="t" style="font-weight:700; display:flex; align-items:center; gap:8px;">🌱 Plant-Based</div>
+        <div class="c" style="color:var(--muted); font-size:.85rem; font-weight:600;"><span id="plantPct">0</span>% of calories</div>
+      </div>
+      <div class="bar" style="height:10px;"><span id="plantBar" style="background:var(--success); width:0%"></span></div>
+      <div class="hint" id="plantHint" style="margin-top:10px;">Log foods to see how plant-based your day is. Use the 🌱 toggle on any food to correct it.</div>
+    </div>
+
     <div class="card" id="activityCard">
       <div class="water-head" style="margin-bottom:12px;">
         <div class="t" style="font-weight:700; display:flex; align-items:center; gap:8px;">🏃 Activity</div>
@@ -382,6 +391,51 @@
         <div class="field"><label>Water (cups)</label><input id="gWater" type="number" inputmode="decimal"></div>
       </div>
       <button class="primary-btn" onclick="saveGoals()">Save Goals</button>
+    </div>
+
+    <div class="card">
+      <h3>🧮 Calorie Goal Planner</h3>
+      <div class="hint">Turn a body-weight or body-fat goal into a daily calorie target (Mifflin–St Jeor). Your latest logged weight is used automatically.</div>
+      <div class="grid2">
+        <div class="field"><label>Sex</label><select id="plSex"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>Age</label><input id="plAge" type="number" inputmode="numeric" placeholder="35"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Height</label><input id="plHeight" type="number" inputmode="decimal" placeholder="70"></div>
+        <div class="field"><label>Height unit</label><select id="plHUnit"><option value="in">inches</option><option value="cm">cm</option></select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Current weight</label><input id="plWeight" type="number" inputmode="decimal"></div>
+        <div class="field"><label>Unit</label><select id="plWUnit"><option>lb</option><option>kg</option></select></div>
+      </div>
+      <div class="field"><label>Activity level</label>
+        <select id="plAct">
+          <option value="1.2">Sedentary — desk job, little exercise</option>
+          <option value="1.375">Light — 1–3 workouts/week</option>
+          <option value="1.55">Moderate — 3–5 workouts/week</option>
+          <option value="1.725">Active — 6–7 workouts/week</option>
+          <option value="1.9">Very active — hard training / physical job</option>
+        </select>
+      </div>
+      <div class="field"><label>Goal</label>
+        <select id="plGoal" onchange="planRateVis()">
+          <option value="lose">Lose weight / fat</option>
+          <option value="maintain">Maintain</option>
+          <option value="gain">Gain weight</option>
+        </select>
+      </div>
+      <div class="grid2" id="plRateWrap">
+        <div class="field"><label>Rate (per week)</label>
+          <select id="plRate">
+            <option value="0.5">0.5 — gentle</option>
+            <option value="1">1 — standard</option>
+            <option value="1.5">1.5 — aggressive</option>
+          </select>
+        </div>
+        <div class="field"><label>Target weight (optional)</label><input id="plTarget" type="number" inputmode="decimal" placeholder="optional"></div>
+      </div>
+      <button class="primary-btn" onclick="computePlan()">Calculate my target</button>
+      <div id="planResult"></div>
     </div>
 
     <div class="card">
@@ -507,6 +561,7 @@
           <div class="field"><label>Fat (g)</label><input id="mFat" type="number" inputmode="decimal" placeholder="0"></div>
           <div class="field"><label>Fiber (g)</label><input id="mFib" type="number" inputmode="decimal" placeholder="0"></div>
         </div>
+        <label class="ai-item"><input type="checkbox" id="mPlant"><div class="ci"><div class="cn">🌱 Plant-based</div><div class="cm">Counts toward your plant-based %</div></div></label>
         <div class="field" id="manualMealWrap"><label>Meal</label>
           <select id="mMeal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select>
         </div>
@@ -743,10 +798,22 @@ function render(){
   setMacro('f', t['fat'], goals.fat);
 
   renderWater(goals);
+  renderPlant(entries);
   renderActivity();
   renderMeals(entries);
   renderDozen();
   renderMicros(t);
+}
+function renderPlant(entries){
+  let total=0, plant=0;
+  entries.forEach(e=>{ const c=e.nutr['energy-kcal']||0; total+=c; if(e.plant) plant+=c; });
+  const pct = total>0 ? Math.round(plant/total*100) : 0;
+  document.getElementById('plantPct').textContent=pct;
+  document.getElementById('plantBar').style.width=pct+'%';
+  const el=document.getElementById('plantHint');
+  if(total<=0) el.textContent='Log foods to see how plant-based your day is.';
+  else if(pct>=100) el.textContent='100% plant-based today 🎉';
+  else el.textContent=`${pct}% of today's calories are from plant-based foods (${Math.round(plant)} of ${Math.round(total)} kcal).`;
 }
 /* Beverages & Exercise auto-fill from the water and activity logs. */
 function dozenAuto(key){
@@ -928,7 +995,7 @@ async function doSearch(){
   try{
     const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`+
       `&search_simple=1&action=process&json=1&page_size=25`+
-      `&fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url`;
+      `&fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags`;
     const res=await fetch(url); const data=await res.json();
     const prods=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g']!=null);
     if(!prods.length){ box.innerHTML=`<div class="empty">No matches. Try another term or use the Manual tab.</div>`; return; }
@@ -949,7 +1016,8 @@ function foodFromProduct(p){
   NUTRIENTS.forEach(n=>{ const v=p.nutriments[n[0]+'_100g']; if(v!=null&&!isNaN(v)) per100[n[0]]=parseFloat(v); });
   if(p.nutriments['energy-kcal_100g']!=null) per100['energy-kcal']=parseFloat(p.nutriments['energy-kcal_100g']);
   let servingG=100; if(p.serving_quantity&&!isNaN(p.serving_quantity)) servingG=parseFloat(p.serving_quantity);
-  selectedFood={ name:p.product_name, brand:p.brands||'', image:p.image_small_url||'', per100, servingG, servingLabelRaw:p.serving_size||'' };
+  const plant = Array.isArray(p.ingredients_analysis_tags) && p.ingredients_analysis_tags.includes('en:vegan');
+  selectedFood={ name:p.product_name, brand:p.brands||'', image:p.image_small_url||'', per100, servingG, servingLabelRaw:p.serving_size||'', plant };
   addAmount=servingG||100; openDetail();
 }
 
@@ -973,7 +1041,7 @@ async function onBarcode(code){
   hint.innerHTML=`<div class="spinner"></div>Looking up ${esc(code)}…`;
   try{
     const url=`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`+
-      `?fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url`;
+      `?fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags`;
     const res=await fetch(url); const data=await res.json();
     if(data.status===1&&data.product&&data.product.product_name){ foodFromProduct(data.product); hint.textContent='Found it!'; }
     else hint.innerHTML=`Barcode <b>${esc(code)}</b> isn't in the database. Add it via the Manual tab.`;
@@ -1009,9 +1077,10 @@ function saveManual(){
   const nutr={'energy-kcal':num('mCal'),'proteins':num('mPro'),'carbohydrates':num('mCarb'),'fat':num('mFat'),'fiber':num('mFib')};
   const item={ name:document.getElementById('mName').value.trim()||'Custom food',
     servingLabel:document.getElementById('mServ').value.trim()||'1 serving',
-    image:manualPhotoData||'', nutr };
+    image:manualPhotoData||'', nutr, plant:document.getElementById('mPlant').checked };
   if(toRecipe){ addIngredientToRecipe(item); }
   else { addEntry(Object.assign({meal:document.getElementById('mMeal').value}, item)); }
+  document.getElementById('mPlant').checked=false;
   ['mName','mCal','mServ','mPro','mCarb','mFat','mFib'].forEach(i=>document.getElementById(i).value='');
   manualPhotoData=null; const ph=document.getElementById('manualPhoto'); ph.style.display='none'; ph.src='';
   document.getElementById('aiResults').innerHTML='';
@@ -1026,9 +1095,10 @@ function saveManual(){
    client-side; this is acceptable for a personal, single-user tool. */
 const AI_SCHEMA = { type:'object', additionalProperties:false, required:['items'], properties:{
   items:{ type:'array', items:{ type:'object', additionalProperties:false,
-    required:['name','grams','calories','protein_g','carbs_g','fat_g','fiber_g'],
+    required:['name','grams','calories','protein_g','carbs_g','fat_g','fiber_g','plant_based'],
     properties:{ name:{type:'string'}, grams:{type:'number'}, calories:{type:'number'},
-      protein_g:{type:'number'}, carbs_g:{type:'number'}, fat_g:{type:'number'}, fiber_g:{type:'number'} } } } } };
+      protein_g:{type:'number'}, carbs_g:{type:'number'}, fat_g:{type:'number'}, fiber_g:{type:'number'},
+      plant_based:{type:'boolean'} } } } } };
 
 async function recognizePhoto(){
   const key=get('nt_apikey',''); const model=get('nt_aimodel','claude-opus-5');
@@ -1040,7 +1110,7 @@ async function recognizePhoto(){
     output_config:{ format:{ type:'json_schema', schema:AI_SCHEMA } },
     messages:[{ role:'user', content:[
       { type:'image', source:{ type:'base64', media_type:m[1], data:m[2] } },
-      { type:'text', text:'Identify every distinct food and drink item in this photo. For each, estimate a realistic portion in grams and its nutrition for that portion: calories (kcal), protein, carbs, fat and fiber in grams. Be a careful, realistic estimator. Return only the structured data.' }
+      { type:'text', text:'Identify every distinct food and drink item in this photo. For each, estimate a realistic portion in grams and its nutrition for that portion: calories (kcal), protein, carbs, fat and fiber in grams. Also set plant_based=true only if the item is entirely plant-based (no meat, fish, dairy, eggs or honey). Be a careful, realistic estimator. Return only the structured data.' }
     ]}]
   };
   try{
@@ -1080,7 +1150,7 @@ function addAiItems(){
   const meal = document.getElementById('aiMeal') ? document.getElementById('aiMeal').value : addMeal;
   checks.forEach(ch=>{
     const it=window._aiItems[parseInt(ch.dataset.i)];
-    const item={ name:it.name, servingLabel:Math.round(it.grams)+' g', image:'', emoji:'🍽️',
+    const item={ name:it.name, servingLabel:Math.round(it.grams)+' g', image:'', emoji:'🍽️', plant:!!it.plant_based,
       nutr:{ 'energy-kcal':it.calories||0, 'proteins':it.protein_g||0, 'carbohydrates':it.carbs_g||0, 'fat':it.fat_g||0, 'fiber':it.fiber_g||0 } };
     if(toRecipe) addIngredientToRecipe(item); else addEntry(Object.assign({meal}, item));
   });
@@ -1129,13 +1199,15 @@ function renderDetail(){
       <div class="nrow"><span><b>Fat</b></span><span>${val('fat')} g</span></div>
       ${microRows?`<div class="nrow" style="border-top:2px solid var(--line)"><span style="font-weight:700">Vitamins & Minerals</span><span></span></div>${microRows}`:''}
     </div>
+    <label class="ai-item"><input type="checkbox" id="detailPlant" ${f.plant?'checked':''} onchange="selectedFood.plant=this.checked">
+      <div class="ci"><div class="cn">🌱 Plant-based</div><div class="cm">Counts toward your plant-based %</div></div></label>
     <button class="primary-btn" onclick="logSelected()">${addTarget==='recipe'?'Add ingredient':'Add to '+addMeal}</button>`;
 }
 function onAmt(v){ addAmount=parseFloat(v)||0; renderDetail(); const el=document.getElementById('amtInput'); if(el){ el.focus(); el.value=Math.round(addAmount)||''; } }
 function setAmt(a){ addAmount=a; renderDetail(); }
 function logSelected(){
   const s=scaledNutr();
-  const item={ name:selectedFood.name, servingLabel:Math.round(addAmount)+' g', image:selectedFood.image||'', nutr:s };
+  const item={ name:selectedFood.name, servingLabel:Math.round(addAmount)+' g', image:selectedFood.image||'', nutr:s, plant:!!selectedFood.plant };
   closeDetail();
   if(addTarget==='recipe'){ addIngredientToRecipe(item); closeAdd(); openRecipeSheet(); }
   else { addEntry(Object.assign({meal:document.getElementById('detailMeal')?.value||addMeal}, item)); closeAdd(); }
@@ -1363,7 +1435,8 @@ function selectedFoodRecipe(r, perServ){
   window._recCommit=()=>{
     const scale=window._recQty||1; const meal=document.getElementById('recMeal').value;
     const nutr={}; for(const k in perServ) nutr[k]=(perServ[k]||0)*scale;
-    addEntry({ name:r.name, meal, servingLabel:scale+' serving'+(scale!==1?'s':''), image:'', emoji:'🍳', nutr });
+    const plant = r.ingredients && r.ingredients.length>0 && r.ingredients.every(i=>i.plant);
+    addEntry({ name:r.name, meal, servingLabel:scale+' serving'+(scale!==1?'s':''), image:'', emoji:'🍳', nutr, plant });
     closeDetail();
   };
   draw();
@@ -1381,6 +1454,7 @@ function loadMoreForm(){
   document.getElementById('aiModel').value=get('nt_aimodel','claude-opus-5');
   updateKeyBadge();
   renderMicroGoalFields();
+  loadPlanner();
   document.getElementById('syncUrl').textContent = location.origin + location.pathname;
   const btn=document.getElementById('installBtn'), hint=document.getElementById('installHint');
   if(deferredInstall){ btn.style.display='block'; hint.textContent=''; }
@@ -1421,6 +1495,76 @@ function saveGoals(){
   set('nt_goals', { cal:n('gCal',2000), pro:n('gPro',150), carb:n('gCarb',250), fat:n('gFat',65), water:n('gWater',8) });
   toast('Goals saved'); render();
 }
+/* ---------- Calorie goal planner ---------- */
+function planRateVis(){ document.getElementById('plRateWrap').style.display = document.getElementById('plGoal').value==='maintain'?'none':'grid'; }
+function loadPlanner(){
+  const p=get('nt_planner',{});
+  const wLatest=(()=>{ const w=get('nt_weight',{}); const k=Object.keys(w).sort(); return k.length?w[k[k.length-1]]:''; })();
+  document.getElementById('plSex').value=p.sex||'male';
+  document.getElementById('plAge').value=p.age||'';
+  document.getElementById('plHeight').value=p.height||'';
+  document.getElementById('plHUnit').value=p.hUnit||'in';
+  document.getElementById('plWeight').value=p.weight!=null&&p.weight!==''?p.weight:(wLatest||'');
+  document.getElementById('plWUnit').value=p.wUnit||get('nt_weightunit','lb');
+  document.getElementById('plAct').value=p.act||'1.55';
+  document.getElementById('plGoal').value=p.goal||'lose';
+  document.getElementById('plRate').value=p.rate||'1';
+  document.getElementById('plTarget').value=p.target||'';
+  planRateVis();
+  if(p.result) document.getElementById('planResult').innerHTML=p.result;
+}
+function computePlan(){
+  const sex=document.getElementById('plSex').value;
+  const age=parseFloat(document.getElementById('plAge').value)||0;
+  const heightRaw=parseFloat(document.getElementById('plHeight').value)||0;
+  const hUnit=document.getElementById('plHUnit').value;
+  const weightRaw=parseFloat(document.getElementById('plWeight').value)||0;
+  const wUnit=document.getElementById('plWUnit').value;
+  const act=parseFloat(document.getElementById('plAct').value)||1.55;
+  const goal=document.getElementById('plGoal').value;
+  const rate=parseFloat(document.getElementById('plRate').value)||1;
+  const targetW=parseFloat(document.getElementById('plTarget').value)||0;
+  if(!age||!heightRaw||!weightRaw){ document.getElementById('planResult').innerHTML='<div class="empty">Enter age, height and weight to calculate.</div>'; return; }
+  const cm = hUnit==='cm'? heightRaw : heightRaw*2.54;
+  const kg = wUnit==='kg'? weightRaw : weightRaw/2.20462;
+  const bmr = Math.round(10*kg + 6.25*cm - 5*age + (sex==='male'?5:-161));
+  const tdee = Math.round(bmr*act);
+  const rateLb = rate * (wUnit==='kg'?2.20462:1);
+  const delta = Math.round(rateLb*500);
+  let cal = goal==='lose'? tdee-delta : goal==='gain'? tdee+delta : tdee;
+  const floor = sex==='male'?1500:1200; let floored=false;
+  if(cal<floor){ cal=floor; floored=true; }
+  // macros: protein ~1.6 g/kg, fat ~27% of cals, carbs remainder
+  const pro=Math.round(kg*1.6);
+  const fat=Math.round(cal*0.27/9);
+  const carb=Math.max(0, Math.round((cal - pro*4 - fat*9)/4));
+  let timeline='';
+  if(targetW && goal!=='maintain'){
+    const diff=Math.abs(weightRaw-targetW); const weeks=Math.max(1, Math.round(diff/rate));
+    const d=new Date(); d.setDate(d.getDate()+weeks*7);
+    timeline=`<div class="nrow"><span>Est. time to ${targetW} ${wUnit}</span><span>~${weeks} weeks (${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})})</span></div>`;
+  }
+  const html=`
+    <div class="ntable">
+      <div class="nrow"><span>BMR (at rest)</span><span>${bmr.toLocaleString()} kcal</span></div>
+      <div class="nrow"><span>Maintenance (TDEE)</span><span>${tdee.toLocaleString()} kcal</span></div>
+      <div class="nrow head"><span>Daily target</span><span>${cal.toLocaleString()} kcal</span></div>
+      <div class="nrow"><span class="indent">Protein</span><span>${pro} g</span></div>
+      <div class="nrow"><span class="indent">Carbs</span><span>${carb} g</span></div>
+      <div class="nrow"><span class="indent">Fat</span><span>${fat} g</span></div>
+      ${timeline}
+    </div>
+    ${floored?`<div class="note">Floored at ${floor} kcal — a faster rate would drop below a safe minimum. Consider a gentler rate.</div>`:''}
+    <button class="primary-btn" onclick="applyPlan(${cal},${pro},${carb},${fat})">Apply to my daily goals</button>`;
+  document.getElementById('planResult').innerHTML=html;
+  set('nt_planner',{sex,age,height:heightRaw,hUnit,weight:weightRaw,wUnit,act:String(act),goal,rate:String(rate),target:targetW||'',result:html});
+}
+function applyPlan(cal,pro,carb,fat){
+  const g=Object.assign(loadGoals(),{cal,pro,carb,fat}); set('nt_goals',g);
+  document.getElementById('gCal').value=cal; document.getElementById('gPro').value=pro;
+  document.getElementById('gCarb').value=carb; document.getElementById('gFat').value=fat;
+  toast('Daily goals updated'); render();
+}
 function saveAI(){
   set('nt_apikey', document.getElementById('aiKey').value.trim());
   set('nt_aimodel', document.getElementById('aiModel').value);
@@ -1429,13 +1573,13 @@ function saveAI(){
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
 function copySyncUrl(){ const u=location.origin+location.pathname; if(navigator.clipboard){ navigator.clipboard.writeText(u).then(()=>toast('Sync URL copied'),()=>toast(u)); } else toast(u); }
 function exportData(){
-  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
+  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nutritrack-backup-'+dateKey(new Date())+'.json'; a.click();
 }
 function clearAll(){
   if(!confirm('Erase all logged food, water, activity, weight, recipes and goals on this device? Your API key is kept. This cannot be undone.')) return;
-  ['nt_log','nt_goals','nt_microgoals','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes'].forEach(k=>localStorage.removeItem(k));
+  ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes'].forEach(k=>localStorage.removeItem(k));
   render(); loadMoreForm(); toast('Data erased');
 }
 
