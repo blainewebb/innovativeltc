@@ -1791,11 +1791,16 @@ if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.
 recordSync();
 handleImport();
 render();
-/* iOS Safari (and Chrome) often restore this page from their back-forward
-   cache when a Shortcut re-opens the URL in an already-open tab, which skips
-   the script run above — so a fresh ?weight=… never imports. Re-run the
-   import and repaint whenever the page is shown from cache. */
-window.addEventListener('pageshow', e=>{ if(e.persisted){ recordSync(); handleImport(); render(); } });
+/* iOS Chrome/Safari often flip back to a frozen (back-forward-cache) copy of
+   an already-open tab when a Shortcut re-opens the URL — showing a stale
+   render and skipping the script run above, so a fresh ?weight=… never
+   imports. If the restored page carries sync params, force a REAL reload so
+   the current app actually runs the import; otherwise just repaint. */
+window.addEventListener('pageshow', e=>{
+  if(!e.persisted) return;
+  if(location.search.length>1){ location.reload(); return; }
+  recordSync(); handleImport(); render();
+});
 </script>
 </body>
 </html>
