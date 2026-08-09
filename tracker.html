@@ -1396,8 +1396,12 @@ function userHeightM(){
 function bmiSeries(){
   const w=get('nt_weight',{}), bmi=get('nt_bmi',{}), unit=get('nt_weightunit','lb');
   const m=userHeightM(); const out={};
-  Object.keys(bmi).forEach(k=>{ if(bmi[k]!=null) out[k]=bmi[k]; });
-  if(m){ Object.keys(w).forEach(k=>{ if(out[k]==null && w[k]!=null){ const kg=(unit==='kg')?w[k]:w[k]*0.453592; out[k]=kg/(m*m); } }); }
+  // With height known, BMI always tracks weight (stays consistent with the
+  // displayed weight, and ignores any stale one-off logged value like an old
+  // manual test entry).
+  if(m){ Object.keys(w).forEach(k=>{ if(w[k]!=null){ const kg=(unit==='kg')?w[k]:w[k]*0.453592; out[k]=kg/(m*m); } }); }
+  // Fall back to a logged/synced BMI only for dates we couldn't compute.
+  Object.keys(bmi).forEach(k=>{ if(out[k]==null && bmi[k]!=null) out[k]=bmi[k]; });
   return out;
 }
 function renderBodyStats(){
@@ -1722,12 +1726,13 @@ function saveGoals(){
 function planRateVis(){ document.getElementById('plRateWrap').style.display = document.getElementById('plGoal').value==='maintain'?'none':'grid'; }
 function loadPlanner(){
   const p=get('nt_planner',{});
-  const wLatest=(()=>{ const w=get('nt_weight',{}); const k=Object.keys(w).sort(); return k.length?w[k[k.length-1]]:''; })();
+  const wLatest=(()=>{ const w=get('nt_weight',{}); const k=Object.keys(w).sort(); return k.length?Math.round(w[k[k.length-1]]*10)/10:''; })();
   document.getElementById('plSex').value=p.sex||'male';
   document.getElementById('plAge').value=p.age||'';
   document.getElementById('plHeight').value=p.height||'';
   document.getElementById('plHUnit').value=p.hUnit||'in';
-  document.getElementById('plWeight').value=p.weight!=null&&p.weight!==''?p.weight:(wLatest||'');
+  // Prefer the latest synced weigh-in so the planner stays current automatically.
+  document.getElementById('plWeight').value=(wLatest!==''&&wLatest!=null)?wLatest:(p.weight||'');
   document.getElementById('plWUnit').value=p.wUnit||get('nt_weightunit','lb');
   document.getElementById('plAct').value=p.act||'1.55';
   document.getElementById('plGoal').value=p.goal||'lose';
