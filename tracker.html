@@ -725,18 +725,22 @@ function dayBurned(){ const d=dayData(); const ex=(d.exercise||[]).reduce((s,e)=
    Health, where Garmin data lands). Idempotent; writes to ?date or today. */
 function handleImport(){
   const p=new URLSearchParams(location.search);
-  if(![...p.keys()].some(k=>['steps','burn','weight','bodyfat','bmi'].includes(k))) return;
+  /* A param only counts if it carries a real value. A truncated/stale URL
+     like "?steps=" (empty) must NOT import — otherwise it clobbers today's
+     real data with 0 and shows a bogus "Synced: 0 steps". */
+  const has=k=>{ const v=p.get(k); return v!=null && v.trim()!==''; };
+  if(!['steps','burn','weight','bodyfat','bmi'].some(has)) return;
   let target=new Date(); const ds=p.get('date');
   if(ds && /^\d{4}-\d{2}-\d{2}$/.test(ds)){ const a=ds.split('-').map(Number); target=new Date(a[0],a[1]-1,a[2]); }
   const saved=currentDate; currentDate=target;
   const dk=dateKey(target); const d=dayData(); const changed=[];
-  if(p.has('steps')){ d.steps=Math.max(0,parseInt(p.get('steps'))||0); changed.push(d.steps.toLocaleString()+' steps'); }
-  if(p.has('burn')){ d.importKcal=Math.max(0,Math.round(parseFloat(p.get('burn'))||0)); changed.push(d.importKcal+' kcal'); }
+  if(has('steps')){ d.steps=Math.max(0,parseInt(p.get('steps'))||0); changed.push(d.steps.toLocaleString()+' steps'); }
+  if(has('burn')){ d.importKcal=Math.max(0,Math.round(parseFloat(p.get('burn'))||0)); changed.push(d.importKcal+' kcal'); }
   setDayData(d); currentDate=saved;
   if(p.get('unit')==='lb'||p.get('unit')==='kg') set('nt_weightunit',p.get('unit'));
-  if(p.has('weight')){ const v=parseFloat(p.get('weight')); if(!isNaN(v)){ const w=get('nt_weight',{}); w[dk]=v; set('nt_weight',w); changed.push(v+' '+get('nt_weightunit','lb')); } }
-  if(p.has('bodyfat')){ let v=parseFloat(p.get('bodyfat')); if(!isNaN(v)){ if(v>0&&v<=1) v=v*100; v=Math.round(v*10)/10; const b=get('nt_bodyfat',{}); b[dk]=v; set('nt_bodyfat',b); changed.push(v+'% fat'); } }
-  if(p.has('bmi')){ const v=parseFloat(p.get('bmi')); if(!isNaN(v)){ const b=get('nt_bmi',{}); b[dk]=v; set('nt_bmi',b); changed.push('BMI '+v); } }
+  if(has('weight')){ const v=parseFloat(p.get('weight')); if(!isNaN(v)){ const w=get('nt_weight',{}); w[dk]=v; set('nt_weight',w); changed.push(v+' '+get('nt_weightunit','lb')); } }
+  if(has('bodyfat')){ let v=parseFloat(p.get('bodyfat')); if(!isNaN(v)){ if(v>0&&v<=1) v=v*100; v=Math.round(v*10)/10; const b=get('nt_bodyfat',{}); b[dk]=v; set('nt_bodyfat',b); changed.push(v+'% fat'); } }
+  if(has('bmi')){ const v=parseFloat(p.get('bmi')); if(!isNaN(v)){ const b=get('nt_bmi',{}); b[dk]=v; set('nt_bmi',b); changed.push('BMI '+v); } }
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   if(changed.length) setTimeout(()=>toast('⌚ Synced: '+changed.join(' · ')),400);
 }
