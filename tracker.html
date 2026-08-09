@@ -111,6 +111,17 @@
   .micro .mbar>span.over{background:var(--warn);}
   .chart-box{position:relative; height:240px;}
 
+  /* ---------- Daily Dozen ---------- */
+  .dz-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);}
+  .dz-row:last-child{border-bottom:none;}
+  .dz-row.done .dz-name{color:var(--success);}
+  .dz-name{font-size:.9rem; font-weight:600; display:flex; align-items:center; gap:8px; min-width:0;}
+  .dz-emoji{font-size:1.05rem;}
+  .dz-t{color:var(--muted); font-weight:600; font-size:.76rem; margin-left:2px;}
+  .dz-dots{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+  .dz-dot{width:24px; height:24px; border-radius:50%; border:2px solid var(--line); background:var(--card); flex:0 0 auto;}
+  .dz-dot.on{background:var(--success); border-color:var(--success); box-shadow:inset 0 0 0 3px #fff;}
+
   /* ---------- Floating add ---------- */
   .fab{
     position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:25;
@@ -286,6 +297,16 @@
     </div>
 
     <div id="mealsContainer"></div>
+
+    <div class="card" id="dozenCard">
+      <div class="water-head" style="margin-bottom:10px;">
+        <div class="t" style="font-weight:700; display:flex; align-items:center; gap:8px;">🥦 Daily Dozen</div>
+        <div class="c" style="color:var(--muted); font-size:.85rem; font-weight:600;"><span id="dozenCount">0</span> / 12 complete</div>
+      </div>
+      <div class="bar" style="margin-bottom:14px;"><span id="dozenBar" style="background:var(--success); width:0%"></span></div>
+      <div id="dozenRows"></div>
+      <div class="hint" style="margin-top:12px;">Dr. Greger's Daily Dozen — tap a circle for each serving. A category counts as done when its circles are filled. Tracked separately from your food log.</div>
+    </div>
 
     <div class="card">
       <h3>Micronutrients</h3>
@@ -584,6 +605,21 @@ const NUTRIENTS = [
 ];
 const NUT_BY_KEY = Object.fromEntries(NUTRIENTS.map(n => [n[0], {key:n[0],label:n[1],unit:n[2],dv:n[3],gToUnit:n[4],group:n[5]}]));
 const MEALS = [{id:'Breakfast',emoji:'🌅'},{id:'Lunch',emoji:'🥪'},{id:'Dinner',emoji:'🍽️'},{id:'Snack',emoji:'🍎'}];
+/* Dr. Greger's Daily Dozen — categories with their recommended daily servings. */
+const DOZEN = [
+  {key:'beans',       emoji:'🫘', label:'Beans',            target:3},
+  {key:'berries',     emoji:'🫐', label:'Berries',          target:1},
+  {key:'fruits',      emoji:'🍎', label:'Other Fruits',     target:3},
+  {key:'cruciferous', emoji:'🥦', label:'Cruciferous Veg',  target:1},
+  {key:'greens',      emoji:'🥬', label:'Greens',           target:2},
+  {key:'veg',         emoji:'🥕', label:'Other Veg',        target:2},
+  {key:'flax',        emoji:'🌱', label:'Flaxseeds',        target:1},
+  {key:'nuts',        emoji:'🥜', label:'Nuts & Seeds',     target:1},
+  {key:'spices',      emoji:'🧂', label:'Herbs & Spices',   target:1},
+  {key:'grains',      emoji:'🌾', label:'Whole Grains',     target:3},
+  {key:'beverages',   emoji:'🥤', label:'Beverages',        target:5},
+  {key:'exercise',    emoji:'🏃', label:'Exercise',         target:1},
+];
 
 /* ---------- State ---------- */
 let currentDate = new Date();
@@ -605,7 +641,7 @@ function set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 function loadLog(){ return get('nt_log', {}); }
 function saveLog(l){ set('nt_log', l); }
 function loadGoals(){ return Object.assign({cal:2000,pro:150,carb:250,fat:65,water:8}, get('nt_goals',{})); }
-function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[], importKcal:d.importKcal}; }
+function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[], importKcal:d.importKcal, dozen:d.dozen||{}}; }
 function setDayData(d){ const l=loadLog(); l[dateKey(currentDate)]=d; saveLog(l); }
 function dayEntries(){ return dayData().entries || []; }
 /* Effective Daily Value target for a nutrient — user override or standard. */
@@ -690,7 +726,27 @@ function render(){
   renderWater(goals);
   renderActivity();
   renderMeals(entries);
+  renderDozen();
   renderMicros(t);
+}
+function renderDozen(){
+  const dz = dayData().dozen || {}; let done=0;
+  const rows = DOZEN.map(it=>{
+    const c = Math.min(dz[it.key]||0, it.target); const complete = c>=it.target; if(complete) done++;
+    const dots = Array.from({length:it.target}, (_,i)=>
+      `<button class="dz-dot${i<c?' on':''}" onclick="tapDozen('${it.key}',${i})" aria-label="${it.label} serving ${i+1}"></button>`).join('');
+    return `<div class="dz-row${complete?' done':''}">
+      <div class="dz-name"><span class="dz-emoji">${it.emoji}</span>${it.label}<span class="dz-t">${c}/${it.target}</span></div>
+      <div class="dz-dots">${dots}</div></div>`;
+  }).join('');
+  document.getElementById('dozenCount').textContent = done;
+  document.getElementById('dozenBar').style.width = (done/DOZEN.length*100)+'%';
+  document.getElementById('dozenRows').innerHTML = rows;
+}
+function tapDozen(key,i){
+  const d=dayData(); d.dozen=d.dozen||{}; const cur=d.dozen[key]||0;
+  d.dozen[key] = (cur===i+1) ? i : i+1;   // tap the last-filled dot to clear it
+  setDayData(d); renderDozen();
 }
 function setMacro(id,val,goal){
   val=val||0;
