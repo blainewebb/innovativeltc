@@ -360,6 +360,11 @@
       <h3>Body Fat %</h3>
       <div class="chart-box"><canvas id="bodyfatChart"></canvas></div>
     </div>
+    <div class="card" id="bmiCard" style="display:none;">
+      <h3>BMI</h3>
+      <div class="hint" id="bmiHint"></div>
+      <div class="chart-box"><canvas id="bmiChart"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -707,7 +712,7 @@ let manualPhotoData = null;
 let scanner = null, scanning = false;
 let deferredInstall = null;
 let editingRecipe = null;     // recipe object being built/edited
-let calChart, macroChart, weightChart, stepsChart, bodyfatChart;
+let calChart, macroChart, weightChart, stepsChart, bodyfatChart, bmiChart;
 const STEP_KCAL = 0.04;       // rough kcal burned per step
 
 /* ---------- Storage ---------- */
@@ -1380,8 +1385,24 @@ function renderTrends(){
 
   renderBodyStats();
 }
+/* Height (in metres) from the Calorie Planner, used to auto-compute BMI. */
+function userHeightM(){
+  const p=get('nt_planner',{}); const h=parseFloat(p.height);
+  if(!h||isNaN(h)) return null;
+  return (p.hUnit==='cm') ? h/100 : h*0.0254;   // planner stores in or cm
+}
+/* BMI per date: use a logged/synced BMI if present, otherwise compute it from
+   that day's weight + the user's height (BMI = kg / m²). */
+function bmiSeries(){
+  const w=get('nt_weight',{}), bmi=get('nt_bmi',{}), unit=get('nt_weightunit','lb');
+  const m=userHeightM(); const out={};
+  Object.keys(bmi).forEach(k=>{ if(bmi[k]!=null) out[k]=bmi[k]; });
+  if(m){ Object.keys(w).forEach(k=>{ if(out[k]==null && w[k]!=null){ const kg=(unit==='kg')?w[k]:w[k]*0.453592; out[k]=kg/(m*m); } }); }
+  return out;
+}
 function renderBodyStats(){
-  const w=get('nt_weight',{}), bf=get('nt_bodyfat',{}), bmi=get('nt_bmi',{}), unit=get('nt_weightunit','lb');
+  const w=get('nt_weight',{}), bf=get('nt_bodyfat',{}), unit=get('nt_weightunit','lb');
+  const bmi=bmiSeries();
   const r1=x=>x==null?null:Math.round(x*10)/10;   // show at most one decimal
   const latest=obj=>{ const k=Object.keys(obj).sort(); return k.length? obj[k[k.length-1]] : null; };
   const lw=r1(latest(w)), lf=r1(latest(bf)), lb=r1(latest(bmi));
@@ -1392,6 +1413,25 @@ function renderBodyStats(){
     tile('BMI', lb!=null?lb:'—', '');
   drawWeightChart();
   drawBodyFatChart();
+  drawBmiChart();
+}
+function drawBmiChart(){
+  const bmi=bmiSeries(); const keys=Object.keys(bmi).sort();
+  const card=document.getElementById('bmiCard'), hint=document.getElementById('bmiHint');
+  if(!keys.length){
+    card.style.display = userHeightM()? 'none' : 'block';
+    if(!userHeightM()) hint.innerHTML='➕ Add your height in the <b>Calorie Planner</b> (More → Plan my calories) and BMI will calculate automatically from your weight.';
+    if(bmiChart){ bmiChart.destroy(); bmiChart=null; }
+    return;
+  }
+  card.style.display='block';
+  hint.textContent = get('nt_bmi',{}) && Object.keys(get('nt_bmi',{})).length ? '' : 'Auto-calculated from your weight and height.';
+  if(typeof Chart==='undefined') return;
+  const ctx=document.getElementById('bmiChart'); if(bmiChart) bmiChart.destroy();
+  const labels=keys.map(k=>{ const p=k.split('-'); return p[1]+'/'+p[2]; });
+  bmiChart=new Chart(ctx,{ type:'line',
+    data:{ labels, datasets:[{ label:'BMI', data:keys.map(k=>Math.round(bmi[k]*10)/10), borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,.12)', fill:true, tension:.25, pointRadius:3 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} } });
 }
 function drawBodyFatChart(){
   const bf=get('nt_bodyfat',{}); const keys=Object.keys(bf).sort();
