@@ -755,7 +755,7 @@ function handleImport(){
   if(has('burn')){ d.importKcal=Math.max(0,Math.round(parseFloat(p.get('burn'))||0)); changed.push(d.importKcal+' kcal'); }
   setDayData(d); currentDate=saved;
   if(p.get('unit')==='lb'||p.get('unit')==='kg') set('nt_weightunit',p.get('unit'));
-  if(has('weight')){ const v=parseFloat(p.get('weight')); if(!isNaN(v)){ const w=get('nt_weight',{}); w[dk]=v; set('nt_weight',w); changed.push(v+' '+get('nt_weightunit','lb')); } }
+  if(has('weight')){ let v=parseFloat(p.get('weight')); if(!isNaN(v)){ v=Math.round(v*10)/10; const w=get('nt_weight',{}); w[dk]=v; set('nt_weight',w); changed.push(v+' '+get('nt_weightunit','lb')); } }
   if(has('bodyfat')){ let v=parseFloat(p.get('bodyfat')); if(!isNaN(v)){ if(v>0&&v<=1) v=v*100; v=Math.round(v*10)/10; const b=get('nt_bodyfat',{}); b[dk]=v; set('nt_bodyfat',b); changed.push(v+'% fat'); } }
   if(has('bmi')){ const v=parseFloat(p.get('bmi')); if(!isNaN(v)){ const b=get('nt_bmi',{}); b[dk]=v; set('nt_bmi',b); changed.push('BMI '+v); } }
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
@@ -1382,8 +1382,9 @@ function renderTrends(){
 }
 function renderBodyStats(){
   const w=get('nt_weight',{}), bf=get('nt_bodyfat',{}), bmi=get('nt_bmi',{}), unit=get('nt_weightunit','lb');
+  const r1=x=>x==null?null:Math.round(x*10)/10;   // show at most one decimal
   const latest=obj=>{ const k=Object.keys(obj).sort(); return k.length? obj[k[k.length-1]] : null; };
-  const lw=latest(w), lf=latest(bf), lb=latest(bmi);
+  const lw=r1(latest(w)), lf=r1(latest(bf)), lb=r1(latest(bmi));
   const tile=(label,val,sub)=> `<div class="stat-tile"><div class="st-l">${label}</div><div class="st-v">${val}</div><div class="st-s">${sub||''}</div></div>`;
   document.getElementById('bodyTiles').innerHTML =
     tile('Weight', lw!=null?lw:'—', lw!=null?unit:'') +
@@ -1463,8 +1464,8 @@ function saveWeight(){
   if(isNaN(v)&&isNaN(fat)&&isNaN(bmiv)){ closeWeight(); return; }
   const unit=document.getElementById('wUnit').value; const date=document.getElementById('wDate').value||dateKey(new Date());
   set('nt_weightunit', unit);
-  if(!isNaN(v)){ const w=get('nt_weight',{}); w[date]=v; set('nt_weight',w); }
-  if(!isNaN(fat)){ const b=get('nt_bodyfat',{}); b[date]=fat; set('nt_bodyfat',b); }
+  if(!isNaN(v)){ const w=get('nt_weight',{}); w[date]=Math.round(v*10)/10; set('nt_weight',w); }
+  if(!isNaN(fat)){ const b=get('nt_bodyfat',{}); b[date]=Math.round(fat*10)/10; set('nt_bodyfat',b); }
   if(!isNaN(bmiv)){ const b=get('nt_bmi',{}); b[date]=bmiv; set('nt_bmi',b); }
   closeWeight(); if(currentView==='trends') renderTrends();
 }
