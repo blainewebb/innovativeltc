@@ -457,7 +457,8 @@
       </div>
       <div class="field"><label id="aiKeyLabel">API key</label><input id="aiKey" type="password" placeholder="..." autocomplete="off"></div>
       <div class="field"><label>Model</label><select id="aiModel"></select></div>
-      <div class="hint" id="aiKeyHelp" style="margin-top:-4px;"></div>
+      <button class="ghost-btn" id="loadModelsBtn" style="display:none; margin-top:2px;" onclick="loadGeminiModels()">🔄 Load models available to my key</button>
+      <div class="hint" id="aiKeyHelp" style="margin-top:6px;"></div>
       <button class="primary-btn" onclick="saveAI()">Save AI Settings</button>
       <div class="hint" style="margin-top:10px;">⚠︎ Don't share this page with your key in it — each person enters their own key in their own browser.</div>
     </div>
@@ -1063,9 +1064,9 @@ async function doSearch(){
    are called directly from the browser and return structured JSON. */
 const AI_MODELS = {
   claude: [['claude-opus-5','Claude Opus 5 — most capable'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-haiku-4-5','Claude Haiku 4.5 — fastest / cheapest']],
-  gemini: [['gemini-2.5-flash','Gemini 2.5 Flash — fast, free-tier'],['gemini-2.5-pro','Gemini 2.5 Pro — most capable'],['gemini-2.0-flash','Gemini 2.0 Flash — widely available']]
+  gemini: [['gemini-flash-latest','Gemini Flash (latest) — recommended'],['gemini-flash-lite-latest','Gemini Flash-Lite (latest) — fastest'],['gemini-pro-latest','Gemini Pro (latest) — most capable']]
 };
-const AI_DEFAULT_MODEL = { claude:'claude-opus-5', gemini:'gemini-2.5-flash' };
+const AI_DEFAULT_MODEL = { claude:'claude-opus-5', gemini:'gemini-flash-latest' };
 function aiProvider(){ return get('nt_aiprovider','claude'); }
 function aiKeyFor(p){ return get(p==='gemini'?'nt_geminikey':'nt_apikey',''); }
 function aiModelFor(p){ return get(p==='gemini'?'nt_geminimodel':'nt_aimodel', AI_DEFAULT_MODEL[p]); }
@@ -1609,12 +1610,42 @@ function updateAiProviderUI(){
   document.getElementById('aiKeyLabel').textContent = p==='gemini'?'Google Gemini API key':'Anthropic API key';
   document.getElementById('aiKey').placeholder = p==='gemini'?'AIza…':'sk-ant-…';
   const sel=document.getElementById('aiModel');
-  sel.innerHTML = AI_MODELS[p].map(m=>`<option value="${m[0]}">${m[1]}</option>`).join('');
+  const opts=AI_MODELS[p].slice();
+  const saved=aiModelFor(p);
+  // Keep a previously-saved custom/loaded model selectable even if it isn't in the built-in list.
+  if(saved && !opts.some(m=>m[0]===saved)) opts.unshift([saved, saved]);
+  sel.innerHTML = opts.map(m=>`<option value="${m[0]}">${m[1]}</option>`).join('');
   document.getElementById('aiKey').value = aiKeyFor(p);
-  sel.value = aiModelFor(p);
+  sel.value = saved || AI_DEFAULT_MODEL[p];
+  document.getElementById('loadModelsBtn').style.display = p==='gemini'?'block':'none';
   document.getElementById('aiKeyHelp').innerHTML = p==='gemini'
-    ? 'Free key at <b>aistudio.google.com</b> → Get API key (free tier, no billing).'
+    ? 'Free key at <b>aistudio.google.com</b>. Model names change often — tap “Load models” to pick one your key supports, then Save.'
     : 'Key at <b>console.anthropic.com</b> → pay-as-you-go (add a little credit).';
+}
+/* Ask Google which models THIS key can actually use (names change over time),
+   and fill the dropdown with those that support generateContent. */
+async function loadGeminiModels(){
+  const help=document.getElementById('aiKeyHelp');
+  const key=document.getElementById('aiKey').value.trim() || aiKeyFor('gemini');
+  if(!key){ help.textContent='Enter your Gemini key above first, then load models.'; return; }
+  help.textContent='Loading models available to your key…';
+  try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1000`);
+    const data=await res.json();
+    if(!res.ok) throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
+    const models=(data.models||[])
+      .filter(m=>Array.isArray(m.supportedGenerationMethods)&&m.supportedGenerationMethods.includes('generateContent'))
+      .map(m=>m.name.replace(/^models\//,''))
+      .filter(n=>/gemini/i.test(n) && !/embedding|aqa|image|vision-legacy/i.test(n));
+    if(!models.length){ help.textContent='No usable text models returned for this key.'; return; }
+    const sel=document.getElementById('aiModel'); const cur=sel.value;
+    sel.innerHTML=models.map(n=>`<option value="${n}">${n}</option>`).join('');
+    const pref=models.find(n=>/flash-latest/i.test(n))
+      || models.find(n=>/flash/i.test(n)&&!/lite/i.test(n))
+      || models.find(n=>/flash/i.test(n)) || models[0];
+    sel.value = models.includes(cur)?cur:pref;
+    help.innerHTML='✅ Loaded '+models.length+' models. Pick one (Flash is a good default) and tap <b>Save AI Settings</b>.';
+  }catch(e){ help.textContent='Couldn\'t load models: '+(e.message||e); }
 }
 function renderMicroGoalFields(){
   const over=get('nt_microgoals',{});
