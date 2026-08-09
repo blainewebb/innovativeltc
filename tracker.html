@@ -240,6 +240,7 @@
       <div class="cal-lines">
         <div class="cal-row"><span class="k">Goal</span><span class="v" id="calGoal">2000</span></div>
         <div class="cal-row"><span class="k">Food</span><span class="v" id="calFood">0</span></div>
+        <div class="cal-row"><span class="k">Exercise</span><span class="v" id="calBurn" style="color:var(--success)">0</span></div>
         <div class="cal-row"><span class="k">Remaining</span><span class="v" id="calRemain2" style="color:var(--success)">2000</span></div>
       </div>
     </div>
@@ -264,6 +265,25 @@
       </div>
     </div>
 
+    <div class="card" id="activityCard">
+      <div class="water-head" style="margin-bottom:12px;">
+        <div class="t" style="font-weight:700; display:flex; align-items:center; gap:8px;">🏃 Activity</div>
+        <div class="c" style="color:var(--muted); font-size:.85rem; font-weight:600;"><span id="burnTotal">0</span> kcal burned</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block; font-weight:600; font-size:.82rem; margin-bottom:6px;">👟 Steps today</label>
+          <input id="stepInput" type="number" inputmode="numeric" placeholder="0" style="width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:12px; outline:none;" oninput="setSteps(this.value)">
+        </div>
+        <div style="text-align:right; min-width:96px;">
+          <div style="font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;">≈ Burn</div>
+          <div id="stepKcal" style="font-weight:800; font-size:1.15rem; color:var(--success);">0</div>
+        </div>
+      </div>
+      <div id="exerciseList"></div>
+      <button class="addbtn-sm" style="text-align:center; width:100%;" onclick="openExercise()">＋ Add exercise</button>
+    </div>
+
     <div id="mealsContainer"></div>
 
     <div class="card">
@@ -286,6 +306,11 @@
     <div class="card">
       <h3>Macros — last 7 days (calories from each)</h3>
       <div class="chart-box"><canvas id="macroChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Steps — last 14 days</h3>
+      <div class="hint">Manually logged steps. The line marks a 10,000-step goal.</div>
+      <div class="chart-box"><canvas id="stepsChart"></canvas></div>
     </div>
     <div class="card">
       <div class="water-head" style="margin-bottom:6px;">
@@ -326,6 +351,14 @@
         <div class="field"><label>Water (cups)</label><input id="gWater" type="number" inputmode="decimal"></div>
       </div>
       <button class="primary-btn" onclick="saveGoals()">Save Goals</button>
+    </div>
+
+    <div class="card">
+      <h3>🎯 Custom Nutrient Goals</h3>
+      <div class="hint">Override the default Daily Value targets used for fiber, sodium, vitamins and minerals. Blank = use the standard reference value.</div>
+      <div id="microGoalFields"></div>
+      <button class="primary-btn" onclick="saveMicroGoals()">Save Nutrient Goals</button>
+      <button class="ghost-btn" onclick="resetMicroGoals()">Reset to defaults</button>
     </div>
 
     <div class="card">
@@ -445,6 +478,35 @@
   </div>
 </div>
 
+<!-- ============ EXERCISE SHEET ============ -->
+<div class="overlay" id="exerciseOverlay">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Add Exercise</h2><button class="x" onclick="closeExercise()">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Activity</label>
+        <select id="exType" onchange="estimateExercise()">
+          <option value="Walking" data-k="4">🚶 Walking</option>
+          <option value="Running" data-k="10">🏃 Running</option>
+          <option value="Cycling" data-k="8">🚴 Cycling</option>
+          <option value="Swimming" data-k="9">🏊 Swimming</option>
+          <option value="Strength training" data-k="6">🏋️ Strength training</option>
+          <option value="HIIT" data-k="12">🔥 HIIT</option>
+          <option value="Elliptical" data-k="7">Elliptical</option>
+          <option value="Yoga" data-k="3">🧘 Yoga</option>
+          <option value="Sports" data-k="8">⚽ Sports</option>
+          <option value="Other" data-k="5">Other</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Duration (min)</label><input id="exMin" type="number" inputmode="numeric" placeholder="30" oninput="estimateExercise()"></div>
+        <div class="field"><label>Calories burned</label><input id="exCal" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div class="hint" style="margin-top:-6px;">Calories are estimated from the activity and duration — edit if you have an exact figure from a watch.</div>
+      <button class="primary-btn" onclick="saveExercise()">Add Exercise</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ WEIGHT SHEET ============ -->
 <div class="overlay" id="weightOverlay">
   <div class="sheet">
@@ -511,7 +573,8 @@ let manualPhotoData = null;
 let scanner = null, scanning = false;
 let deferredInstall = null;
 let editingRecipe = null;     // recipe object being built/edited
-let calChart, macroChart, weightChart;
+let calChart, macroChart, weightChart, stepsChart;
+const STEP_KCAL = 0.04;       // rough kcal burned per step
 
 /* ---------- Storage ---------- */
 function dateKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -520,9 +583,13 @@ function set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 function loadLog(){ return get('nt_log', {}); }
 function saveLog(l){ set('nt_log', l); }
 function loadGoals(){ return Object.assign({cal:2000,pro:150,carb:250,fat:65,water:8}, get('nt_goals',{})); }
-function dayData(){ const l=loadLog(); return l[dateKey(currentDate)] || {entries:[], water:0}; }
+function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[]}; }
 function setDayData(d){ const l=loadLog(); l[dateKey(currentDate)]=d; saveLog(l); }
 function dayEntries(){ return dayData().entries || []; }
+/* Effective Daily Value target for a nutrient — user override or standard. */
+function dvFor(key){ const o=get('nt_microgoals',{})[key]; return (o!=null && !isNaN(o) && o>0) ? o : NUT_BY_KEY[key].dv; }
+/* Calories burned today = logged exercise + estimated from steps. */
+function dayBurned(){ const d=dayData(); const ex=(d.exercise||[]).reduce((s,e)=>s+(e.calories||0),0); return ex + Math.round((d.steps||0)*STEP_KCAL); }
 
 /* ---------- Nav ---------- */
 function go(view){
@@ -561,23 +628,27 @@ function render(){
   const t = totalsFor(entries);
 
   const food = Math.round(t['energy-kcal']||0);
-  const remain = goals.cal - food;
+  const burned = dayBurned();
+  const remain = goals.cal - food + burned;
   document.getElementById('calGoal').textContent = goals.cal.toLocaleString();
   document.getElementById('calFood').textContent = food.toLocaleString();
+  document.getElementById('calBurn').textContent = (burned?'+':'') + burned.toLocaleString();
   document.getElementById('calRemain2').textContent = remain.toLocaleString();
   document.getElementById('calRemain2').style.color = remain<0?'var(--danger)':'var(--success)';
   document.getElementById('calRemain').textContent = Math.abs(remain).toLocaleString();
   document.getElementById('calSubLabel').textContent = remain<0?'over':'remaining';
-  const pct = Math.min(1, food/(goals.cal||1)), C = 2*Math.PI*58;
+  const budget = goals.cal + burned;
+  const pct = Math.min(1, food/(budget||1)), C = 2*Math.PI*58;
   const fg = document.getElementById('ringFg');
   fg.setAttribute('stroke-dashoffset', (C*(1-pct)).toFixed(1));
-  fg.setAttribute('stroke', food>goals.cal?'var(--danger)':'var(--primary)');
+  fg.setAttribute('stroke', food>budget?'var(--danger)':'var(--primary)');
 
   setMacro('p', t['proteins'], goals.pro);
   setMacro('c', t['carbohydrates'], goals.carb);
   setMacro('f', t['fat'], goals.fat);
 
   renderWater(goals);
+  renderActivity();
   renderMeals(entries);
   renderMicros(t);
 }
@@ -600,6 +671,64 @@ function renderWater(goals){
 function addWater(n){
   const d = dayData(); d.water = Math.max(0, (d.water||0)+n); setDayData(d); renderWater(loadGoals());
 }
+
+/* ---------- Activity: steps + exercise ---------- */
+function renderActivity(){
+  const d = dayData();
+  document.getElementById('stepInput').value = d.steps ? d.steps : '';
+  document.getElementById('stepKcal').textContent = Math.round((d.steps||0)*STEP_KCAL);
+  document.getElementById('burnTotal').textContent = dayBurned();
+  const list = document.getElementById('exerciseList');
+  const ex = d.exercise||[];
+  if(!ex.length){ list.innerHTML = `<div class="empty" style="padding:8px 0;">No workouts logged yet</div>`; return; }
+  list.innerHTML = ex.map(e=>`
+    <div class="ing-row">
+      <div class="in">${esc(e.name)} <span class="muted">· ${e.minutes||0} min</span></div>
+      <div style="color:var(--success); font-weight:700;">${Math.round(e.calories||0)} kcal</div>
+      <button class="del" onclick="deleteExercise('${e.id}')">🗑</button>
+    </div>`).join('');
+}
+function setSteps(v){
+  const d = dayData(); d.steps = Math.max(0, parseInt(v)||0); setDayData(d);
+  document.getElementById('stepKcal').textContent = Math.round(d.steps*STEP_KCAL);
+  document.getElementById('burnTotal').textContent = dayBurned();
+  refreshCalorieLine();
+}
+function refreshCalorieLine(){
+  const goals=loadGoals(), t=totalsFor(dayEntries()), food=Math.round(t['energy-kcal']||0), burned=dayBurned();
+  const remain=goals.cal-food+burned, budget=goals.cal+burned;
+  document.getElementById('calBurn').textContent=(burned?'+':'')+burned.toLocaleString();
+  document.getElementById('calRemain2').textContent=remain.toLocaleString();
+  document.getElementById('calRemain2').style.color=remain<0?'var(--danger)':'var(--success)';
+  document.getElementById('calRemain').textContent=Math.abs(remain).toLocaleString();
+  document.getElementById('calSubLabel').textContent=remain<0?'over':'remaining';
+  const pct=Math.min(1,food/(budget||1)), C=2*Math.PI*58, fg=document.getElementById('ringFg');
+  fg.setAttribute('stroke-dashoffset',(C*(1-pct)).toFixed(1));
+  fg.setAttribute('stroke', food>budget?'var(--danger)':'var(--primary)');
+}
+function openExercise(){
+  document.getElementById('exType').value='Walking';
+  document.getElementById('exMin').value='30';
+  estimateExercise();
+  document.getElementById('exerciseOverlay').classList.add('open');
+}
+function closeExercise(){ document.getElementById('exerciseOverlay').classList.remove('open'); }
+function estimateExercise(){
+  const sel=document.getElementById('exType');
+  const k=parseFloat(sel.options[sel.selectedIndex].dataset.k)||5;
+  const min=parseFloat(document.getElementById('exMin').value)||0;
+  document.getElementById('exCal').value = Math.round(k*min) || '';
+}
+function saveExercise(){
+  const name=document.getElementById('exType').value;
+  const minutes=parseFloat(document.getElementById('exMin').value)||0;
+  const calories=Math.round(parseFloat(document.getElementById('exCal').value)||0);
+  if(!calories && !minutes){ closeExercise(); return; }
+  const d=dayData(); d.exercise=d.exercise||[];
+  d.exercise.push({ id:'x'+Date.now()+Math.floor(Math.random()*1000), name, minutes, calories });
+  setDayData(d); closeExercise(); render();
+}
+function deleteExercise(id){ const d=dayData(); d.exercise=(d.exercise||[]).filter(e=>e.id!==id); setDayData(d); render(); }
 function renderMeals(entries){
   const cont=document.getElementById('mealsContainer'); cont.innerHTML='';
   MEALS.forEach(m=>{
@@ -630,7 +759,7 @@ function renderMicros(t){
   let html='';
   groups.forEach(([g,label])=>{
     const rows=NUTRIENTS.filter(n=>n[5]===g).map(n=>{
-      const c=NUT_BY_KEY[n[0]], val=t[n[0]]||0, pct=c.dv?val/c.dv*100:0;
+      const c=NUT_BY_KEY[n[0]], val=t[n[0]]||0, dv=dvFor(n[0]), pct=dv?val/dv*100:0;
       return `<div class="micro" style="${val>0?'':'opacity:.45'}">
         <div class="ml">${c.label}</div>
         <div class="mv">${fmtNum(val)} ${c.unit} · ${Math.round(pct)}% DV</div>
@@ -849,7 +978,7 @@ function renderDetail(){
   const macroRows=['saturated-fat','trans-fat','cholesterol','fiber','sugars','sodium'].filter(k=>s[k]!=null)
     .map(k=>`<div class="nrow"><span class="indent">${NUT_BY_KEY[k].label}</span><span>${val(k)} ${NUT_BY_KEY[k].unit}</span></div>`).join('');
   const microRows=NUTRIENTS.filter(n=>(n[5]==='vitamin'||n[5]==='mineral')&&s[n[0]]!=null)
-    .map(n=>`<div class="nrow"><span class="indent">${n[1]}</span><span>${fmtNum(s[n[0]])} ${n[2]} · ${Math.round(s[n[0]]/n[3]*100)}% DV</span></div>`).join('');
+    .map(n=>`<div class="nrow"><span class="indent">${n[1]}</span><span>${fmtNum(s[n[0]])} ${n[2]} · ${Math.round(s[n[0]]/dvFor(n[0])*100)}% DV</span></div>`).join('');
   const mealSel = addTarget==='diary' ? `
     <div class="field" style="margin-top:16px"><label>Meal</label>
       <select id="detailMeal" onchange="addMeal=this.value">${MEALS.map(m=>`<option ${m.id===addMeal?'selected':''}>${m.id}</option>`).join('')}</select></div>` : '';
@@ -897,11 +1026,15 @@ function deleteEntry(id){ const d=dayData(); d.entries=(d.entries||[]).filter(e=
    ========================================================================= */
 function lastNDates(n){ const out=[]; const d=new Date(); for(let i=n-1;i>=0;i--){ const x=new Date(d); x.setDate(d.getDate()-i); out.push(x); } return out; }
 function renderTrends(){
+  if(typeof Chart==='undefined'){ document.getElementById('weightHint').textContent='Charts load from the internet on first visit — reconnect and reopen to see them.'; return; }
   const goals=loadGoals(), log=loadLog();
   const days14=lastNDates(14);
   const calData=days14.map(d=>{ const e=(log[dateKey(d)]||{}).entries||[]; return Math.round(totalsFor(e)['energy-kcal']||0); });
   const labels14=days14.map(d=>d.toLocaleDateString(undefined,{month:'numeric',day:'numeric'}));
   drawCalChart(labels14, calData, goals.cal);
+
+  const stepData=days14.map(d=>{ return (log[dateKey(d)]||{}).steps||0; });
+  drawStepsChart(labels14, stepData);
 
   const days7=lastNDates(7);
   const labels7=days7.map(d=>d.toLocaleDateString(undefined,{weekday:'short'}));
@@ -918,6 +1051,15 @@ function drawCalChart(labels, data, goal){
     data:{ labels, datasets:[
       { type:'line', label:'Goal', data:labels.map(()=>goal), borderColor:'#94a3b8', borderDash:[6,6], pointRadius:0, borderWidth:2 },
       { label:'Calories', data, backgroundColor:data.map(v=>v>goal?'#ef4444':'#2563eb'), borderRadius:6 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ y:{ beginAtZero:true, ticks:{callback:v=>v.toLocaleString()} } } } });
+}
+function drawStepsChart(labels, data){
+  const ctx=document.getElementById('stepsChart'); if(stepsChart) stepsChart.destroy();
+  stepsChart=new Chart(ctx,{ type:'bar',
+    data:{ labels, datasets:[
+      { type:'line', label:'Goal', data:labels.map(()=>10000), borderColor:'#94a3b8', borderDash:[6,6], pointRadius:0, borderWidth:2 },
+      { label:'Steps', data, backgroundColor:'#10b981', borderRadius:6 } ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
       scales:{ y:{ beginAtZero:true, ticks:{callback:v=>v.toLocaleString()} } } } });
 }
@@ -1081,6 +1223,7 @@ function loadMoreForm(){
   document.getElementById('aiKey').value=get('nt_apikey','');
   document.getElementById('aiModel').value=get('nt_aimodel','claude-opus-5');
   updateKeyBadge();
+  renderMicroGoalFields();
   const btn=document.getElementById('installBtn'), hint=document.getElementById('installHint');
   if(deferredInstall){ btn.style.display='block'; hint.textContent=''; }
   else if(window.matchMedia('(display-mode: standalone)').matches){ btn.style.display='none'; hint.textContent='✅ Installed and running as an app.'; }
@@ -1090,6 +1233,31 @@ function updateKeyBadge(){
   const b=document.getElementById('keyBadge'); const has=!!get('nt_apikey','');
   b.textContent=has?'active':'not set'; b.className='badge-key '+(has?'badge-ok':'badge-no');
 }
+function renderMicroGoalFields(){
+  const over=get('nt_microgoals',{});
+  const groups=[['macro','Fiber, Fats & Sodium'],['vitamin','Vitamins'],['mineral','Minerals']];
+  let html='';
+  groups.forEach(([g,label])=>{
+    html+=`<div class="micro-group">${label}</div>`;
+    NUTRIENTS.filter(n=>n[5]===g).forEach(n=>{
+      const c=NUT_BY_KEY[n[0]]; const cur=over[n[0]];
+      html+=`<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <label style="flex:1; font-size:.86rem; font-weight:600;">${c.label} <span class="muted">(${c.unit})</span></label>
+        <input data-mk="${n[0]}" type="number" inputmode="decimal" placeholder="${c.dv}" value="${cur!=null?cur:''}"
+          style="width:110px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; outline:none; text-align:right;">
+      </div>`;
+    });
+  });
+  document.getElementById('microGoalFields').innerHTML=html;
+}
+function saveMicroGoals(){
+  const over={};
+  document.querySelectorAll('#microGoalFields input[data-mk]').forEach(inp=>{
+    const v=parseFloat(inp.value); if(!isNaN(v)&&v>0) over[inp.dataset.mk]=v;
+  });
+  set('nt_microgoals', over); toast('Nutrient goals saved'); if(currentView==='diary') render();
+}
+function resetMicroGoals(){ localStorage.removeItem('nt_microgoals'); renderMicroGoalFields(); toast('Reset to defaults'); }
 function saveGoals(){
   const n=(id,d)=>parseFloat(document.getElementById(id).value)||d;
   set('nt_goals', { cal:n('gCal',2000), pro:n('gPro',150), carb:n('gCarb',250), fat:n('gFat',65), water:n('gWater',8) });
@@ -1102,13 +1270,13 @@ function saveAI(){
 }
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
 function exportData(){
-  const dump={}; ['nt_log','nt_goals','nt_weight','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
+  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_weight','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nutritrack-backup-'+dateKey(new Date())+'.json'; a.click();
 }
 function clearAll(){
-  if(!confirm('Erase all logged food, water, weight, recipes and goals on this device? Your API key is kept. This cannot be undone.')) return;
-  ['nt_log','nt_goals','nt_weight','nt_weightunit','nt_recipes'].forEach(k=>localStorage.removeItem(k));
+  if(!confirm('Erase all logged food, water, activity, weight, recipes and goals on this device? Your API key is kept. This cannot be undone.')) return;
+  ['nt_log','nt_goals','nt_microgoals','nt_weight','nt_weightunit','nt_recipes'].forEach(k=>localStorage.removeItem(k));
   render(); loadMoreForm(); toast('Data erased');
 }
 
