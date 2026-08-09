@@ -1007,20 +1007,47 @@ function switchTab(name){
 }
 
 /* ---------- Search (Open Food Facts) ---------- */
+const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags';
+/* Fetch JSON with a hard timeout so a hung request can't spin forever. */
+async function offFetch(url){
+  const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort('timeout'),12000);
+  try{
+    const res=await fetch(url,{signal:ctrl.signal, headers:{'Accept':'application/json'}});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  } finally { clearTimeout(to); }
+}
+/* Keep only products we can actually log (name + a per-100g calorie value). */
+function offUsable(list){
+  return (list||[]).filter(p=>p&&p.product_name&&p.nutriments&&
+    (p.nutriments['energy-kcal_100g']!=null||p.nutriments['energy_100g']!=null));
+}
 async function doSearch(){
   const q=document.getElementById('searchInput').value.trim(); if(!q) return;
   const box=document.getElementById('searchResults');
   box.innerHTML=`<div class="loading"><div class="spinner"></div>Searching…</div>`;
+  let prods=[], err=null;
+  // 1) Newer search-a-licious API — faster and CORS-friendly.
   try{
-    const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`+
-      `&search_simple=1&action=process&json=1&page_size=25`+
-      `&fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags`;
-    const res=await fetch(url); const data=await res.json();
-    const prods=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g']!=null);
-    if(!prods.length){ box.innerHTML=`<div class="empty">No matches. Try another term or use the Manual tab.</div>`; return; }
-    window._results=prods;
-    box.innerHTML=prods.map((p,i)=>resultCard(p,i)).join('');
-  }catch(e){ box.innerHTML=`<div class="empty">Couldn't reach the food database. Check your connection, or add it manually.</div>`; }
+    const d=await offFetch(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=30&fields=${OFF_FIELDS}`);
+    prods=offUsable(d.hits);
+  }catch(e){ err=e; }
+  // 2) Fall back to the legacy CGI search if the new one gave nothing.
+  if(!prods.length){
+    try{
+      const d=await offFetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`+
+        `&search_simple=1&action=process&json=1&page_size=30&fields=${OFF_FIELDS}`);
+      prods=offUsable(d.products); err=null;
+    }catch(e){ if(!err) err=e; }
+  }
+  if(!prods.length){
+    box.innerHTML = err
+      ? `<div class="empty">Couldn't reach the food database (${esc(String(err.message||err))}). Check your connection, or add it manually.</div>`
+      : `<div class="empty">No matches for “${esc(q)}”. Try another term (or a brand), or use the Manual tab.</div>`;
+    return;
+  }
+  window._results=prods;
+  box.innerHTML=prods.map((p,i)=>resultCard(p,i)).join('');
 }
 function resultCard(p,i){
   const kcal=Math.round(p.nutriments['energy-kcal_100g']||0);
