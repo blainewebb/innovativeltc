@@ -447,16 +447,17 @@
     </div>
 
     <div class="card">
-      <h3>📷 AI Photo Recognition <span id="keyBadge" class="badge-key badge-no">not set</span></h3>
-      <div class="hint">Snap a plate of food and let Claude estimate the items and nutrition. Uses your own Anthropic API key, stored only in this browser on this device. Get a key at console.anthropic.com.</div>
-      <div class="field"><label>Anthropic API key</label><input id="aiKey" type="password" placeholder="sk-ant-..." autocomplete="off"></div>
-      <div class="field"><label>Model</label>
-        <select id="aiModel">
-          <option value="claude-opus-5">Claude Opus 5 — most capable</option>
-          <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
-          <option value="claude-haiku-4-5">Claude Haiku 4.5 — fastest / cheapest</option>
+      <h3>🤖 AI Lookup & Photo <span id="keyBadge" class="badge-key badge-no">not set</span></h3>
+      <div class="hint">Powers the “Ask AI” food search (restaurant &amp; menu items) and photo recognition. Uses your own API key, stored only in this browser on this device.</div>
+      <div class="field"><label>Provider</label>
+        <select id="aiProvider" onchange="updateAiProviderUI()">
+          <option value="claude">Claude (Anthropic) — needs paid credits</option>
+          <option value="gemini">Google Gemini — free tier available</option>
         </select>
       </div>
+      <div class="field"><label id="aiKeyLabel">API key</label><input id="aiKey" type="password" placeholder="..." autocomplete="off"></div>
+      <div class="field"><label>Model</label><select id="aiModel"></select></div>
+      <div class="hint" id="aiKeyHelp" style="margin-top:-4px;"></div>
       <button class="primary-btn" onclick="saveAI()">Save AI Settings</button>
       <div class="hint" style="margin-top:10px;">⚠︎ Don't share this page with your key in it — each person enters their own key in their own browser.</div>
     </div>
@@ -1040,9 +1041,9 @@ async function doSearch(){
       prods=offUsable(d.products); err=null;
     }catch(e){ if(!err) err=e; }
   }
-  const aiBtn = get('nt_apikey','')
+  const aiBtn = aiConfigured()
     ? `<button class="ghost-btn" style="width:100%;margin:2px 0 12px" onclick="aiFoodSearch()">🤖 Ask AI for “${esc(q)}” — restaurant & menu items</button>`
-    : `<div class="note" style="margin:2px 0 12px">💡 For restaurant items (Lupe Tortilla, Chipotle…), add your Claude key in <b>More → 🤖 AI</b>, then Search again to use “Ask AI”.</div>`;
+    : `<div class="note" style="margin:2px 0 12px">💡 For restaurant items (Lupe Tortilla, Chipotle…), add a Claude or Gemini key in <b>More → 🤖 AI</b>, then Search again to use “Ask AI”.</div>`;
   if(!prods.length){
     box.innerHTML = aiBtn + (err
       ? `<div class="empty">Couldn't reach the packaged-food database (${esc(String(err.message||err))}).<br>Try the AI button above, or add it manually.</div>`
@@ -1056,6 +1057,59 @@ async function doSearch(){
 /* ---------- AI food lookup (text) — restaurant & menu items, MFP-style ----
    Uses the user's own Claude key to estimate full nutrition for any typed
    food, including specific chain menu items Open Food Facts won't have. */
+/* ---------- AI provider (Claude or Gemini) ----------
+   One key per provider is stored so switching never loses the other. Gemini
+   uses Google AI Studio's free-tier key; Claude uses Anthropic (paid). Both
+   are called directly from the browser and return structured JSON. */
+const AI_MODELS = {
+  claude: [['claude-opus-5','Claude Opus 5 — most capable'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-haiku-4-5','Claude Haiku 4.5 — fastest / cheapest']],
+  gemini: [['gemini-2.5-flash','Gemini 2.5 Flash — fast, free-tier'],['gemini-2.5-pro','Gemini 2.5 Pro — most capable'],['gemini-2.0-flash','Gemini 2.0 Flash — widely available']]
+};
+const AI_DEFAULT_MODEL = { claude:'claude-opus-5', gemini:'gemini-2.5-flash' };
+function aiProvider(){ return get('nt_aiprovider','claude'); }
+function aiKeyFor(p){ return get(p==='gemini'?'nt_geminikey':'nt_apikey',''); }
+function aiModelFor(p){ return get(p==='gemini'?'nt_geminimodel':'nt_aimodel', AI_DEFAULT_MODEL[p]); }
+function aiActiveKey(){ return aiKeyFor(aiProvider()); }
+function aiConfigured(){ return !!aiActiveKey(); }
+
+/* Unified AI call. opts: {text, image:{mime,data}|null, schema, jsonHint}.
+   schema drives Claude's structured output; jsonHint tells Gemini the exact
+   JSON shape (it returns application/json). Returns the parsed object. */
+async function callAI(opts){
+  const provider=aiProvider(), key=aiActiveKey(), model=aiModelFor(provider);
+  if(!key) throw new Error('Add your API key in More → 🤖 AI first.');
+  if(provider==='gemini'){
+    const parts=[];
+    if(opts.image) parts.push({inline_data:{mime_type:opts.image.mime, data:opts.image.data}});
+    parts.push({text: opts.text + '\n\n' + opts.jsonHint});
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{
+      method:'POST', headers:{'content-type':'application/json'},
+      body:JSON.stringify({ contents:[{role:'user',parts}], generationConfig:{ responseMimeType:'application/json', temperature:0.4, maxOutputTokens:2048 } })
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
+    const cand=(data.candidates||[])[0];
+    if(cand&&cand.finishReason&&cand.finishReason!=='STOP'&&!(cand.content&&cand.content.parts)) throw new Error('The model declined this request ('+cand.finishReason+').');
+    const txt=cand&&cand.content&&cand.content.parts?cand.content.parts.map(p=>p.text||'').join(''):'';
+    if(!txt) throw new Error('Empty response.');
+    return JSON.parse(txt);
+  } else {
+    const content=[];
+    if(opts.image) content.push({type:'image',source:{type:'base64',media_type:opts.image.mime,data:opts.image.data}});
+    content.push({type:'text', text:opts.text});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
+      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({ model, max_tokens:2048, output_config:{format:{type:'json_schema',schema:opts.schema}}, messages:[{role:'user',content}] })
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error((data&&data.error&&data.error.message)||('HTTP '+res.status));
+    if(data.stop_reason==='refusal') throw new Error('The model declined this request.');
+    const tb=(data.content||[]).find(b=>b.type==='text');
+    if(!tb) throw new Error('Empty response.');
+    return JSON.parse(tb.text);
+  }
+}
+
 const AI_FOOD_SCHEMA = { type:'object', additionalProperties:false, required:['foods'], properties:{
   foods:{ type:'array', items:{ type:'object', additionalProperties:false,
     required:['name','serving_label','grams','calories','protein_g','carbs_g','fat_g','saturated_fat_g','fiber_g','sugar_g','sodium_mg','cholesterol_mg','potassium_mg','plant_based'],
@@ -1067,26 +1121,15 @@ const AI_FOOD_SCHEMA = { type:'object', additionalProperties:false, required:['f
 
 async function aiFoodSearch(){
   const q=document.getElementById('searchInput').value.trim(); if(!q) return;
-  const key=get('nt_apikey',''); const model=get('nt_aimodel','claude-opus-5');
   const box=document.getElementById('searchResults');
-  if(!key){ box.innerHTML=`<div class="empty">Add your Claude API key in <b>More → 🤖 AI</b> first, then try again.</div>`; return; }
+  if(!aiConfigured()){ box.innerHTML=`<div class="empty">Add your AI key in <b>More → 🤖 AI</b> first, then try again.</div>`; return; }
   box.innerHTML=`<div class="loading"><div class="spinner"></div>Asking AI about “${esc(q)}”…</div>`;
-  const body={ model, max_tokens:1500,
-    output_config:{ format:{ type:'json_schema', schema:AI_FOOD_SCHEMA } },
-    messages:[{ role:'user', content:[{ type:'text', text:
-      `Give nutrition for this food or restaurant menu item: "${q}". If it names a specific restaurant or chain dish (e.g. "Lupe Tortilla beef fajitas"), use that chain's actual menu item as best you know it. Return 1–4 likely matches (common portion sizes or close variants), most likely first. For each: a clear name (include the restaurant if given), a serving_label describing the portion, the portion weight in grams, and nutrition FOR THAT PORTION: calories (kcal), protein_g, carbs_g, fat_g, saturated_fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg, potassium_mg. Set plant_based=true only if fully plant-based (no meat, fish, dairy, eggs, honey). Be a careful, realistic estimator; give your best typical estimate if unsure. Return only structured data.` }]}]
-  };
+  const text=`Give nutrition for this food or restaurant menu item: "${q}". If it names a specific restaurant or chain dish (e.g. "Lupe Tortilla beef fajitas"), use that chain's actual menu item as best you know it. Return 1–4 likely matches (common portion sizes or close variants), most likely first. For each: a clear name (include the restaurant if given), a serving_label describing the portion, the portion weight in grams, and nutrition FOR THAT PORTION: calories (kcal), protein_g, carbs_g, fat_g, saturated_fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg, potassium_mg. Set plant_based=true only if fully plant-based (no meat, fish, dairy, eggs, honey). Be a careful, realistic estimator; give your best typical estimate if unsure.`;
+  const jsonHint=`Respond with ONLY a JSON object of this exact shape: {"foods":[{"name":string,"serving_label":string,"grams":number,"calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"saturated_fat_g":number,"fiber_g":number,"sugar_g":number,"sodium_mg":number,"cholesterol_mg":number,"potassium_mg":number,"plant_based":boolean}]}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
-      headers:{ 'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-      body:JSON.stringify(body) });
-    const data=await res.json();
-    if(!res.ok){ box.innerHTML=`<div class="empty">AI error: ${esc((data&&data.error&&data.error.message)||res.status)}.<br>Check your key/model in Settings.</div>`; return; }
-    if(data.stop_reason==='refusal'){ box.innerHTML=`<div class="empty">The model declined this one. Try rephrasing or add it manually.</div>`; return; }
-    const tb=(data.content||[]).find(b=>b.type==='text');
-    let parsed; try{ parsed=JSON.parse(tb.text); }catch(e){ box.innerHTML=`<div class="empty">Couldn't read the AI result. Try again.</div>`; return; }
+    const parsed=await callAI({ text, image:null, schema:AI_FOOD_SCHEMA, jsonHint });
     renderAiFoods(parsed.foods||[], q);
-  }catch(e){ box.innerHTML=`<div class="empty">AI request failed. Check your connection and that the page is on HTTPS.</div>`; }
+  }catch(e){ box.innerHTML=`<div class="empty">${esc(String(e.message||e))}<br>Check your key/model in Settings, or add it manually.</div>`; }
 }
 function renderAiFoods(foods, q){
   const box=document.getElementById('searchResults');
@@ -1178,7 +1221,7 @@ function handlePhoto(ev){
   reader.readAsDataURL(file);
 }
 function updateAiBtn(){
-  const has = !!(manualPhotoData && get('nt_apikey',''));
+  const has = !!(manualPhotoData && aiConfigured());
   document.getElementById('aiBtn').style.display = has ? 'block' : 'none';
 }
 function saveManual(){
@@ -1198,11 +1241,9 @@ function saveManual(){
   if(toRecipe) openRecipeSheet();
 }
 
-/* ---------- AI photo recognition (Anthropic, user's own key) ---------- */
-/* AI_HOOK: sends the meal photo to Claude and asks for a structured nutrition
-   estimate. Uses the user's own API key from Settings, stored only in this
-   browser. The dangerous-direct-browser-access header lets the call run
-   client-side; this is acceptable for a personal, single-user tool. */
+/* ---------- AI photo recognition (Claude or Gemini, user's own key) ------
+   Sends the meal photo to the selected provider and asks for a structured
+   nutrition estimate via the shared callAI() helper. */
 const AI_SCHEMA = { type:'object', additionalProperties:false, required:['items'], properties:{
   items:{ type:'array', items:{ type:'object', additionalProperties:false,
     required:['name','grams','calories','protein_g','carbs_g','fat_g','fiber_g','plant_based'],
@@ -1211,32 +1252,16 @@ const AI_SCHEMA = { type:'object', additionalProperties:false, required:['items'
       plant_based:{type:'boolean'} } } } } };
 
 async function recognizePhoto(){
-  const key=get('nt_apikey',''); const model=get('nt_aimodel','claude-opus-5');
-  if(!key||!manualPhotoData) return;
+  if(!aiConfigured()||!manualPhotoData) return;
   const out=document.getElementById('aiResults');
   out.innerHTML=`<div class="loading"><div class="spinner"></div>Identifying your meal…</div>`;
   const m=manualPhotoData.match(/^data:(image\/\w+);base64,(.*)$/); if(!m){ out.innerHTML='<div class="empty">Photo error.</div>'; return; }
-  const body={ model, max_tokens:2048,
-    output_config:{ format:{ type:'json_schema', schema:AI_SCHEMA } },
-    messages:[{ role:'user', content:[
-      { type:'image', source:{ type:'base64', media_type:m[1], data:m[2] } },
-      { type:'text', text:'Identify every distinct food and drink item in this photo. For each, estimate a realistic portion in grams and its nutrition for that portion: calories (kcal), protein, carbs, fat and fiber in grams. Also set plant_based=true only if the item is entirely plant-based (no meat, fish, dairy, eggs or honey). Be a careful, realistic estimator. Return only the structured data.' }
-    ]}]
-  };
+  const text='Identify every distinct food and drink item in this photo. For each, estimate a realistic portion in grams and its nutrition for that portion: calories (kcal), protein, carbs, fat and fiber in grams. Also set plant_based=true only if the item is entirely plant-based (no meat, fish, dairy, eggs or honey). Be a careful, realistic estimator.';
+  const jsonHint='Respond with ONLY a JSON object of this exact shape: {"items":[{"name":string,"grams":number,"calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"plant_based":boolean}]}';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{ 'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-      body:JSON.stringify(body)
-    });
-    const data=await res.json();
-    if(!res.ok){ out.innerHTML=`<div class="empty">API error: ${esc((data&&data.error&&data.error.message)||res.status)}.<br>Check your key/model in Settings.</div>`; return; }
-    if(data.stop_reason==='refusal'){ out.innerHTML=`<div class="empty">The model declined to analyze this image. Try another photo or enter it manually.</div>`; return; }
-    const textBlock=(data.content||[]).find(b=>b.type==='text');
-    if(!textBlock){ out.innerHTML=`<div class="empty">No result. Try again or enter manually.</div>`; return; }
-    let parsed; try{ parsed=JSON.parse(textBlock.text); }catch(e){ out.innerHTML=`<div class="empty">Could not read the AI result. Try again.</div>`; return; }
+    const parsed=await callAI({ text, image:{mime:m[1], data:m[2]}, schema:AI_SCHEMA, jsonHint });
     renderAiResults(parsed.items||[]);
-  }catch(e){ out.innerHTML=`<div class="empty">Request failed. Check your connection and that the page is served over HTTPS.</div>`; }
+  }catch(e){ out.innerHTML=`<div class="empty">${esc(String(e.message||e))}<br>Check your key/model in Settings, or enter it manually.</div>`; }
 }
 function renderAiResults(items){
   const out=document.getElementById('aiResults');
@@ -1560,8 +1585,8 @@ function loadMoreForm(){
   document.getElementById('gCal').value=g.cal; document.getElementById('gPro').value=g.pro;
   document.getElementById('gCarb').value=g.carb; document.getElementById('gFat').value=g.fat;
   document.getElementById('gWater').value=g.water;
-  document.getElementById('aiKey').value=get('nt_apikey','');
-  document.getElementById('aiModel').value=get('nt_aimodel','claude-opus-5');
+  document.getElementById('aiProvider').value=aiProvider();
+  updateAiProviderUI();
   updateKeyBadge();
   renderMicroGoalFields();
   loadPlanner();
@@ -1574,8 +1599,22 @@ function loadMoreForm(){
   else { btn.style.display='none'; hint.innerHTML='On iPhone: tap the Share button, then <b>Add to Home Screen</b>. On Android/desktop Chrome: use the browser menu → Install.'; }
 }
 function updateKeyBadge(){
-  const b=document.getElementById('keyBadge'); const has=!!get('nt_apikey','');
+  const b=document.getElementById('keyBadge'); const has=aiConfigured();
   b.textContent=has?'active':'not set'; b.className='badge-key '+(has?'badge-ok':'badge-no');
+}
+/* Repaint the AI settings card for the selected provider and load its saved
+   key + model (each provider keeps its own, so switching loses nothing). */
+function updateAiProviderUI(){
+  const p=document.getElementById('aiProvider').value;
+  document.getElementById('aiKeyLabel').textContent = p==='gemini'?'Google Gemini API key':'Anthropic API key';
+  document.getElementById('aiKey').placeholder = p==='gemini'?'AIza…':'sk-ant-…';
+  const sel=document.getElementById('aiModel');
+  sel.innerHTML = AI_MODELS[p].map(m=>`<option value="${m[0]}">${m[1]}</option>`).join('');
+  document.getElementById('aiKey').value = aiKeyFor(p);
+  sel.value = aiModelFor(p);
+  document.getElementById('aiKeyHelp').innerHTML = p==='gemini'
+    ? 'Free key at <b>aistudio.google.com</b> → Get API key (free tier, no billing).'
+    : 'Key at <b>console.anthropic.com</b> → pay-as-you-go (add a little credit).';
 }
 function renderMicroGoalFields(){
   const over=get('nt_microgoals',{});
@@ -1678,14 +1717,18 @@ function applyPlan(cal,pro,carb,fat){
   toast('Daily goals updated'); render();
 }
 function saveAI(){
-  set('nt_apikey', document.getElementById('aiKey').value.trim());
-  set('nt_aimodel', document.getElementById('aiModel').value);
-  updateKeyBadge(); updateAiBtn(); toast('AI settings saved');
+  const p=document.getElementById('aiProvider').value;
+  const key=document.getElementById('aiKey').value.trim();
+  const model=document.getElementById('aiModel').value;
+  set('nt_aiprovider', p);
+  if(p==='gemini'){ set('nt_geminikey', key); set('nt_geminimodel', model); }
+  else { set('nt_apikey', key); set('nt_aimodel', model); }
+  updateKeyBadge(); updateAiBtn(); toast('AI settings saved ('+(p==='gemini'?'Gemini':'Claude')+')');
 }
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
 function copySyncUrl(){ const u=location.origin+location.pathname; if(navigator.clipboard){ navigator.clipboard.writeText(u).then(()=>toast('Sync URL copied'),()=>toast(u)); } else toast(u); }
 function exportData(){
-  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
+  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_aiprovider','nt_aimodel','nt_geminimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nutritrack-backup-'+dateKey(new Date())+'.json'; a.click();
 }
