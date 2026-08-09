@@ -1604,6 +1604,11 @@ window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferred
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 handleImport();
 render();
+/* iOS Safari (and Chrome) often restore this page from their back-forward
+   cache when a Shortcut re-opens the URL in an already-open tab, which skips
+   the script run above — so a fresh ?weight=… never imports. Re-run the
+   import and repaint whenever the page is shown from cache. */
+window.addEventListener('pageshow', e=>{ if(e.persisted){ handleImport(); render(); } });
 </script>
 </body>
 </html>
