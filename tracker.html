@@ -1040,14 +1040,78 @@ async function doSearch(){
       prods=offUsable(d.products); err=null;
     }catch(e){ if(!err) err=e; }
   }
+  const aiBtn = get('nt_apikey','')
+    ? `<button class="ghost-btn" style="width:100%;margin:2px 0 12px" onclick="aiFoodSearch()">🤖 Ask AI for “${esc(q)}” — restaurant & menu items</button>`
+    : `<div class="note" style="margin:2px 0 12px">💡 For restaurant items (Lupe Tortilla, Chipotle…), add your Claude key in <b>More → 🤖 AI</b>, then Search again to use “Ask AI”.</div>`;
   if(!prods.length){
-    box.innerHTML = err
-      ? `<div class="empty">Couldn't reach the food database (${esc(String(err.message||err))}). Check your connection, or add it manually.</div>`
-      : `<div class="empty">No matches for “${esc(q)}”. Try another term (or a brand), or use the Manual tab.</div>`;
+    box.innerHTML = aiBtn + (err
+      ? `<div class="empty">Couldn't reach the packaged-food database (${esc(String(err.message||err))}).<br>Try the AI button above, or add it manually.</div>`
+      : `<div class="empty">No packaged-food matches for “${esc(q)}”.<br>Try the AI button above for restaurant/menu items, or use Manual.</div>`);
     return;
   }
   window._results=prods;
-  box.innerHTML=prods.map((p,i)=>resultCard(p,i)).join('');
+  box.innerHTML = aiBtn + prods.map((p,i)=>resultCard(p,i)).join('');
+}
+
+/* ---------- AI food lookup (text) — restaurant & menu items, MFP-style ----
+   Uses the user's own Claude key to estimate full nutrition for any typed
+   food, including specific chain menu items Open Food Facts won't have. */
+const AI_FOOD_SCHEMA = { type:'object', additionalProperties:false, required:['foods'], properties:{
+  foods:{ type:'array', items:{ type:'object', additionalProperties:false,
+    required:['name','serving_label','grams','calories','protein_g','carbs_g','fat_g','saturated_fat_g','fiber_g','sugar_g','sodium_mg','cholesterol_mg','potassium_mg','plant_based'],
+    properties:{ name:{type:'string'}, serving_label:{type:'string'}, grams:{type:'number'},
+      calories:{type:'number'}, protein_g:{type:'number'}, carbs_g:{type:'number'}, fat_g:{type:'number'},
+      saturated_fat_g:{type:'number'}, fiber_g:{type:'number'}, sugar_g:{type:'number'},
+      sodium_mg:{type:'number'}, cholesterol_mg:{type:'number'}, potassium_mg:{type:'number'},
+      plant_based:{type:'boolean'} } } } } };
+
+async function aiFoodSearch(){
+  const q=document.getElementById('searchInput').value.trim(); if(!q) return;
+  const key=get('nt_apikey',''); const model=get('nt_aimodel','claude-opus-5');
+  const box=document.getElementById('searchResults');
+  if(!key){ box.innerHTML=`<div class="empty">Add your Claude API key in <b>More → 🤖 AI</b> first, then try again.</div>`; return; }
+  box.innerHTML=`<div class="loading"><div class="spinner"></div>Asking AI about “${esc(q)}”…</div>`;
+  const body={ model, max_tokens:1500,
+    output_config:{ format:{ type:'json_schema', schema:AI_FOOD_SCHEMA } },
+    messages:[{ role:'user', content:[{ type:'text', text:
+      `Give nutrition for this food or restaurant menu item: "${q}". If it names a specific restaurant or chain dish (e.g. "Lupe Tortilla beef fajitas"), use that chain's actual menu item as best you know it. Return 1–4 likely matches (common portion sizes or close variants), most likely first. For each: a clear name (include the restaurant if given), a serving_label describing the portion, the portion weight in grams, and nutrition FOR THAT PORTION: calories (kcal), protein_g, carbs_g, fat_g, saturated_fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg, potassium_mg. Set plant_based=true only if fully plant-based (no meat, fish, dairy, eggs, honey). Be a careful, realistic estimator; give your best typical estimate if unsure. Return only structured data.` }]}]
+  };
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
+      headers:{ 'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      body:JSON.stringify(body) });
+    const data=await res.json();
+    if(!res.ok){ box.innerHTML=`<div class="empty">AI error: ${esc((data&&data.error&&data.error.message)||res.status)}.<br>Check your key/model in Settings.</div>`; return; }
+    if(data.stop_reason==='refusal'){ box.innerHTML=`<div class="empty">The model declined this one. Try rephrasing or add it manually.</div>`; return; }
+    const tb=(data.content||[]).find(b=>b.type==='text');
+    let parsed; try{ parsed=JSON.parse(tb.text); }catch(e){ box.innerHTML=`<div class="empty">Couldn't read the AI result. Try again.</div>`; return; }
+    renderAiFoods(parsed.foods||[], q);
+  }catch(e){ box.innerHTML=`<div class="empty">AI request failed. Check your connection and that the page is on HTTPS.</div>`; }
+}
+function renderAiFoods(foods, q){
+  const box=document.getElementById('searchResults');
+  if(!foods.length){ box.innerHTML=`<div class="empty">AI had no estimate for “${esc(q)}”. Try rephrasing.</div>`; return; }
+  window._aiFoods=foods;
+  const cards=foods.map((f,i)=>`<div class="result" onclick="pickAiFood(${i})">
+    <div class="noimg">🤖</div>
+    <div class="rinfo"><div class="rname">${esc(f.name)}</div>
+      <div class="rbrand">${esc(f.serving_label||'')} · ${Math.round(f.calories||0)} kcal · P${Math.round(f.protein_g||0)} C${Math.round(f.carbs_g||0)} F${Math.round(f.fat_g||0)}</div></div>
+    <div class="rcal">›</div></div>`).join('');
+  box.innerHTML=`<div class="note" style="margin-bottom:8px">🤖 <b>AI estimates</b> for “${esc(q)}” — smart guesses, not exact labels. Tap one to review and log.</div>${cards}`;
+}
+function pickAiFood(i){
+  const f=window._aiFoods[i]; const g=(f.grams>0?f.grams:100);
+  const per=v=>((v||0)/g)*100;                 // grams-per-portion → per 100 g
+  const mgToG=v=>(((v||0)/1000)/g)*100;        // mg-per-portion → grams per 100 g
+  const per100={
+    'energy-kcal': per(f.calories), 'proteins': per(f.protein_g),
+    'carbohydrates': per(f.carbs_g), 'fat': per(f.fat_g),
+    'saturated-fat': per(f.saturated_fat_g), 'fiber': per(f.fiber_g),
+    'sugars': per(f.sugar_g), 'sodium': mgToG(f.sodium_mg),
+    'cholesterol': mgToG(f.cholesterol_mg), 'potassium': mgToG(f.potassium_mg)
+  };
+  selectedFood={ name:f.name, brand:'AI estimate', image:'', per100, servingG:g, servingLabelRaw:f.serving_label||'', plant:!!f.plant_based };
+  addAmount=g||100; openDetail();
 }
 function resultCard(p,i){
   const kcal=Math.round(p.nutriments['energy-kcal_100g']||0);
