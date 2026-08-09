@@ -280,6 +280,7 @@
           <div id="stepKcal" style="font-weight:800; font-size:1.15rem; color:var(--success);">0</div>
         </div>
       </div>
+      <div id="syncedNote" class="muted" style="display:none; font-size:.78rem; margin-bottom:10px;"></div>
       <div id="exerciseList"></div>
       <button class="addbtn-sm" style="text-align:center; width:100%;" onclick="openExercise()">＋ Add exercise</button>
     </div>
@@ -374,6 +375,27 @@
       </div>
       <button class="primary-btn" onclick="saveAI()">Save AI Settings</button>
       <div class="hint" style="margin-top:10px;">⚠︎ Don't share this page with your key in it — each person enters their own key in their own browser.</div>
+    </div>
+
+    <div class="card">
+      <h3>⌚ Garmin & Apple Health Sync</h3>
+      <div class="hint">Garmin already syncs your steps & activity to Apple Health. A short Apple Shortcut can push that into NutriTrack automatically each day — no account or server needed.</div>
+      <div style="background:var(--chip); border-radius:10px; padding:10px 12px; font-size:.78rem; word-break:break-all; margin-bottom:10px;">
+        <div class="muted" style="margin-bottom:4px;">Your sync URL</div>
+        <code id="syncUrl">…</code>
+      </div>
+      <button class="ghost-btn" onclick="copySyncUrl()">Copy sync URL</button>
+      <div class="note" style="margin-top:12px;">⚠︎ <b>Important on iPhone:</b> Shortcuts open links in <b>Safari</b>, which keeps separate storage from a home-screen app. For auto-sync, use NutriTrack in <b>Safari</b> (bookmark it) rather than the installed icon — otherwise the synced data lands in the wrong place.</div>
+      <div class="hint" style="margin-top:12px; line-height:1.55;">
+        <b>Set up (~2 min):</b><br>
+        1. Open <b>Shortcuts</b> → new shortcut.<br>
+        2. <b>Find Health Samples</b> → Steps → today → then <b>Calculate Statistics → Sum</b>. Set variable <b>Steps</b>.<br>
+        3. Another <b>Find Health Samples</b> → Active Energy → today → <b>Sum</b>. Set variable <b>Burn</b>.<br>
+        4. <b>Text</b> action: paste your sync URL and append <code>?steps=</code>[Steps]<code>&burn=</code>[Burn].<br>
+        5. <b>Open URLs</b> with that text.<br>
+        6. In <b>Automation</b> → new <b>Personal Automation</b> → <b>Time of Day</b> (e.g. 10 PM) → run this shortcut daily; turn off “Ask Before Running”.<br>
+        Done — each night your Garmin steps & active calories log themselves.
+      </div>
     </div>
 
     <div class="card">
@@ -583,13 +605,31 @@ function set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 function loadLog(){ return get('nt_log', {}); }
 function saveLog(l){ set('nt_log', l); }
 function loadGoals(){ return Object.assign({cal:2000,pro:150,carb:250,fat:65,water:8}, get('nt_goals',{})); }
-function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[]}; }
+function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[], importKcal:d.importKcal}; }
 function setDayData(d){ const l=loadLog(); l[dateKey(currentDate)]=d; saveLog(l); }
 function dayEntries(){ return dayData().entries || []; }
 /* Effective Daily Value target for a nutrient — user override or standard. */
 function dvFor(key){ const o=get('nt_microgoals',{})[key]; return (o!=null && !isNaN(o) && o>0) ? o : NUT_BY_KEY[key].dv; }
-/* Calories burned today = logged exercise + estimated from steps. */
-function dayBurned(){ const d=dayData(); const ex=(d.exercise||[]).reduce((s,e)=>s+(e.calories||0),0); return ex + Math.round((d.steps||0)*STEP_KCAL); }
+/* Calories burned today = logged exercise + (synced active energy, or an
+   estimate from steps when nothing was synced). */
+function dayBurned(){ const d=dayData(); const ex=(d.exercise||[]).reduce((s,e)=>s+(e.calories||0),0);
+  const base = (d.importKcal!=null) ? d.importKcal : Math.round((d.steps||0)*STEP_KCAL);
+  return ex + base; }
+/* Import steps / active-energy from a URL (e.g. an Apple Shortcut reading
+   Health, where Garmin data lands). Idempotent; writes to ?date or today. */
+function handleImport(){
+  const p=new URLSearchParams(location.search);
+  if(![...p.keys()].some(k=>['steps','burn','date'].includes(k))) return;
+  let target=new Date(); const ds=p.get('date');
+  if(ds && /^\d{4}-\d{2}-\d{2}$/.test(ds)){ const a=ds.split('-').map(Number); target=new Date(a[0],a[1]-1,a[2]); }
+  const saved=currentDate; currentDate=target;
+  const d=dayData(); const changed=[];
+  if(p.has('steps')){ d.steps=Math.max(0,parseInt(p.get('steps'))||0); changed.push(d.steps.toLocaleString()+' steps'); }
+  if(p.has('burn')){ d.importKcal=Math.max(0,Math.round(parseFloat(p.get('burn'))||0)); changed.push(d.importKcal+' kcal'); }
+  setDayData(d); currentDate=saved;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  if(changed.length) setTimeout(()=>toast('⌚ Synced: '+changed.join(' · ')),400);
+}
 
 /* ---------- Nav ---------- */
 function go(view){
@@ -678,6 +718,9 @@ function renderActivity(){
   document.getElementById('stepInput').value = d.steps ? d.steps : '';
   document.getElementById('stepKcal').textContent = Math.round((d.steps||0)*STEP_KCAL);
   document.getElementById('burnTotal').textContent = dayBurned();
+  const syncedEl = document.getElementById('syncedNote');
+  if(d.importKcal!=null){ syncedEl.style.display='block'; syncedEl.innerHTML=`⌚ Synced active energy: <b>${d.importKcal} kcal</b> — used for today's burn.`; }
+  else { syncedEl.style.display='none'; }
   const list = document.getElementById('exerciseList');
   const ex = d.exercise||[];
   if(!ex.length){ list.innerHTML = `<div class="empty" style="padding:8px 0;">No workouts logged yet</div>`; return; }
@@ -1224,6 +1267,7 @@ function loadMoreForm(){
   document.getElementById('aiModel').value=get('nt_aimodel','claude-opus-5');
   updateKeyBadge();
   renderMicroGoalFields();
+  document.getElementById('syncUrl').textContent = location.origin + location.pathname;
   const btn=document.getElementById('installBtn'), hint=document.getElementById('installHint');
   if(deferredInstall){ btn.style.display='block'; hint.textContent=''; }
   else if(window.matchMedia('(display-mode: standalone)').matches){ btn.style.display='none'; hint.textContent='✅ Installed and running as an app.'; }
@@ -1269,6 +1313,7 @@ function saveAI(){
   updateKeyBadge(); updateAiBtn(); toast('AI settings saved');
 }
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
+function copySyncUrl(){ const u=location.origin+location.pathname; if(navigator.clipboard){ navigator.clipboard.writeText(u).then(()=>toast('Sync URL copied'),()=>toast(u)); } else toast(u); }
 function exportData(){
   const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_weight','nt_weightunit','nt_recipes','nt_aimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
@@ -1299,6 +1344,7 @@ document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click', e=>
 }));
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='more') loadMoreForm(); });
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+handleImport();
 render();
 </script>
 </body>

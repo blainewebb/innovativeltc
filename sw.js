@@ -1,6 +1,6 @@
 /* NutriTrack service worker — offline app shell.
    Bump CACHE when the shell changes so old caches are cleared. */
-const CACHE = 'nutritrack-v2';
+const CACHE = 'nutritrack-v3';
 const SHELL = [
   './tracker.html',
   './manifest.webmanifest',
