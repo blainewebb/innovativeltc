@@ -1,6 +1,6 @@
 /* NutriTrack service worker — offline app shell.
    Bump CACHE when the shell changes so old caches are cleared. */
-const CACHE = 'nutritrack-v5';
+const CACHE = 'nutritrack-v6';
 const SHELL = [
   './tracker.html',
   './manifest.webmanifest',
@@ -35,7 +35,22 @@ self.addEventListener('fetch', e => {
     return; // default browser handling
   }
 
-  // App shell + CDN libs: cache-first, fall back to network and cache it.
+  // The app page itself: network-FIRST so a new deploy shows up on the next
+  // load when online; fall back to cache only when offline.
+  const isPage = url.origin === location.origin &&
+    (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/'));
+  if (isPage) {
+    e.respondWith(
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+        return res;
+      }).catch(() => caches.match(req).then(hit => hit || caches.match('./tracker.html')))
+    );
+    return;
+  }
+
+  // Static assets + CDN libs: cache-first for speed/offline, then network.
   e.respondWith(
     caches.match(req).then(hit => hit || fetch(req).then(res => {
       if (res && res.status === 200 && (url.origin === location.origin || SHELL.includes(req.url))) {
