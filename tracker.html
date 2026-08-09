@@ -1787,7 +1787,20 @@ document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click', e=>
   if(e.target===o){ o.classList.remove('open'); if(o.id==='addOverlay') stopScan(); }
 }));
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='more') loadMoreForm(); });
-if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+/* Register the service worker and actively evict any stale one. Older builds
+   shipped a cache-first worker that could keep serving a weeks-old page (and
+   an old app version that doesn't know about newer settings). Force an update
+   check, and when a new worker takes control, reload once to guarantee the
+   current app + fresh caches. */
+if('serviceWorker' in navigator){
+  let _swReloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(_swReloaded) return; _swReloaded=true; location.reload();
+  });
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{ try{ reg.update(); }catch(e){} }).catch(()=>{});
+  });
+}
 recordSync();
 handleImport();
 render();
