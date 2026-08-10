@@ -171,6 +171,8 @@
   .result .rname{font-weight:600; font-size:.9rem;}
   .result .rbrand{font-size:.78rem; color:var(--muted);}
   .result .rcal{font-weight:700; font-size:.85rem; white-space:nowrap;}
+  .starbtn{background:none; border:none; font-size:1.35rem; line-height:1; color:#cbd5e1; padding:4px 6px; flex:0 0 auto;}
+  .starbtn.on{color:#f59e0b;}
 
   #reader{width:100%; border-radius:14px; overflow:hidden; background:#000;}
   .scan-hint{text-align:center; color:var(--muted); font-size:.85rem; margin:12px 0;}
@@ -530,11 +532,14 @@
       <button class="x" onclick="closeAdd()">✕</button>
     </div>
     <div class="tabs" id="tabsBar">
+      <div class="tab" data-tab="saved" onclick="switchTab('saved')">⭐ Saved</div>
       <div class="tab active" data-tab="search" onclick="switchTab('search')">🔎 Search</div>
       <div class="tab" data-tab="scan" onclick="switchTab('scan')">📷 Scan</div>
       <div class="tab" data-tab="manual" onclick="switchTab('manual')">✎ Manual</div>
     </div>
     <div class="sheet-body">
+      <!-- SAVED (Favorites + Recent) -->
+      <div class="tabpane" id="pane-saved" style="display:none"></div>
       <!-- SEARCH -->
       <div class="tabpane" id="pane-search">
         <div class="search-row">
@@ -999,18 +1004,21 @@ function openAdd(meal){
   document.getElementById('sheetTitle').textContent = addTarget==='recipe' ? 'Add Ingredient' : 'Add Food';
   document.getElementById('manualMealWrap').style.display = addTarget==='recipe' ? 'none' : 'block';
   document.getElementById('addOverlay').classList.add('open');
-  switchTab('search');
   document.getElementById('searchResults').innerHTML='';
   document.getElementById('searchInput').value='';
   document.getElementById('aiResults').innerHTML='';
   updateAiBtn();
-  setTimeout(()=>document.getElementById('searchInput').focus(),150);
+  // If they have saved/recent foods, open to those for one-tap logging.
+  const hasSaved = (loadFav().length + loadRecent().length) > 0;
+  if(hasSaved && addTarget==='diary'){ switchTab('saved'); }
+  else { switchTab('search'); setTimeout(()=>document.getElementById('searchInput').focus(),150); }
 }
 function closeAdd(){ document.getElementById('addOverlay').classList.remove('open'); stopScan(); addTarget='diary'; }
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
-  ['search','scan','manual'].forEach(p=>document.getElementById('pane-'+p).style.display=p===name?'block':'none');
+  ['saved','search','scan','manual'].forEach(p=>document.getElementById('pane-'+p).style.display=p===name?'block':'none');
   if(name!=='scan') stopScan();
+  if(name==='saved') renderSaved();
 }
 
 /* ---------- Search (Open Food Facts) ---------- */
@@ -1342,8 +1350,11 @@ function renderDetail(){
     </div>
     <label class="ai-item"><input type="checkbox" id="detailPlant" ${f.plant?'checked':''} onchange="selectedFood.plant=this.checked">
       <div class="ci"><div class="cn">🌱 Plant-based</div><div class="cm">Counts toward your plant-based %</div></div></label>
+    <button class="ghost-btn" onclick="favFromDetail()" style="margin-bottom:10px">${isFav(detailFavItem())?'★ Saved to Favorites — tap to remove':'☆ Save to Favorites'}</button>
     <button class="primary-btn" onclick="logSelected()">${addTarget==='recipe'?'Add ingredient':'Add to '+addMeal}</button>`;
 }
+function detailFavItem(){ return { name:selectedFood.name, servingLabel:Math.round(addAmount)+' g', nutr:scaledNutr(), plant:!!selectedFood.plant, image:selectedFood.image||'' }; }
+function favFromDetail(){ toggleFav(detailFavItem()); renderDetail(); }
 function onAmt(v){ addAmount=parseFloat(v)||0; renderDetail(); const el=document.getElementById('amtInput'); if(el){ el.focus(); el.value=Math.round(addAmount)||''; } }
 function setAmt(a){ addAmount=a; renderDetail(); }
 function logSelected(){
@@ -1354,10 +1365,64 @@ function logSelected(){
   else { addEntry(Object.assign({meal:document.getElementById('detailMeal')?.value||addMeal}, item)); closeAdd(); }
 }
 
+/* ---------- Favorites & Recent foods ---------- */
+function foodKey(x){ return ((x.name||'')+'|'+(x.servingLabel||'')).toLowerCase(); }
+function loadFav(){ return get('nt_favorites', []); }
+function loadRecent(){ return get('nt_recent', []); }
+function favItem(x){ return { name:x.name, servingLabel:x.servingLabel||'', nutr:x.nutr||{}, plant:!!x.plant, emoji:x.emoji||'', image:x.image||'' }; }
+function isFav(x){ return loadFav().some(f=>foodKey(f)===foodKey(x)); }
+function toggleFav(x){
+  const fav=loadFav(); const i=fav.findIndex(f=>foodKey(f)===foodKey(x));
+  if(i>=0){ fav.splice(i,1); set('nt_favorites',fav); toast('Removed from Favorites'); return false; }
+  fav.unshift(favItem(x)); set('nt_favorites',fav); toast('⭐ Saved to Favorites'); return true;
+}
+/* Keep the last 20 logged foods for quick re-adding (most recent first). */
+function pushRecent(x){
+  if(!x||!x.name||!x.nutr) return;
+  let r=loadRecent().filter(o=>foodKey(o)!==foodKey(x));
+  r.unshift(favItem(x)); set('nt_recent', r.slice(0,20));
+}
+function renderSaved(){
+  const pane=document.getElementById('pane-saved'); if(!pane) return;
+  const fav=loadFav(), rec=loadRecent();
+  const mealSel = addTarget==='diary'
+    ? `<div class="field" style="margin:0 0 12px"><label>Add to meal</label>
+        <select id="savedMeal">${MEALS.map(m=>`<option ${m.id===addMeal?'selected':''}>${m.id}</option>`).join('')}</select></div>` : '';
+  const row=(it,idx,kind)=>{
+    const kcal=Math.round((it.nutr&&it.nutr['energy-kcal'])||0);
+    const favd = kind==='fav' || isFav(it);
+    const thumb = it.image?`<img src="${it.image}">`:(it.emoji||'🍽️');
+    return `<div class="result">
+      <div class="noimg" style="cursor:pointer" onclick="logSaved('${kind}',${idx})">${thumb}</div>
+      <div class="rinfo" style="cursor:pointer" onclick="logSaved('${kind}',${idx})">
+        <div class="rname">${esc(it.name)}</div>
+        <div class="rbrand">${esc(it.servingLabel||'')} · ${kcal} kcal</div></div>
+      <button class="starbtn ${favd?'on':''}" onclick="toggleFavFrom('${kind}',${idx})">${favd?'★':'☆'}</button>
+    </div>`;
+  };
+  let html=mealSel;
+  if(fav.length){ html+=`<div class="micro-group">⭐ Favorites</div>`+fav.map((it,i)=>row(it,i,'fav')).join(''); }
+  if(rec.length){ html+=`<div class="micro-group" style="margin-top:14px">🕘 Recent</div>`+rec.map((it,i)=>row(it,i,'rec')).join(''); }
+  if(!fav.length && !rec.length){ html+=`<div class="empty">No saved foods yet. Log any food, then tap its ⭐ to keep it here — and foods you log will show up under Recent automatically.</div>`; }
+  pane.innerHTML=html;
+}
+function logSaved(kind, idx){
+  const it=(kind==='fav'?loadFav():loadRecent())[idx]; if(!it) return;
+  if(addTarget==='recipe'){ addIngredientToRecipe(favItem(it)); closeAdd(); openRecipeSheet(); return; }
+  const meal=document.getElementById('savedMeal')?document.getElementById('savedMeal').value:addMeal;
+  addEntry(Object.assign({meal}, favItem(it)));
+  toast('Added '+it.name); closeAdd();
+}
+function toggleFavFrom(kind, idx){
+  const it=(kind==='fav'?loadFav():loadRecent())[idx]; if(!it) return;
+  toggleFav(it); renderSaved();
+}
+
 /* ---------- Entry CRUD ---------- */
 function addEntry(e){
   e.id='e'+Date.now()+Math.floor(Math.random()*1000);
-  const d=dayData(); d.entries=d.entries||[]; d.entries.push(e); setDayData(d); render();
+  const d=dayData(); d.entries=d.entries||[]; d.entries.push(e); setDayData(d);
+  pushRecent(e); render();
 }
 function deleteEntry(id){ const d=dayData(); d.entries=(d.entries||[]).filter(e=>e.id!==id); setDayData(d); render(); }
 
@@ -1805,13 +1870,13 @@ function saveAI(){
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
 function copySyncUrl(){ const u=location.origin+location.pathname; if(navigator.clipboard){ navigator.clipboard.writeText(u).then(()=>toast('Sync URL copied'),()=>toast(u)); } else toast(u); }
 function exportData(){
-  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_aiprovider','nt_aimodel','nt_geminimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
+  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_favorites','nt_recent','nt_aiprovider','nt_aimodel','nt_geminimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nutritrack-backup-'+dateKey(new Date())+'.json'; a.click();
 }
 function clearAll(){
   if(!confirm('Erase all logged food, water, activity, weight, recipes and goals on this device? Your API key is kept. This cannot be undone.')) return;
-  ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes'].forEach(k=>localStorage.removeItem(k));
+  ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_favorites','nt_recent'].forEach(k=>localStorage.removeItem(k));
   render(); loadMoreForm(); toast('Data erased');
 }
 
