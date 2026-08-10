@@ -323,6 +323,18 @@
       <div class="hint" style="margin-top:12px;">Dr. Greger's Daily Dozen — tap a circle for each serving. <b>Beverages</b> and <b>Exercise</b> fill in automatically from your water & activity logs. Tracked separately from your food log.</div>
     </div>
 
+    <div class="card" id="ageCard">
+      <details>
+        <summary style="list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+          <div class="t" style="font-weight:700;">🧬 How Not to Age</div>
+          <div class="c" style="color:var(--muted); font-size:.85rem; font-weight:600;"><span id="ageCount">0</span> / 16 ▾</div>
+        </summary>
+        <div class="bar" style="margin:12px 0 14px;"><span id="ageBar" style="background:var(--success); width:0%"></span></div>
+        <div id="ageRows"></div>
+        <div class="hint" style="margin-top:12px;">Dr. Greger's <i>How Not to Age</i> anti-aging additions — tap the circle for each one you get today. Tracked separately from your food log.</div>
+      </details>
+    </div>
+
     <div class="card">
       <h3>Micronutrients</h3>
       <div class="hint">% of Daily Value from today's food. Shown where the product database has data.</div>
@@ -758,6 +770,25 @@ const DOZEN = [
   {key:'beverages',   emoji:'🥤', label:'Beverages',        target:5},
   {key:'exercise',    emoji:'🏃', label:'Exercise',         target:1},
 ];
+/* Dr. Greger's "How Not to Age" additions — each a single daily tick. */
+const AGE = [
+  {key:'vinegar',      emoji:'🍶', label:'Vinegar'},
+  {key:'coffee',       emoji:'☕', label:'Coffee'},
+  {key:'wheatgerm',    emoji:'🌾', label:'Wheat germ'},
+  {key:'strawberries', emoji:'🍓', label:'Strawberries'},
+  {key:'pippali',      emoji:'🌿', label:'Pippali (long pepper)'},
+  {key:'greentea',     emoji:'🍵', label:'Green tea'},
+  {key:'ksalt',        emoji:'🧂', label:'Potassium salt substitute'},
+  {key:'chili',        emoji:'🌶️', label:'Chili peppers'},
+  {key:'mushrooms',    emoji:'🍄', label:'Mushrooms'},
+  {key:'purplesp',     emoji:'🍠', label:'Purple sweet potatoes'},
+  {key:'pumpkin',      emoji:'🎃', label:'Pumpkin seeds'},
+  {key:'cranberries',  emoji:'🔴', label:'Cranberries'},
+  {key:'nutyeast',     emoji:'🧀', label:'Nutritional yeast'},
+  {key:'cocoa',        emoji:'🍫', label:'Cocoa powder'},
+  {key:'sesame',       emoji:'⚫', label:'Black sesame seeds'},
+  {key:'taurine',      emoji:'💊', label:'Taurine (optional)'},
+];
 
 /* ---------- State ---------- */
 let currentDate = new Date();
@@ -784,7 +815,7 @@ function set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 function loadLog(){ return get('nt_log', {}); }
 function saveLog(l){ set('nt_log', l); }
 function loadGoals(){ return Object.assign({cal:2000,pro:150,carb:250,fat:65,water:8}, get('nt_goals',{})); }
-function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[], importKcal:d.importKcal, dozen:d.dozen||{}}; }
+function dayData(){ const l=loadLog(); const d=l[dateKey(currentDate)]||{}; return {entries:d.entries||[], water:d.water||0, steps:d.steps||0, exercise:d.exercise||[], importKcal:d.importKcal, dozen:d.dozen||{}, age:d.age||{}}; }
 function setDayData(d){ const l=loadLog(); l[dateKey(currentDate)]=d; saveLog(l); }
 function dayEntries(){ return dayData().entries || []; }
 /* Effective Daily Value target for a nutrient — user override or standard. */
@@ -890,6 +921,7 @@ function render(){
   renderActivity();
   renderMeals(entries);
   renderDozen();
+  renderAge();
   renderMicros(t);
 }
 function renderPlant(entries){
@@ -930,6 +962,21 @@ function tapDozen(key,i){
   const d=dayData(); d.dozen=d.dozen||{}; const cur=d.dozen[key]||0;
   d.dozen[key] = (cur===i+1) ? i : i+1;   // tap the last-filled dot to clear it
   setDayData(d); renderDozen();
+}
+function renderAge(){
+  const ag = dayData().age || {}; let done=0;
+  const rows = AGE.map(it=>{
+    const on = !!ag[it.key]; if(on) done++;
+    return `<div class="dz-row${on?' done':''}">
+      <div class="dz-name"><span class="dz-emoji">${it.emoji}</span>${it.label}</div>
+      <div class="dz-dots"><button class="dz-dot${on?' on':''}" onclick="tapAge('${it.key}')" aria-label="${it.label}"></button></div></div>`;
+  }).join('');
+  document.getElementById('ageCount').textContent = done;
+  document.getElementById('ageBar').style.width = (done/AGE.length*100)+'%';
+  document.getElementById('ageRows').innerHTML = rows;
+}
+function tapAge(key){
+  const d=dayData(); d.age=d.age||{}; d.age[key]=d.age[key]?0:1; setDayData(d); renderAge();
 }
 function setMacro(id,val,goal){
   val=val||0;
