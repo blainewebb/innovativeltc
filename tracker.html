@@ -367,6 +367,27 @@
       <div class="hint" id="bmiHint"></div>
       <div class="chart-box"><canvas id="bmiChart"></canvas></div>
     </div>
+    <div class="card">
+      <div class="water-head" style="margin-bottom:10px;">
+        <h3>📏 Measurements</h3>
+        <button class="pill" onclick="openMeasure()">＋ Log</button>
+      </div>
+      <div id="measureTiles" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;"></div>
+      <div id="measureChartWrap" style="display:none; margin-top:12px;">
+        <select id="measurePick" onchange="drawMeasureChart()" style="width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px;"></select>
+        <div class="chart-box"><canvas id="measureChart"></canvas></div>
+      </div>
+      <div class="hint" id="measureHint" style="margin-top:8px;"></div>
+    </div>
+    <div class="card">
+      <div class="water-head" style="margin-bottom:10px;">
+        <h3>🩺 Blood Pressure</h3>
+        <button class="pill" onclick="openBp()">＋ Log</button>
+      </div>
+      <div id="bpLatest"></div>
+      <div id="bpChartWrap" style="display:none; margin-top:6px;"><div class="chart-box"><canvas id="bpChart"></canvas></div></div>
+      <div class="hint" id="bpHint" style="margin-top:8px;"></div>
+    </div>
   </div>
 </div>
 
@@ -651,6 +672,37 @@
   </div>
 </div>
 
+<div class="overlay" id="measureOverlay">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Log Measurements</h2><button class="x" onclick="closeMeasure()">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Unit</label><select id="mUnit"><option value="in">inches</option><option value="cm">cm</option></select></div>
+      <div id="measureFields"></div>
+      <div class="field"><label>Date</label><input id="mDate" type="date"></div>
+      <button class="primary-btn" onclick="saveMeasure()">Save</button>
+      <div class="hint" style="margin-top:8px;">Only the fields you fill in are saved. Leave the rest blank.</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="bpOverlay">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Log Blood Pressure</h2><button class="x" onclick="closeBp()">✕</button></div>
+    <div class="sheet-body">
+      <div class="grid2">
+        <div class="field"><label>Systolic (top)</label><input id="bpSys" type="number" inputmode="numeric" placeholder="120"></div>
+        <div class="field"><label>Diastolic (bottom)</label><input id="bpDia" type="number" inputmode="numeric" placeholder="80"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Pulse (bpm)</label><input id="bpPulse" type="number" inputmode="numeric" placeholder="optional"></div>
+        <div class="field"><label>Time</label><input id="bpTime" type="time"></div>
+      </div>
+      <div class="field"><label>Date</label><input id="bpDate" type="date"></div>
+      <button class="primary-btn" onclick="saveBp()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =========================================================================
    NutriTrack — self-contained calorie & nutrient tracker (multi-view PWA)
@@ -717,7 +769,12 @@ let manualPhotoData = null;
 let scanner = null, scanning = false;
 let deferredInstall = null;
 let editingRecipe = null;     // recipe object being built/edited
-let calChart, macroChart, weightChart, stepsChart, bodyfatChart, bmiChart;
+let calChart, macroChart, weightChart, stepsChart, bodyfatChart, bmiChart, measureChart, bpChart;
+const MEASURES=[
+  {k:'neck',label:'Neck'},{k:'shoulders',label:'Shoulders'},{k:'chest',label:'Chest'},
+  {k:'waist',label:'Waist'},{k:'hips',label:'Hips'},{k:'bicep',label:'Bicep'},
+  {k:'thigh',label:'Thigh'},{k:'calf',label:'Calf'}
+];
 const STEP_KCAL = 0.04;       // rough kcal burned per step
 
 /* ---------- Storage ---------- */
@@ -1022,7 +1079,21 @@ function switchTab(name){
 }
 
 /* ---------- Search (Open Food Facts) ---------- */
-const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags';
+const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags,categories_tags';
+/* Decide if an Open Food Facts product is plant-based. Trust the vegan/
+   non-vegan analysis tag when present; otherwise fall back to category/name
+   keywords so whole foods (a banana, spinach…) that were never ingredient-
+   analyzed still get flagged, while anything with animal words does not. */
+function offPlant(p){
+  const tags=Array.isArray(p.ingredients_analysis_tags)?p.ingredients_analysis_tags:[];
+  if(tags.includes('en:vegan')) return true;
+  if(tags.includes('en:non-vegan')) return false;
+  const cats=(Array.isArray(p.categories_tags)?p.categories_tags.join(' '):(p.categories||''));
+  const hay=(cats+' '+(p.product_name||'')).toLowerCase();
+  if(/\b(meat|beef|pork|chicken|turkey|poultry|fish|seafood|shrimp|prawn|salmon|tuna|cod|dairy|milk|cheese|yogh?urt|cream|egg|butter|honey|gelatin|gelatine|bacon|ham|sausage|lard|whey|casein|anchovy)\b/.test(hay)) return false;
+  if(/\b(fruit|fruits|vegetable|vegetables|legume|legumes|bean|beans|lentil|lentils|pea|peas|chickpea|nut|nuts|seed|seeds|grain|grains|cereal|cereals|rice|oat|oats|tofu|tempeh|seitan|plant-based|plant based|vegan|soy|soya|greens|berry|berries|potato|tomato|avocado|mushroom)\b/.test(hay)) return true;
+  return false;
+}
 /* Fetch JSON with a hard timeout so a hung request can't spin forever. */
 async function offFetch(url){
   const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort('timeout'),12000);
@@ -1183,7 +1254,7 @@ function foodFromProduct(p){
   NUTRIENTS.forEach(n=>{ const v=p.nutriments[n[0]+'_100g']; if(v!=null&&!isNaN(v)) per100[n[0]]=parseFloat(v); });
   if(p.nutriments['energy-kcal_100g']!=null) per100['energy-kcal']=parseFloat(p.nutriments['energy-kcal_100g']);
   let servingG=100; if(p.serving_quantity&&!isNaN(p.serving_quantity)) servingG=parseFloat(p.serving_quantity);
-  const plant = Array.isArray(p.ingredients_analysis_tags) && p.ingredients_analysis_tags.includes('en:vegan');
+  const plant = offPlant(p);
   selectedFood={ name:p.product_name, brand:p.brands||'', image:p.image_small_url||'', per100, servingG, servingLabelRaw:p.serving_size||'', plant };
   addAmount=servingG||100; openDetail();
 }
@@ -1483,6 +1554,99 @@ function renderBodyStats(){
   drawWeightChart();
   drawBodyFatChart();
   drawBmiChart();
+  renderMeasure();
+  renderBp();
+}
+/* ---------- Body measurements ---------- */
+function measureLatest(k){ const m=get('nt_measure',{}); const dates=Object.keys(m).sort(); for(let i=dates.length-1;i>=0;i--){ if(m[dates[i]] && m[dates[i]][k]!=null) return m[dates[i]][k]; } return null; }
+function renderMeasure(){
+  const unit=get('nt_measureunit','in');
+  const tiles=document.getElementById('measureTiles'); if(!tiles) return;
+  const any=MEASURES.map(mm=>({mm,v:measureLatest(mm.k)})).filter(x=>x.v!=null);
+  if(!any.length){ tiles.innerHTML=''; document.getElementById('measureChartWrap').style.display='none';
+    document.getElementById('measureHint').textContent='Tap “Log” to record waist, chest, hips and more — and track the changes over time.'; return; }
+  document.getElementById('measureHint').textContent='';
+  tiles.innerHTML=any.map(x=>`<div class="stat-tile"><div class="st-l">${x.mm.label}</div><div class="st-v">${Math.round(x.v*10)/10}</div><div class="st-s">${unit}</div></div>`).join('');
+  const m=get('nt_measure',{});
+  const withData=MEASURES.filter(mm=>Object.keys(m).some(d=>m[d][mm.k]!=null));
+  const pick=document.getElementById('measurePick'); const prev=pick.value;
+  pick.innerHTML=withData.map(mm=>`<option value="${mm.k}">${mm.label}</option>`).join('');
+  if(withData.some(mm=>mm.k===prev)) pick.value=prev;
+  document.getElementById('measureChartWrap').style.display = withData.length ? 'block':'none';
+  drawMeasureChart();
+}
+function drawMeasureChart(){
+  if(typeof Chart==='undefined') return;
+  const pick=document.getElementById('measurePick'); const k=pick&&pick.value; if(!k) return;
+  const m=get('nt_measure',{}); const dates=Object.keys(m).filter(d=>m[d][k]!=null).sort();
+  const ctx=document.getElementById('measureChart'); if(measureChart) measureChart.destroy();
+  const labels=dates.map(d=>{ const p=d.split('-'); return p[1]+'/'+p[2]; });
+  measureChart=new Chart(ctx,{ type:'line',
+    data:{ labels, datasets:[{ label:k, data:dates.map(d=>m[d][k]), borderColor:'#0ea5e9', backgroundColor:'rgba(14,165,233,.12)', fill:true, tension:.25, pointRadius:3 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} } });
+}
+function openMeasure(){
+  document.getElementById('mUnit').value=get('nt_measureunit','in');
+  document.getElementById('mDate').value=dateKey(new Date());
+  const today=(get('nt_measure',{})[dateKey(new Date())])||{};
+  document.getElementById('measureFields').innerHTML='<div class="grid2">'+MEASURES.map(mm=>
+    `<div class="field"><label>${mm.label}</label><input id="ms_${mm.k}" type="number" inputmode="decimal" placeholder="—" value="${today[mm.k]!=null?today[mm.k]:''}"></div>`).join('')+'</div>';
+  document.getElementById('measureOverlay').classList.add('open');
+}
+function closeMeasure(){ document.getElementById('measureOverlay').classList.remove('open'); }
+function saveMeasure(){
+  set('nt_measureunit', document.getElementById('mUnit').value);
+  const date=document.getElementById('mDate').value||dateKey(new Date());
+  const m=get('nt_measure',{}); const rec=Object.assign({}, m[date]||{});
+  MEASURES.forEach(mm=>{ const v=parseFloat(document.getElementById('ms_'+mm.k).value); if(!isNaN(v)) rec[mm.k]=Math.round(v*10)/10; });
+  if(Object.keys(rec).length){ m[date]=rec; set('nt_measure',m); }
+  closeMeasure(); toast('Measurements saved'); renderMeasure();
+}
+/* ---------- Blood pressure ---------- */
+function bpCategory(sys,dia){
+  if(sys>=180||dia>=120) return {t:'Hypertensive crisis', c:'#b91c1c'};
+  if(sys>=140||dia>=90)  return {t:'Stage 2 high', c:'#dc2626'};
+  if(sys>=130||dia>=80)  return {t:'Stage 1 high', c:'#f59e0b'};
+  if(sys>=120)           return {t:'Elevated', c:'#eab308'};
+  return {t:'Normal', c:'#10b981'};
+}
+function renderBp(){
+  const arr=get('nt_bp',[]); const latest=document.getElementById('bpLatest'); if(!latest) return;
+  if(!arr.length){ latest.innerHTML=''; document.getElementById('bpChartWrap').style.display='none';
+    document.getElementById('bpHint').textContent='Tap “Log” to record a reading (systolic / diastolic, plus optional pulse).'; return; }
+  document.getElementById('bpHint').textContent='';
+  const sorted=arr.slice().sort((a,b)=>((a.date+(a.time||'')).localeCompare(b.date+(b.time||''))));
+  const l=sorted[sorted.length-1]; const cat=bpCategory(l.sys,l.dia);
+  latest.innerHTML=`<div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+      <div style="font-size:1.8rem; font-weight:800;">${l.sys}/${l.dia}</div>
+      <div style="font-weight:700; color:${cat.c};">${cat.t}</div>
+      ${l.pulse?`<div class="muted">· ${l.pulse} bpm</div>`:''}</div>
+    <div class="muted" style="font-size:.8rem; margin-top:2px;">Latest: ${l.date}${l.time?' '+l.time:''}</div>`;
+  document.getElementById('bpChartWrap').style.display='block';
+  if(typeof Chart==='undefined') return;
+  const ctx=document.getElementById('bpChart'); if(bpChart) bpChart.destroy();
+  const labels=sorted.map(r=>{ const p=r.date.split('-'); return p[1]+'/'+p[2]; });
+  bpChart=new Chart(ctx,{ type:'line',
+    data:{ labels, datasets:[
+      { label:'Systolic', data:sorted.map(r=>r.sys), borderColor:'#ef4444', backgroundColor:'transparent', tension:.25, pointRadius:3 },
+      { label:'Diastolic', data:sorted.map(r=>r.dia), borderColor:'#3b82f6', backgroundColor:'transparent', tension:.25, pointRadius:3 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} } });
+}
+function openBp(){
+  const now=new Date();
+  document.getElementById('bpDate').value=dateKey(now);
+  document.getElementById('bpTime').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  ['bpSys','bpDia','bpPulse'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('bpOverlay').classList.add('open');
+}
+function closeBp(){ document.getElementById('bpOverlay').classList.remove('open'); }
+function saveBp(){
+  const sys=parseInt(document.getElementById('bpSys').value), dia=parseInt(document.getElementById('bpDia').value);
+  if(isNaN(sys)||isNaN(dia)){ toast('Enter both systolic and diastolic'); return; }
+  const pulse=parseInt(document.getElementById('bpPulse').value);
+  const arr=get('nt_bp',[]);
+  arr.push({ date:document.getElementById('bpDate').value||dateKey(new Date()), time:document.getElementById('bpTime').value||'', sys, dia, pulse:isNaN(pulse)?null:pulse });
+  set('nt_bp',arr); closeBp(); toast('Blood pressure saved'); renderBp();
 }
 function drawBmiChart(){
   const bmi=bmiSeries(); const keys=Object.keys(bmi).sort();
@@ -1870,13 +2034,13 @@ function saveAI(){
 function installApp(){ if(deferredInstall){ deferredInstall.prompt(); deferredInstall=null; document.getElementById('installBtn').style.display='none'; } }
 function copySyncUrl(){ const u=location.origin+location.pathname; if(navigator.clipboard){ navigator.clipboard.writeText(u).then(()=>toast('Sync URL copied'),()=>toast(u)); } else toast(u); }
 function exportData(){
-  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_favorites','nt_recent','nt_aiprovider','nt_aimodel','nt_geminimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
+  const dump={}; ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_measure','nt_measureunit','nt_bp','nt_recipes','nt_favorites','nt_recent','nt_aiprovider','nt_aimodel','nt_geminimodel'].forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) dump[k]=JSON.parse(v); });
   const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nutritrack-backup-'+dateKey(new Date())+'.json'; a.click();
 }
 function clearAll(){
   if(!confirm('Erase all logged food, water, activity, weight, recipes and goals on this device? Your API key is kept. This cannot be undone.')) return;
-  ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_recipes','nt_favorites','nt_recent'].forEach(k=>localStorage.removeItem(k));
+  ['nt_log','nt_goals','nt_microgoals','nt_planner','nt_weight','nt_bodyfat','nt_bmi','nt_weightunit','nt_measure','nt_measureunit','nt_bp','nt_recipes','nt_favorites','nt_recent'].forEach(k=>localStorage.removeItem(k));
   render(); loadMoreForm(); toast('Data erased');
 }
 
