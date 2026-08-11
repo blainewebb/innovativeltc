@@ -1,0 +1,15 @@
+{
+  "_note": "Named quote scenarios Blaine runs often. Each 'option' fixes everything EXCEPT the applicant — at runtime only age + gender (+ state) are supplied. Edit the options to match exactly what Blaine presents. Carriers reference the folders under quoting/ (currently 'ngl').",
+  "scenarios": {
+    "standard-3": {
+      "label": "Standard 3-Option Comparison",
+      "status": "EXAMPLE — replace these three options with Blaine's real typical scenario",
+      "carrier": "ngl",
+      "options": [
+        {"name": "Option 1 — Essential",    "monthly_benefit": 3000, "benefit_period": "36", "elimination": "90", "inflation": 0.03},
+        {"name": "Option 2 — Recommended",  "monthly_benefit": 4500, "benefit_period": "36", "elimination": "90", "inflation": 0.03},
+        {"name": "Option 3 — Premium",      "monthly_benefit": 4500, "benefit_period": "48", "elimination": "90", "inflation": 0.05}
+      ]
+    }
+  }
+}

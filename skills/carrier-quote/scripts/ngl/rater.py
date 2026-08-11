@@ -154,6 +154,31 @@ def quote(
     return result
 
 
+def _cost_figure(result):
+    """The premium a quote result is 'quoting at' — single premium or modal payment."""
+    return result.get("single_premium", result.get("modal_payment"))
+
+
+def benefit_for_premium(target_premium, age, gender, mode="monthly", **kw):
+    """Reverse quote: 'If they can spend $X, how much benefit does that buy?'
+
+    Premium is exactly linear in the monthly benefit (benefit only scales the unit
+    count; every other factor is a constant multiplier), so we price one reference
+    unit and scale. `target_premium` is in the same cadence as `mode` (monthly target
+    → monthly premium), or the single premium if pay='single'. Returns the solved
+    monthly benefit plus the full quote at that benefit.
+    """
+    ref = quote(age, gender, RATES["base_unit"], mode=mode, **kw)   # $300/mo = 1 unit
+    ref_cost = _cost_figure(ref)
+    monthly_benefit = RATES["base_unit"] * (target_premium / ref_cost)
+    full = quote(age, gender, monthly_benefit, mode=mode, **kw)
+    return {
+        "target_premium": target_premium,
+        "solved_monthly_benefit": round(monthly_benefit, 2),
+        "quote": full,
+    }
+
+
 def quote_couple(age1, gender1, age2, gender2, monthly_benefit, **kw):
     """Joint (two-life) NGL policy.
 

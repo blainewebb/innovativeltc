@@ -94,6 +94,40 @@ them), and **Premier is the only class** he quotes. A substandard "Class One" of
 (+35%) exists as an optional `class_one=True` toggle but stays off unless Blaine
 explicitly asks to show a rated scenario.
 
+## Saved scenarios ("run my standard 3 for a 62F")
+
+Blaine runs the same option sets over and over. Those live in `scripts/scenarios.json`
+as named scenarios — each option fixes everything except the applicant. At runtime he
+supplies only age + gender (+ state), and every option is quoted at once:
+
+```
+python3 scripts/run_scenario.py --scenario standard-3 --age 62 --gender female --state TX
+```
+
+**Defining / editing a scenario:** when Blaine says "save this as my standard three:
+Option 1 is X, Option 2 is Y, Option 3 is Z," write those options into
+`scripts/scenarios.json` under a new key (or edit an existing one). Each option takes
+`name`, `monthly_benefit`, `benefit_period`, `elimination`, `inflation`, and any other
+`quote()` argument. The shipped `standard-3` is a **placeholder example** — replace it
+with Blaine's real options the first time he specifies them. A scenario names a
+`carrier` (currently `ngl`); as carriers are added, an option can name its own carrier
+so one scenario spans multiple carriers.
+
+## Budget / reverse quoting ("what does $300/mo buy?")
+
+Given a target premium, solve for the benefit it buys — premium is exactly linear in
+the monthly benefit, so this is precise, not a search:
+
+```
+python3 scripts/run_scenario.py --scenario standard-3 --age 62 --gender female --budget 300
+```
+
+That answers "if they can spend $300/mo, how much coverage does each option design
+buy?" For a single config, `rater.benefit_for_premium(target, age, gender, ...)` does
+the same. When Blaine asks "what can I get across these carriers for $X," run the
+budget solve for each authorized carrier and lay the results side by side — today
+that's NGL; the same call fans out as carriers are added.
+
 ## Quoting a couple
 
 Use `quote_couple(age1, gender1, age2, gender2, monthly_benefit, ...)` for a joint
