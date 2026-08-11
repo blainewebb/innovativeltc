@@ -86,9 +86,10 @@ inferred from the tables, not from NGL's formula doc. Until the validation log i
 
 - Frame outputs as **"calculated from NGL's published rate tables — verify in NGL's
   software before it's binding."** Do not present them as official NGL quotes.
-- A couple of specific items are known-open: Return-of-Premium riders (LROP/LROPS)
-  are intentionally **off**, and only the **Premier** risk class exists in this
-  filing. See the reference for the full list.
+- Settled per Blaine: Return-of-Premium riders are **permanently off** (he doesn't
+  sell them), and **Premier is the only class** he quotes. A substandard "Class One"
+  offer (+35%) exists as an optional `class_one=True` toggle but stays off unless
+  Blaine explicitly asks to show a rated scenario.
 
 Once Blaine confirms a few configs match to the dollar, note it in the validation
 log and the framing can relax to a plain quote.

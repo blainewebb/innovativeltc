@@ -42,6 +42,7 @@ def quote(
     pay="level",            # 'level' | '10pay' | 'single'
     mode="monthly",         # 'annual','semiannual','quarterly','monthly'
     risk_class="Premier",
+    class_one=False,        # substandard "Class One" offer = +35% (Premier is the only standard class NGL writes)
     state=None,
     worksite=False,
     rider_shared_additional=False,   # SBA rider (needs total benefit period)
@@ -96,6 +97,9 @@ def quote(
     annual *= rcf
     if rcf != 1.0:
         steps.append((f"× {rcf} risk class ({risk_class})", annual))
+    if class_one:
+        annual *= 1.35
+        steps.append(("× 1.35 Class One (substandard) offer", annual))
 
     # --- optional riders (multiplicative) ---
     if rider_shared_additional:

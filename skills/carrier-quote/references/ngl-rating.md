@@ -42,15 +42,14 @@ illustration:
 1. **Factor order / all-multiplicative.** The rater multiplies all factors together
    (standard LTC practice). Confirm NGL applies COLA, benefit-period, and
    elimination factors this way rather than some additive combination.
-2. **Riders not yet enabled.** The Return-of-Premium riders (LROP / LROPS) are in
-   the workbook but **excluded from the rater** — their columns could be read as a
-   per-$300 add-on *or* a multiplier, and guessing wrong on a client quote isn't
-   worth it. Left off until confirmed. The Shared-Additional, First-Day HCCS, and
-   Shortened-Benefit riders are wired in as multipliers (labeled that way in the
-   workbook) but should still be spot-checked.
-3. **Single risk class.** This filing lists only **Premier** (factor 1.00). If NGL
-   also writes Select/Standard classes with their own factors, they aren't in this
-   workbook — get that table to quote them.
+2. **Return-of-Premium riders (LROP / LROPS) are permanently off** — Blaine doesn't
+   sell them, so they're excluded by design, not pending. The Shared-Additional,
+   First-Day HCCS, and Shortened-Benefit riders are wired in as multipliers (labeled
+   that way in the workbook) but should still be spot-checked if used.
+3. **Premier is the only class.** Confirmed by Blaine: NGL writes only Premier on
+   this product. Underwriting occasionally returns a substandard **"Class One" offer
+   at +35%**; that's available as an optional `class_one=True` toggle (×1.35) but is
+   off by default, since Blaine normally quotes Premier.
 
 ## Validation log
 
