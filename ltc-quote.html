@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Innovative LTC — Instant Quote</title>
+<style>
+  :root{
+    --primary:#2563eb; --primary-d:#1d4ed8; --success:#059669; --bg:#f1f5f9;
+    --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --soft:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:0}
+  .wrap{max-width:920px;margin:0 auto;padding:20px 16px 60px}
+  header.top{display:flex;align-items:center;gap:12px;padding:8px 0 20px}
+  .brand{font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
+  .brand span{color:var(--primary)}
+  .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
+  .badge{margin-left:auto;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
+  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .tab{flex:1;min-width:120px;text-align:center;padding:11px 8px;border-radius:10px;border:1px solid var(--border);background:var(--soft);color:var(--muted);font-weight:700;cursor:pointer;font-size:.92rem;transition:.15s}
+  .tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+  h2{font-size:1.05rem;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .field label{display:block;font-weight:600;font-size:.82rem;margin-bottom:5px;color:#334155}
+  input,select{width:100%;padding:11px;border:1px solid var(--border);border-radius:9px;font-size:1rem;background:#fff;outline:none}
+  input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .riders{display:flex;flex-wrap:wrap;gap:14px;margin-top:4px}
+  .riders label{display:flex;align-items:center;gap:7px;font-weight:600;font-size:.85rem;color:#334155}
+  .riders input{width:auto}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  button.run{background:var(--primary);color:#fff;border:none;padding:13px 22px;border-radius:10px;font-weight:800;font-size:1rem;cursor:pointer}
+  button.run:hover{background:var(--primary-d)}
+  button.ghost{background:#fff;color:var(--primary);border:1px solid var(--primary);padding:13px 18px;border-radius:10px;font-weight:700;cursor:pointer}
+  .hint{color:var(--muted);font-size:.8rem;margin-top:6px}
+  .shorthand{display:flex;gap:8px;margin-bottom:16px}
+  .shorthand input{font-family:ui-monospace,Menlo,monospace}
+  /* results */
+  #result:empty{display:none}
+  .res-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px}
+  .price{font-size:2.1rem;font-weight:800;color:var(--primary);line-height:1}
+  .price small{font-size:.9rem;color:var(--muted);font-weight:600}
+  .price2{font-size:1rem;color:var(--muted);font-weight:600}
+  .config-line{font-size:.86rem;color:#475569;background:var(--soft);padding:8px 12px;border-radius:8px;margin-bottom:12px}
+  table.opts{width:100%;border-collapse:collapse;margin:6px 0}
+  table.opts th,table.opts td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:.92rem}
+  table.opts th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+  table.opts td.p{font-weight:800;color:var(--primary);text-align:right;white-space:nowrap}
+  table.opts td.b{text-align:right;white-space:nowrap}
+  details.steps{margin-top:10px}
+  details.steps summary{cursor:pointer;color:var(--primary);font-weight:600;font-size:.85rem}
+  .steps ul{margin:8px 0 0;padding-left:18px;color:#475569;font-size:.82rem;line-height:1.7}
+  .disc{color:var(--muted);font-size:.72rem;line-height:1.5;margin-top:14px;border-top:1px dashed var(--border);padding-top:10px}
+  /* saved combos */
+  .combo{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--soft)}
+  .combo .nm{font-weight:700;font-size:.9rem}
+  .combo .cfg{color:var(--muted);font-size:.78rem}
+  .combo .sp{margin-left:auto;display:flex;gap:6px}
+  .combo button{border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:.8rem}
+  .combo .go{background:var(--primary);color:#fff}
+  .combo .del{background:#fef2f2;color:#dc2626}
+  .empty{color:var(--muted);font-size:.85rem;font-style:italic}
+  .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:10px 12px;border-radius:9px;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">Innovative <span>LTC</span></div>
+      <div class="sub">Instant quote engine</div>
+    </div>
+    <div class="badge">✓ NGL EssentialLTC · verified rates</div>
+  </header>
+
+  <div class="card">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-mode="single">Single</div>
+      <div class="tab" data-mode="couple">Couple</div>
+      <div class="tab" data-mode="budget">Budget</div>
+      <div class="tab" data-mode="standard">My Standard</div>
+    </div>
+
+    <!-- SINGLE -->
+    <div class="pane" data-pane="single">
+      <div class="shorthand">
+        <input id="sh" placeholder="Quick type:  62F 4500 3yr 3%   (age, gender, monthly benefit, term, inflation)">
+        <button class="ghost" onclick="parseShorthand()">Fill</button>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>Gender</label><select id="s_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="100"></div>
+        <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+        <div class="field"><label>Elimination period</label><select id="s_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
+        <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
+        <div class="field"><label>Payment plan</label><select id="s_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
+        <div class="field"><label>Premium mode</label><select id="s_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
+        <div class="field"><label>State</label><select id="s_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+      </div>
+      <div class="riders">
+        <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
+        <label><input type="checkbox" id="s_fdc"> First-day HCCS rider</label>
+        <label><input type="checkbox" id="s_sbn"> Shortened benefit rider</label>
+      </div>
+      <div class="actions">
+        <button class="run" onclick="runSingle()">Run quote</button>
+        <button class="ghost" onclick="saveCombo()">Save this combination</button>
+      </div>
+    </div>
+
+    <!-- COUPLE -->
+    <div class="pane" data-pane="couple" hidden>
+      <div class="grid">
+        <div class="field"><label>Client 1 — age</label><input id="c_age1" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>Client 1 — gender</label><select id="c_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>Client 2 — age</label><input id="c_age2" type="number" value="60" min="18" max="79"></div>
+        <div class="field"><label>Client 2 — gender</label><select id="c_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="100"></div>
+        <div class="field"><label>Benefit period</label><select id="c_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
+        <div class="field"><label>Elimination period</label><select id="c_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
+        <div class="field"><label>Inflation protection</label><select id="c_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
+      </div>
+      <div class="riders"><label><input type="checkbox" id="c_sba"> Shared-care rider</label></div>
+      <div class="actions"><button class="run" onclick="runCouple()">Run couple quote</button></div>
+    </div>
+
+    <!-- BUDGET -->
+    <div class="pane" data-pane="budget" hidden>
+      <p class="hint" style="margin-top:0">“If they can spend $X a month, how much coverage does that buy?”</p>
+      <div class="grid">
+        <div class="field"><label>Monthly budget ($)</label><input id="b_target" type="number" value="300" step="10"></div>
+        <div class="field"><label>Issue age</label><input id="b_age" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>Gender</label><select id="b_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="field"><label>Benefit period</label><select id="b_bp"><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option></select></div>
+        <div class="field"><label>Inflation protection</label><select id="b_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
+        <div class="field"><label>State</label><select id="b_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+      </div>
+      <div class="actions"><button class="run" onclick="runBudget()">Solve coverage</button></div>
+    </div>
+
+    <!-- STANDARD -->
+    <div class="pane" data-pane="standard" hidden>
+      <p class="hint" style="margin-top:0" id="std_desc"></p>
+      <div class="grid">
+        <div class="field"><label>Gender</label><select id="t_gender"><option value="female">Single female</option><option value="male">Single male</option></select></div>
+        <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>State</label><select id="t_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+      </div>
+      <div class="actions"><button class="run" onclick="runStandard()">Run my standard</button></div>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" hidden><div id="result"></div></div>
+
+  <div class="card">
+    <h2>Saved combinations</h2>
+    <div id="combos"><p class="empty">No saved combinations yet. Set up a quote on the Single tab and hit “Save this combination.”</p></div>
+  </div>
+</div>
+
+<script>
+// ltc-engine.js — NGL EssentialLTC quoting engine (browser + node).
+// Data and algorithm ported verbatim from the verified Python rater (quoting/ngl).
+// Verified to the penny against 6 real NGL illustrations. Do not hand-edit the data.
+
+const RATES = {
+  "product": "NGL EssentialLTC (NLTC200)",
+  "base_config": "Annual / 36-Month Benefit Period / Premier Risk / 90-Day Elimination / Reimbursement / per $300 monthly benefit",
+  "tables": {
+    "Generic Non-Worksite": {
+      "18-40": {
+        "base": {
+          "male": 39.91,
+          "female": 65.33,
+          "joint": 81.66
+        },
+        "cola": {
+          "0.05": 5.35,
+          "0.04": 3.493,
+          "0.03": 2.28,
+          "0.02": 1.7,
+          "0.01": 1.38
+        },
+        "tenpay": 3.28,
+        "singlepay": 28.5
+      },
+      "41": {
+        "base": {
+          "male": 40.9,
+          "female": 67,
+          "joint": 83.75
+        },
+        "cola": {
+          "0.05": 5.25,
+          "0.04": 3.449,
+          "0.03": 2.26,
+          "0.02": 1.694,
+          "0.01": 1.374
+        },
+        "tenpay": 3.22,
+        "singlepay": 27.88
+      },
+      "42": {
+        "base": {
+          "male": 41.92,
+          "female": 68.71,
+          "joint": 85.89
+        },
+        "cola": {
+          "0.05": 5.14,
+          "0.04": 3.405,
+          "0.03": 2.25,
+          "0.02": 1.688,
+          "0.01": 1.368
+        },
+        "tenpay": 3.15,
+        "singlepay": 27.28
+      },
+      "43": {
+        "base": {
+          "male": 42.96,
+          "female": 70.46,
+          "joint": 88.08
+        },
+        "cola": {
+          "0.05": 5.05,
+          "0.04": 3.361,
+          "0.03": 2.23,
+          "0.02": 1.682,
+          "0.01": 1.362
+        },
+        "tenpay": 3.09,
+        "singlepay": 26.68
+      },
+      "44": {
+        "base": {
+          "male": 44.02,
+          "female": 72.26,
+          "joint": 90.33
+        },
+        "cola": {
+          "0.05": 4.95,
+          "0.04": 3.317,
+          "0.03": 2.21,
+          "0.02": 1.676,
+          "0.01": 1.356
+        },
+        "tenpay": 3.03,
+        "singlepay": 26.1
+      },
+      "45": {
+        "base": {
+          "male": 45.12,
+          "female": 74.11,
+          "joint": 92.64
+        },
+        "cola": {
+          "0.05": 4.85,
+          "0.04": 3.274,
+          "0.03": 2.2,
+          "0.02": 1.67,
+          "0.01": 1.35
+        },
+        "tenpay": 2.97,
+        "singlepay": 25.54
+      },
+      "46": {
+        "base": {
+          "male": 46.24,
+          "female": 76,
+          "joint": 95
+        },
+        "cola": {
+          "0.05": 4.76,
+          "0.04": 3.23,
+          "0.03": 2.18,
+          "0.02": 1.664,
+          "0.01": 1.344
+        },
+        "tenpay": 2.91,
+        "singlepay": 24.98
+      },
+      "47": {
+        "base": {
+          "male": 47.38,
+          "female": 77.94,
+          "joint": 97.43
+        },
+        "cola": {
+          "0.05": 4.67,
+          "0.04": 3.186,
+          "0.03": 2.17,
+          "0.02": 1.658,
+          "0.01": 1.338
+        },
+        "tenpay": 2.85,
+        "singlepay": 24.44
+      },
+      "48": {
+        "base": {
+          "male": 49.53,
+          "female": 81.53,
+          "joint": 101.91
+        },
+        "cola": {
+          "0.05": 4.58,
+          "0.04": 3.142,
+          "0.03": 2.15,
+          "0.02": 1.652,
+          "0.01": 1.332
+        },
+        "tenpay": 2.8,
+        "singlepay": 23.91
+      },
+      "49": {
+        "base": {
+          "male": 50.76,
+          "female": 83.61,
+          "joint": 104.51
+        },
+        "cola": {
+          "0.05": 4.49,
+          "0.04": 3.098,
+          "0.03": 2.14,
+          "0.02": 1.646,
+          "0.01": 1.326
+        },
+        "tenpay": 2.74,
+        "singlepay": 23.39
+      },
+      "50": {
+        "base": {
+          "male": 52.02,
+          "female": 85.74,
+          "joint": 107.18
+        },
+        "cola": {
+          "0.05": 4.4,
+          "0.04": 3.054,
+          "0.03": 2.12,
+          "0.02": 1.64,
+          "0.01": 1.32
+        },
+        "tenpay": 2.69,
+        "singlepay": 22.88
+      },
+      "51": {
+        "base": {
+          "male": 54.61,
+          "female": 90.04,
+          "joint": 112.55
+        },
+        "cola": {
+          "0.05": 4.27,
+          "0.04": 2.994,
+          "0.03": 2.09,
+          "0.02": 1.633,
+          "0.01": 1.313
+        },
+        "tenpay": 2.66,
+        "singlepay": 22.6
+      },
+      "52": {
+        "base": {
+          "male": 57.34,
+          "female": 94.55,
+          "joint": 118.19
+        },
+        "cola": {
+          "0.05": 4.14,
+          "0.04": 2.933,
+          "0.03": 2.06,
+          "0.02": 1.625,
+          "0.01": 1.306
+        },
+        "tenpay": 2.62,
+        "singlepay": 22.33
+      },
+      "53": {
+        "base": {
+          "male": 60.19,
+          "female": 99.28,
+          "joint": 124.1
+        },
+        "cola": {
+          "0.05": 4.02,
+          "0.04": 2.873,
+          "0.03": 2.03,
+          "0.02": 1.618,
+          "0.01": 1.299
+        },
+        "tenpay": 2.59,
+        "singlepay": 22.05
+      },
+      "54": {
+        "base": {
+          "male": 63.17,
+          "female": 104.22,
+          "joint": 130.28
+        },
+        "cola": {
+          "0.05": 3.9,
+          "0.04": 2.812,
+          "0.03": 2,
+          "0.02": 1.61,
+          "0.01": 1.292
+        },
+        "tenpay": 2.56,
+        "singlepay": 21.79
+      },
+      "55": {
+        "base": {
+          "male": 65.67,
+          "female": 108.39,
+          "joint": 135.49
+        },
+        "cola": {
+          "0.05": 3.79,
+          "0.04": 2.752,
+          "0.03": 1.98,
+          "0.02": 1.603,
+          "0.01": 1.285
+        },
+        "tenpay": 2.53,
+        "singlepay": 21.52
+      },
+      "56": {
+        "base": {
+          "male": 68.92,
+          "female": 113.77,
+          "joint": 142.21
+        },
+        "cola": {
+          "0.05": 3.68,
+          "0.04": 2.691,
+          "0.03": 1.95,
+          "0.02": 1.595,
+          "0.01": 1.278
+        },
+        "tenpay": 2.5,
+        "singlepay": 21.26
+      },
+      "57": {
+        "base": {
+          "male": 71.66,
+          "female": 118.32,
+          "joint": 147.9
+        },
+        "cola": {
+          "0.05": 3.57,
+          "0.04": 2.631,
+          "0.03": 1.92,
+          "0.02": 1.588,
+          "0.01": 1.271
+        },
+        "tenpay": 2.47,
+        "singlepay": 21
+      },
+      "58": {
+        "base": {
+          "male": 74.5,
+          "female": 123.05,
+          "joint": 153.81
+        },
+        "cola": {
+          "0.05": 3.46,
+          "0.04": 2.57,
+          "0.03": 1.89,
+          "0.02": 1.58,
+          "0.01": 1.264
+        },
+        "tenpay": 2.44,
+        "singlepay": 20.74
+      },
+      "59": {
+        "base": {
+          "male": 77.46,
+          "female": 127.96,
+          "joint": 159.95
+        },
+        "cola": {
+          "0.05": 3.36,
+          "0.04": 2.51,
+          "0.03": 1.87,
+          "0.02": 1.573,
+          "0.01": 1.257
+        },
+        "tenpay": 2.41,
+        "singlepay": 20.49
+      },
+      "60": {
+        "base": {
+          "male": 80.53,
+          "female": 133.08,
+          "joint": 166.35
+        },
+        "cola": {
+          "0.05": 3.26,
+          "0.04": 2.449,
+          "0.03": 1.84,
+          "0.02": 1.565,
+          "0.01": 1.25
+        },
+        "tenpay": 2.38,
+        "singlepay": 20.24
+      },
+      "61": {
+        "base": {
+          "male": 87.1,
+          "female": 143.63,
+          "joint": 179.54
+        },
+        "cola": {
+          "0.05": 3.08,
+          "0.04": 2.366,
+          "0.03": 1.79,
+          "0.02": 1.538,
+          "0.01": 1.239
+        },
+        "tenpay": 2.34,
+        "singlepay": 19.6
+      },
+      "62": {
+        "base": {
+          "male": 94.19,
+          "female": 155,
+          "joint": 193.75
+        },
+        "cola": {
+          "0.05": 2.91,
+          "0.04": 2.283,
+          "0.03": 1.74,
+          "0.02": 1.511,
+          "0.01": 1.228
+        },
+        "tenpay": 2.3,
+        "singlepay": 18.99
+      },
+      "63": {
+        "base": {
+          "male": 101.87,
+          "female": 167.28,
+          "joint": 209.1
+        },
+        "cola": {
+          "0.05": 2.75,
+          "0.04": 2.2,
+          "0.03": 1.7,
+          "0.02": 1.483,
+          "0.01": 1.217
+        },
+        "tenpay": 2.26,
+        "singlepay": 18.39
+      },
+      "64": {
+        "base": {
+          "male": 110.18,
+          "female": 180.54,
+          "joint": 225.68
+        },
+        "cola": {
+          "0.05": 2.6,
+          "0.04": 2.117,
+          "0.03": 1.65,
+          "0.02": 1.456,
+          "0.01": 1.206
+        },
+        "tenpay": 2.22,
+        "singlepay": 17.81
+      },
+      "65": {
+        "base": {
+          "male": 119.16,
+          "female": 194.85,
+          "joint": 243.56
+        },
+        "cola": {
+          "0.05": 2.46,
+          "0.04": 2.034,
+          "0.03": 1.61,
+          "0.02": 1.429,
+          "0.01": 1.195
+        },
+        "tenpay": 2.19,
+        "singlepay": 17.25
+      },
+      "66": {
+        "base": {
+          "male": 127.67,
+          "female": 208.32,
+          "joint": 260.4
+        },
+        "cola": {
+          "0.05": 2.33,
+          "0.04": 1.951,
+          "0.03": 1.57,
+          "0.02": 1.402,
+          "0.01": 1.184
+        },
+        "tenpay": 2.15,
+        "singlepay": 16.71
+      },
+      "67": {
+        "base": {
+          "male": 136.77,
+          "female": 222.71,
+          "joint": 278.39
+        },
+        "cola": {
+          "0.05": 2.2,
+          "0.04": 1.868,
+          "0.03": 1.53,
+          "0.02": 1.375,
+          "0.01": 1.173
+        },
+        "tenpay": 2.11,
+        "singlepay": 16.18
+      },
+      "68": {
+        "base": {
+          "male": 147.92,
+          "female": 240.36,
+          "joint": 300.45
+        },
+        "cola": {
+          "0.05": 2.08,
+          "0.04": 1.785,
+          "0.03": 1.49,
+          "0.02": 1.347,
+          "0.01": 1.162
+        },
+        "tenpay": 2.08,
+        "singlepay": 15.67
+      },
+      "69": {
+        "base": {
+          "male": 159.99,
+          "female": 259.39,
+          "joint": 324.24
+        },
+        "cola": {
+          "0.05": 1.97,
+          "0.04": 1.702,
+          "0.03": 1.45,
+          "0.02": 1.32,
+          "0.01": 1.151
+        },
+        "tenpay": 2.04,
+        "singlepay": 15.18
+      },
+      "70": {
+        "base": {
+          "male": 173.03,
+          "female": 279.95,
+          "joint": 349.94
+        },
+        "cola": {
+          "0.05": 1.86,
+          "0.04": 1.619,
+          "0.03": 1.41,
+          "0.02": 1.293,
+          "0.01": 1.14
+        },
+        "tenpay": 2.01,
+        "singlepay": 14.7
+      },
+      "71": {
+        "base": {
+          "male": 189.02,
+          "female": 300.58,
+          "joint": 375.73
+        },
+        "cola": {
+          "0.05": 1.81,
+          "0.04": 1.589,
+          "0.03": 1.39,
+          "0.02": 1.283,
+          "0.01": 1.134
+        },
+        "tenpay": 1.97,
+        "singlepay": 14.39
+      },
+      "72": {
+        "base": {
+          "male": 208.44,
+          "female": 325.81,
+          "joint": 407.26
+        },
+        "cola": {
+          "0.05": 1.75,
+          "0.04": 1.559,
+          "0.03": 1.37,
+          "0.02": 1.272,
+          "0.01": 1.128
+        },
+        "tenpay": 1.92,
+        "singlepay": 14.09
+      },
+      "73": {
+        "base": {
+          "male": 232.12,
+          "female": 356.61,
+          "joint": 445.76
+        },
+        "cola": {
+          "0.05": 1.7,
+          "0.04": 1.529,
+          "0.03": 1.35,
+          "0.02": 1.262,
+          "0.01": 1.122
+        },
+        "tenpay": 1.88,
+        "singlepay": 13.8
+      },
+      "74": {
+        "base": {
+          "male": 253.41,
+          "female": 382.67,
+          "joint": 478.34
+        },
+        "cola": {
+          "0.05": 1.66,
+          "0.04": 1.499,
+          "0.03": 1.34,
+          "0.02": 1.252,
+          "0.01": 1.116
+        },
+        "tenpay": 1.84,
+        "singlepay": 13.51
+      },
+      "75": {
+        "base": {
+          "male": 282.2,
+          "female": 418.85,
+          "joint": 523.56
+        },
+        "cola": {
+          "0.05": 1.61,
+          "0.04": 1.469,
+          "0.03": 1.32,
+          "0.02": 1.242,
+          "0.01": 1.11
+        },
+        "tenpay": 1.8,
+        "singlepay": 13.23
+      },
+      "76": {
+        "base": {
+          "male": 314.25,
+          "female": 458.45,
+          "joint": 573.06
+        },
+        "cola": {
+          "0.05": 1.56,
+          "0.04": 1.438,
+          "0.03": 1.3,
+          "0.02": 1.231,
+          "0.01": 1.104
+        },
+        "tenpay": 1.76,
+        "singlepay": 12.95
+      },
+      "77": {
+        "base": {
+          "male": 349.95,
+          "female": 501.8,
+          "joint": 627.25
+        },
+        "cola": {
+          "0.05": 1.52,
+          "0.04": 1.408,
+          "0.03": 1.28,
+          "0.02": 1.221,
+          "0.01": 1.098
+        },
+        "tenpay": 1.72,
+        "singlepay": 12.68
+      },
+      "78": {
+        "base": {
+          "male": 389.7,
+          "female": 549.24,
+          "joint": 686.55
+        },
+        "cola": {
+          "0.05": 1.47,
+          "0.04": 1.378,
+          "0.03": 1.26,
+          "0.02": 1.211,
+          "0.01": 1.092
+        },
+        "tenpay": 1.68,
+        "singlepay": 12.41
+      },
+      "79": {
+        "base": {
+          "male": 433.97,
+          "female": 601.17,
+          "joint": 751.46
+        },
+        "cola": {
+          "0.05": 1.43,
+          "0.04": 1.348,
+          "0.03": 1.25,
+          "0.02": 1.2,
+          "0.01": 1.086
+        },
+        "tenpay": 1.65,
+        "singlepay": 12.15
+      }
+    },
+    "Generic Worksite": {
+      "18-40": {
+        "base": {
+          "single": 58.8,
+          "joint": 73.5
+        },
+        "cola": {
+          "0.05": 5.35,
+          "0.04": 3.493,
+          "0.03": 2.28,
+          "0.02": 1.7,
+          "0.01": 1.38
+        },
+        "tenpay": 3.28,
+        "singlepay": 28.5
+      },
+      "41": {
+        "base": {
+          "single": 60.3,
+          "joint": 75.38
+        },
+        "cola": {
+          "0.05": 5.25,
+          "0.04": 3.449,
+          "0.03": 2.26,
+          "0.02": 1.694,
+          "0.01": 1.374
+        },
+        "tenpay": 3.22,
+        "singlepay": 27.88
+      },
+      "42": {
+        "base": {
+          "single": 61.84,
+          "joint": 77.3
+        },
+        "cola": {
+          "0.05": 5.14,
+          "0.04": 3.405,
+          "0.03": 2.25,
+          "0.02": 1.688,
+          "0.01": 1.368
+        },
+        "tenpay": 3.15,
+        "singlepay": 27.28
+      },
+      "43": {
+        "base": {
+          "single": 63.41,
+          "joint": 79.26
+        },
+        "cola": {
+          "0.05": 5.05,
+          "0.04": 3.361,
+          "0.03": 2.23,
+          "0.02": 1.682,
+          "0.01": 1.362
+        },
+        "tenpay": 3.09,
+        "singlepay": 26.68
+      },
+      "44": {
+        "base": {
+          "single": 65.03,
+          "joint": 81.29
+        },
+        "cola": {
+          "0.05": 4.95,
+          "0.04": 3.317,
+          "0.03": 2.21,
+          "0.02": 1.676,
+          "0.01": 1.356
+        },
+        "tenpay": 3.03,
+        "singlepay": 26.1
+      },
+      "45": {
+        "base": {
+          "single": 66.7,
+          "joint": 83.38
+        },
+        "cola": {
+          "0.05": 4.85,
+          "0.04": 3.274,
+          "0.03": 2.2,
+          "0.02": 1.67,
+          "0.01": 1.35
+        },
+        "tenpay": 2.97,
+        "singlepay": 25.54
+      },
+      "46": {
+        "base": {
+          "single": 68.4,
+          "joint": 85.5
+        },
+        "cola": {
+          "0.05": 4.76,
+          "0.04": 3.23,
+          "0.03": 2.18,
+          "0.02": 1.664,
+          "0.01": 1.344
+        },
+        "tenpay": 2.91,
+        "singlepay": 24.98
+      },
+      "47": {
+        "base": {
+          "single": 70.15,
+          "joint": 87.69
+        },
+        "cola": {
+          "0.05": 4.67,
+          "0.04": 3.186,
+          "0.03": 2.17,
+          "0.02": 1.658,
+          "0.01": 1.338
+        },
+        "tenpay": 2.85,
+        "singlepay": 24.44
+      },
+      "48": {
+        "base": {
+          "single": 73.38,
+          "joint": 91.73
+        },
+        "cola": {
+          "0.05": 4.58,
+          "0.04": 3.142,
+          "0.03": 2.15,
+          "0.02": 1.652,
+          "0.01": 1.332
+        },
+        "tenpay": 2.8,
+        "singlepay": 23.91
+      },
+      "49": {
+        "base": {
+          "single": 75.25,
+          "joint": 94.06
+        },
+        "cola": {
+          "0.05": 4.49,
+          "0.04": 3.098,
+          "0.03": 2.14,
+          "0.02": 1.646,
+          "0.01": 1.326
+        },
+        "tenpay": 2.74,
+        "singlepay": 23.39
+      },
+      "50": {
+        "base": {
+          "single": 77.17,
+          "joint": 96.46
+        },
+        "cola": {
+          "0.05": 4.4,
+          "0.04": 3.054,
+          "0.03": 2.12,
+          "0.02": 1.64,
+          "0.01": 1.32
+        },
+        "tenpay": 2.69,
+        "singlepay": 22.88
+      },
+      "51": {
+        "base": {
+          "single": 81.04,
+          "joint": 101.3
+        },
+        "cola": {
+          "0.05": 4.27,
+          "0.04": 2.994,
+          "0.03": 2.09,
+          "0.02": 1.633,
+          "0.01": 1.313
+        },
+        "tenpay": 2.66,
+        "singlepay": 22.6
+      },
+      "52": {
+        "base": {
+          "single": 85.1,
+          "joint": 106.38
+        },
+        "cola": {
+          "0.05": 4.14,
+          "0.04": 2.933,
+          "0.03": 2.06,
+          "0.02": 1.625,
+          "0.01": 1.306
+        },
+        "tenpay": 2.62,
+        "singlepay": 22.33
+      },
+      "53": {
+        "base": {
+          "single": 89.35,
+          "joint": 111.69
+        },
+        "cola": {
+          "0.05": 4.02,
+          "0.04": 2.873,
+          "0.03": 2.03,
+          "0.02": 1.618,
+          "0.01": 1.299
+        },
+        "tenpay": 2.59,
+        "singlepay": 22.05
+      },
+      "54": {
+        "base": {
+          "single": 93.8,
+          "joint": 117.25
+        },
+        "cola": {
+          "0.05": 3.9,
+          "0.04": 2.812,
+          "0.03": 2,
+          "0.02": 1.61,
+          "0.01": 1.292
+        },
+        "tenpay": 2.56,
+        "singlepay": 21.79
+      },
+      "55": {
+        "base": {
+          "single": 97.55,
+          "joint": 121.94
+        },
+        "cola": {
+          "0.05": 3.79,
+          "0.04": 2.752,
+          "0.03": 1.98,
+          "0.02": 1.603,
+          "0.01": 1.285
+        },
+        "tenpay": 2.53,
+        "singlepay": 21.52
+      },
+      "56": {
+        "base": {
+          "single": 102.39,
+          "joint": 127.99
+        },
+        "cola": {
+          "0.05": 3.68,
+          "0.04": 2.691,
+          "0.03": 1.95,
+          "0.02": 1.595,
+          "0.01": 1.278
+        },
+        "tenpay": 2.5,
+        "singlepay": 21.26
+      },
+      "57": {
+        "base": {
+          "single": 106.49,
+          "joint": 133.11
+        },
+        "cola": {
+          "0.05": 3.57,
+          "0.04": 2.631,
+          "0.03": 1.92,
+          "0.02": 1.588,
+          "0.01": 1.271
+        },
+        "tenpay": 2.47,
+        "singlepay": 21
+      },
+      "58": {
+        "base": {
+          "single": 110.75,
+          "joint": 138.44
+        },
+        "cola": {
+          "0.05": 3.46,
+          "0.04": 2.57,
+          "0.03": 1.89,
+          "0.02": 1.58,
+          "0.01": 1.264
+        },
+        "tenpay": 2.44,
+        "singlepay": 20.74
+      },
+      "59": {
+        "base": {
+          "single": 115.16,
+          "joint": 143.95
+        },
+        "cola": {
+          "0.05": 3.36,
+          "0.04": 2.51,
+          "0.03": 1.87,
+          "0.02": 1.573,
+          "0.01": 1.257
+        },
+        "tenpay": 2.41,
+        "singlepay": 20.49
+      },
+      "60": {
+        "base": {
+          "single": 119.77,
+          "joint": 149.71
+        },
+        "cola": {
+          "0.05": 3.26,
+          "0.04": 2.449,
+          "0.03": 1.84,
+          "0.02": 1.565,
+          "0.01": 1.25
+        },
+        "tenpay": 2.38,
+        "singlepay": 20.24
+      },
+      "61": {
+        "base": {
+          "single": 129.27,
+          "joint": 161.59
+        },
+        "cola": {
+          "0.05": 3.08,
+          "0.04": 2.366,
+          "0.03": 1.79,
+          "0.02": 1.538,
+          "0.01": 1.239
+        },
+        "tenpay": 2.34,
+        "singlepay": 19.6
+      },
+      "62": {
+        "base": {
+          "single": 139.5,
+          "joint": 174.38
+        },
+        "cola": {
+          "0.05": 2.91,
+          "0.04": 2.283,
+          "0.03": 1.74,
+          "0.02": 1.511,
+          "0.01": 1.228
+        },
+        "tenpay": 2.3,
+        "singlepay": 18.99
+      },
+      "63": {
+        "base": {
+          "single": 150.55,
+          "joint": 188.19
+        },
+        "cola": {
+          "0.05": 2.75,
+          "0.04": 2.2,
+          "0.03": 1.7,
+          "0.02": 1.483,
+          "0.01": 1.217
+        },
+        "tenpay": 2.26,
+        "singlepay": 18.39
+      },
+      "64": {
+        "base": {
+          "single": 162.49,
+          "joint": 203.11
+        },
+        "cola": {
+          "0.05": 2.6,
+          "0.04": 2.117,
+          "0.03": 1.65,
+          "0.02": 1.456,
+          "0.01": 1.206
+        },
+        "tenpay": 2.22,
+        "singlepay": 17.81
+      },
+      "65": {
+        "base": {
+          "single": 175.37,
+          "joint": 219.21
+        },
+        "cola": {
+          "0.05": 2.46,
+          "0.04": 2.034,
+          "0.03": 1.61,
+          "0.02": 1.429,
+          "0.01": 1.195
+        },
+        "tenpay": 2.19,
+        "singlepay": 17.25
+      },
+      "66": {
+        "base": {
+          "single": 187.49,
+          "joint": 234.36
+        },
+        "cola": {
+          "0.05": 2.33,
+          "0.04": 1.951,
+          "0.03": 1.57,
+          "0.02": 1.402,
+          "0.01": 1.184
+        },
+        "tenpay": 2.15,
+        "singlepay": 16.71
+      },
+      "67": {
+        "base": {
+          "single": 200.44,
+          "joint": 250.55
+        },
+        "cola": {
+          "0.05": 2.2,
+          "0.04": 1.868,
+          "0.03": 1.53,
+          "0.02": 1.375,
+          "0.01": 1.173
+        },
+        "tenpay": 2.11,
+        "singlepay": 16.18
+      },
+      "68": {
+        "base": {
+          "single": 216.32,
+          "joint": 270.4
+        },
+        "cola": {
+          "0.05": 2.08,
+          "0.04": 1.785,
+          "0.03": 1.49,
+          "0.02": 1.347,
+          "0.01": 1.162
+        },
+        "tenpay": 2.08,
+        "singlepay": 15.67
+      },
+      "69": {
+        "base": {
+          "single": 233.45,
+          "joint": 291.81
+        },
+        "cola": {
+          "0.05": 1.97,
+          "0.04": 1.702,
+          "0.03": 1.45,
+          "0.02": 1.32,
+          "0.01": 1.151
+        },
+        "tenpay": 2.04,
+        "singlepay": 15.18
+      },
+      "70": {
+        "base": {
+          "single": 251.96,
+          "joint": 314.95
+        },
+        "cola": {
+          "0.05": 1.86,
+          "0.04": 1.619,
+          "0.03": 1.41,
+          "0.02": 1.293,
+          "0.01": 1.14
+        },
+        "tenpay": 2.01,
+        "singlepay": 14.7
+      },
+      "71": {
+        "base": {
+          "single": 270.52,
+          "joint": 338.15
+        },
+        "cola": {
+          "0.05": 1.81,
+          "0.04": 1.589,
+          "0.03": 1.39,
+          "0.02": 1.283,
+          "0.01": 1.134
+        },
+        "tenpay": 1.97,
+        "singlepay": 14.39
+      },
+      "72": {
+        "base": {
+          "single": 293.23,
+          "joint": 366.54
+        },
+        "cola": {
+          "0.05": 1.75,
+          "0.04": 1.559,
+          "0.03": 1.37,
+          "0.02": 1.272,
+          "0.01": 1.128
+        },
+        "tenpay": 1.92,
+        "singlepay": 14.09
+      },
+      "73": {
+        "base": {
+          "single": 320.95,
+          "joint": 401.19
+        },
+        "cola": {
+          "0.05": 1.7,
+          "0.04": 1.529,
+          "0.03": 1.35,
+          "0.02": 1.262,
+          "0.01": 1.122
+        },
+        "tenpay": 1.88,
+        "singlepay": 13.8
+      },
+      "74": {
+        "base": {
+          "single": 344.4,
+          "joint": 430.5
+        },
+        "cola": {
+          "0.05": 1.66,
+          "0.04": 1.499,
+          "0.03": 1.34,
+          "0.02": 1.252,
+          "0.01": 1.116
+        },
+        "tenpay": 1.84,
+        "singlepay": 13.51
+      },
+      "75": {
+        "base": {
+          "single": 376.97,
+          "joint": 471.21
+        },
+        "cola": {
+          "0.05": 1.61,
+          "0.04": 1.469,
+          "0.03": 1.32,
+          "0.02": 1.242,
+          "0.01": 1.11
+        },
+        "tenpay": 1.8,
+        "singlepay": 13.23
+      },
+      "76": {
+        "base": {
+          "single": 412.61,
+          "joint": 515.76
+        },
+        "cola": {
+          "0.05": 1.56,
+          "0.04": 1.438,
+          "0.03": 1.3,
+          "0.02": 1.231,
+          "0.01": 1.104
+        },
+        "tenpay": 1.76,
+        "singlepay": 12.95
+      },
+      "77": {
+        "base": {
+          "single": 451.62,
+          "joint": 564.53
+        },
+        "cola": {
+          "0.05": 1.52,
+          "0.04": 1.408,
+          "0.03": 1.28,
+          "0.02": 1.221,
+          "0.01": 1.098
+        },
+        "tenpay": 1.72,
+        "singlepay": 12.68
+      },
+      "78": {
+        "base": {
+          "single": 494.32,
+          "joint": 617.9
+        },
+        "cola": {
+          "0.05": 1.47,
+          "0.04": 1.378,
+          "0.03": 1.26,
+          "0.02": 1.211,
+          "0.01": 1.092
+        },
+        "tenpay": 1.68,
+        "singlepay": 12.41
+      },
+      "79": {
+        "base": {
+          "single": 541.05,
+          "joint": 676.31
+        },
+        "cola": {
+          "0.05": 1.43,
+          "0.04": 1.348,
+          "0.03": 1.25,
+          "0.02": 1.2,
+          "0.01": 1.086
+        },
+        "tenpay": 1.65,
+        "singlepay": 12.15
+      }
+    },
+    "CO Non-Worksite": {
+      "18-40": {
+        "base": {
+          "single": 65.33,
+          "joint": 81.66
+        },
+        "cola": {
+          "0.05": 5.35,
+          "0.04": 3.493,
+          "0.03": 2.28,
+          "0.02": 1.7,
+          "0.01": 1.38
+        },
+        "tenpay": 3.28,
+        "singlepay": 28.5
+      },
+      "41": {
+        "base": {
+          "single": 67,
+          "joint": 83.75
+        },
+        "cola": {
+          "0.05": 5.25,
+          "0.04": 3.449,
+          "0.03": 2.26,
+          "0.02": 1.694,
+          "0.01": 1.374
+        },
+        "tenpay": 3.22,
+        "singlepay": 27.88
+      },
+      "42": {
+        "base": {
+          "single": 68.71,
+          "joint": 85.89
+        },
+        "cola": {
+          "0.05": 5.14,
+          "0.04": 3.405,
+          "0.03": 2.25,
+          "0.02": 1.688,
+          "0.01": 1.368
+        },
+        "tenpay": 3.15,
+        "singlepay": 27.28
+      },
+      "43": {
+        "base": {
+          "single": 70.46,
+          "joint": 88.08
+        },
+        "cola": {
+          "0.05": 5.05,
+          "0.04": 3.361,
+          "0.03": 2.23,
+          "0.02": 1.682,
+          "0.01": 1.362
+        },
+        "tenpay": 3.09,
+        "singlepay": 26.68
+      },
+      "44": {
+        "base": {
+          "single": 72.26,
+          "joint": 90.33
+        },
+        "cola": {
+          "0.05": 4.95,
+          "0.04": 3.317,
+          "0.03": 2.21,
+          "0.02": 1.676,
+          "0.01": 1.356
+        },
+        "tenpay": 3.03,
+        "singlepay": 26.1
+      },
+      "45": {
+        "base": {
+          "single": 74.11,
+          "joint": 92.64
+        },
+        "cola": {
+          "0.05": 4.85,
+          "0.04": 3.274,
+          "0.03": 2.2,
+          "0.02": 1.67,
+          "0.01": 1.35
+        },
+        "tenpay": 2.97,
+        "singlepay": 25.54
+      },
+      "46": {
+        "base": {
+          "single": 76,
+          "joint": 95
+        },
+        "cola": {
+          "0.05": 4.76,
+          "0.04": 3.23,
+          "0.03": 2.18,
+          "0.02": 1.664,
+          "0.01": 1.344
+        },
+        "tenpay": 2.91,
+        "singlepay": 24.98
+      },
+      "47": {
+        "base": {
+          "single": 77.94,
+          "joint": 97.43
+        },
+        "cola": {
+          "0.05": 4.67,
+          "0.04": 3.186,
+          "0.03": 2.17,
+          "0.02": 1.658,
+          "0.01": 1.338
+        },
+        "tenpay": 2.85,
+        "singlepay": 24.44
+      },
+      "48": {
+        "base": {
+          "single": 81.53,
+          "joint": 101.91
+        },
+        "cola": {
+          "0.05": 4.58,
+          "0.04": 3.142,
+          "0.03": 2.15,
+          "0.02": 1.652,
+          "0.01": 1.332
+        },
+        "tenpay": 2.8,
+        "singlepay": 23.91
+      },
+      "49": {
+        "base": {
+          "single": 83.61,
+          "joint": 104.51
+        },
+        "cola": {
+          "0.05": 4.49,
+          "0.04": 3.098,
+          "0.03": 2.14,
+          "0.02": 1.646,
+          "0.01": 1.326
+        },
+        "tenpay": 2.74,
+        "singlepay": 23.39
+      },
+      "50": {
+        "base": {
+          "single": 85.74,
+          "joint": 107.18
+        },
+        "cola": {
+          "0.05": 4.4,
+          "0.04": 3.054,
+          "0.03": 2.12,
+          "0.02": 1.64,
+          "0.01": 1.32
+        },
+        "tenpay": 2.69,
+        "singlepay": 22.88
+      },
+      "51": {
+        "base": {
+          "single": 90.04,
+          "joint": 112.55
+        },
+        "cola": {
+          "0.05": 4.27,
+          "0.04": 2.994,
+          "0.03": 2.09,
+          "0.02": 1.633,
+          "0.01": 1.313
+        },
+        "tenpay": 2.66,
+        "singlepay": 22.6
+      },
+      "52": {
+        "base": {
+          "single": 94.55,
+          "joint": 118.19
+        },
+        "cola": {
+          "0.05": 4.14,
+          "0.04": 2.933,
+          "0.03": 2.06,
+          "0.02": 1.625,
+          "0.01": 1.306
+        },
+        "tenpay": 2.62,
+        "singlepay": 22.33
+      },
+      "53": {
+        "base": {
+          "single": 99.28,
+          "joint": 124.1
+        },
+        "cola": {
+          "0.05": 4.02,
+          "0.04": 2.873,
+          "0.03": 2.03,
+          "0.02": 1.618,
+          "0.01": 1.299
+        },
+        "tenpay": 2.59,
+        "singlepay": 22.05
+      },
+      "54": {
+        "base": {
+          "single": 104.22,
+          "joint": 130.28
+        },
+        "cola": {
+          "0.05": 3.9,
+          "0.04": 2.812,
+          "0.03": 2,
+          "0.02": 1.61,
+          "0.01": 1.292
+        },
+        "tenpay": 2.56,
+        "singlepay": 21.79
+      },
+      "55": {
+        "base": {
+          "single": 108.39,
+          "joint": 135.49
+        },
+        "cola": {
+          "0.05": 3.79,
+          "0.04": 2.752,
+          "0.03": 1.98,
+          "0.02": 1.603,
+          "0.01": 1.285
+        },
+        "tenpay": 2.53,
+        "singlepay": 21.52
+      },
+      "56": {
+        "base": {
+          "single": 113.77,
+          "joint": 142.21
+        },
+        "cola": {
+          "0.05": 3.68,
+          "0.04": 2.691,
+          "0.03": 1.95,
+          "0.02": 1.595,
+          "0.01": 1.278
+        },
+        "tenpay": 2.5,
+        "singlepay": 21.26
+      },
+      "57": {
+        "base": {
+          "single": 118.32,
+          "joint": 147.9
+        },
+        "cola": {
+          "0.05": 3.57,
+          "0.04": 2.631,
+          "0.03": 1.92,
+          "0.02": 1.588,
+          "0.01": 1.271
+        },
+        "tenpay": 2.47,
+        "singlepay": 21
+      },
+      "58": {
+        "base": {
+          "single": 123.05,
+          "joint": 153.81
+        },
+        "cola": {
+          "0.05": 3.46,
+          "0.04": 2.57,
+          "0.03": 1.89,
+          "0.02": 1.58,
+          "0.01": 1.264
+        },
+        "tenpay": 2.44,
+        "singlepay": 20.74
+      },
+      "59": {
+        "base": {
+          "single": 127.96,
+          "joint": 159.95
+        },
+        "cola": {
+          "0.05": 3.36,
+          "0.04": 2.51,
+          "0.03": 1.87,
+          "0.02": 1.573,
+          "0.01": 1.257
+        },
+        "tenpay": 2.41,
+        "singlepay": 20.49
+      },
+      "60": {
+        "base": {
+          "single": 133.08,
+          "joint": 166.35
+        },
+        "cola": {
+          "0.05": 3.26,
+          "0.04": 2.449,
+          "0.03": 1.84,
+          "0.02": 1.565,
+          "0.01": 1.25
+        },
+        "tenpay": 2.38,
+        "singlepay": 20.24
+      },
+      "61": {
+        "base": {
+          "single": 143.63,
+          "joint": 179.54
+        },
+        "cola": {
+          "0.05": 3.08,
+          "0.04": 2.366,
+          "0.03": 1.79,
+          "0.02": 1.538,
+          "0.01": 1.239
+        },
+        "tenpay": 2.34,
+        "singlepay": 19.6
+      },
+      "62": {
+        "base": {
+          "single": 155,
+          "joint": 193.75
+        },
+        "cola": {
+          "0.05": 2.91,
+          "0.04": 2.283,
+          "0.03": 1.74,
+          "0.02": 1.511,
+          "0.01": 1.228
+        },
+        "tenpay": 2.3,
+        "singlepay": 18.99
+      },
+      "63": {
+        "base": {
+          "single": 167.28,
+          "joint": 209.1
+        },
+        "cola": {
+          "0.05": 2.75,
+          "0.04": 2.2,
+          "0.03": 1.7,
+          "0.02": 1.483,
+          "0.01": 1.217
+        },
+        "tenpay": 2.26,
+        "singlepay": 18.39
+      },
+      "64": {
+        "base": {
+          "single": 180.54,
+          "joint": 225.68
+        },
+        "cola": {
+          "0.05": 2.6,
+          "0.04": 2.117,
+          "0.03": 1.65,
+          "0.02": 1.456,
+          "0.01": 1.206
+        },
+        "tenpay": 2.22,
+        "singlepay": 17.81
+      },
+      "65": {
+        "base": {
+          "single": 194.85,
+          "joint": 243.56
+        },
+        "cola": {
+          "0.05": 2.46,
+          "0.04": 2.034,
+          "0.03": 1.61,
+          "0.02": 1.429,
+          "0.01": 1.195
+        },
+        "tenpay": 2.19,
+        "singlepay": 17.25
+      },
+      "66": {
+        "base": {
+          "single": 208.32,
+          "joint": 260.4
+        },
+        "cola": {
+          "0.05": 2.33,
+          "0.04": 1.951,
+          "0.03": 1.57,
+          "0.02": 1.402,
+          "0.01": 1.184
+        },
+        "tenpay": 2.15,
+        "singlepay": 16.71
+      },
+      "67": {
+        "base": {
+          "single": 222.71,
+          "joint": 278.39
+        },
+        "cola": {
+          "0.05": 2.2,
+          "0.04": 1.868,
+          "0.03": 1.53,
+          "0.02": 1.375,
+          "0.01": 1.173
+        },
+        "tenpay": 2.11,
+        "singlepay": 16.18
+      },
+      "68": {
+        "base": {
+          "single": 240.36,
+          "joint": 300.45
+        },
+        "cola": {
+          "0.05": 2.08,
+          "0.04": 1.785,
+          "0.03": 1.49,
+          "0.02": 1.347,
+          "0.01": 1.162
+        },
+        "tenpay": 2.08,
+        "singlepay": 15.67
+      },
+      "69": {
+        "base": {
+          "single": 259.39,
+          "joint": 324.24
+        },
+        "cola": {
+          "0.05": 1.97,
+          "0.04": 1.702,
+          "0.03": 1.45,
+          "0.02": 1.32,
+          "0.01": 1.151
+        },
+        "tenpay": 2.04,
+        "singlepay": 15.18
+      },
+      "70": {
+        "base": {
+          "single": 279.95,
+          "joint": 349.94
+        },
+        "cola": {
+          "0.05": 1.86,
+          "0.04": 1.619,
+          "0.03": 1.41,
+          "0.02": 1.293,
+          "0.01": 1.14
+        },
+        "tenpay": 2.01,
+        "singlepay": 14.7
+      },
+      "71": {
+        "base": {
+          "single": 300.58,
+          "joint": 375.73
+        },
+        "cola": {
+          "0.05": 1.81,
+          "0.04": 1.589,
+          "0.03": 1.39,
+          "0.02": 1.283,
+          "0.01": 1.134
+        },
+        "tenpay": 1.97,
+        "singlepay": 14.39
+      },
+      "72": {
+        "base": {
+          "single": 325.81,
+          "joint": 407.26
+        },
+        "cola": {
+          "0.05": 1.75,
+          "0.04": 1.559,
+          "0.03": 1.37,
+          "0.02": 1.272,
+          "0.01": 1.128
+        },
+        "tenpay": 1.92,
+        "singlepay": 14.09
+      },
+      "73": {
+        "base": {
+          "single": 356.61,
+          "joint": 445.76
+        },
+        "cola": {
+          "0.05": 1.7,
+          "0.04": 1.529,
+          "0.03": 1.35,
+          "0.02": 1.262,
+          "0.01": 1.122
+        },
+        "tenpay": 1.88,
+        "singlepay": 13.8
+      },
+      "74": {
+        "base": {
+          "single": 382.67,
+          "joint": 478.34
+        },
+        "cola": {
+          "0.05": 1.66,
+          "0.04": 1.499,
+          "0.03": 1.34,
+          "0.02": 1.252,
+          "0.01": 1.116
+        },
+        "tenpay": 1.84,
+        "singlepay": 13.51
+      },
+      "75": {
+        "base": {
+          "single": 418.85,
+          "joint": 523.56
+        },
+        "cola": {
+          "0.05": 1.61,
+          "0.04": 1.469,
+          "0.03": 1.32,
+          "0.02": 1.242,
+          "0.01": 1.11
+        },
+        "tenpay": 1.8,
+        "singlepay": 13.23
+      },
+      "76": {
+        "base": {
+          "single": 458.45,
+          "joint": 573.06
+        },
+        "cola": {
+          "0.05": 1.56,
+          "0.04": 1.438,
+          "0.03": 1.3,
+          "0.02": 1.231,
+          "0.01": 1.104
+        },
+        "tenpay": 1.76,
+        "singlepay": 12.95
+      },
+      "77": {
+        "base": {
+          "single": 501.8,
+          "joint": 627.25
+        },
+        "cola": {
+          "0.05": 1.52,
+          "0.04": 1.408,
+          "0.03": 1.28,
+          "0.02": 1.221,
+          "0.01": 1.098
+        },
+        "tenpay": 1.72,
+        "singlepay": 12.68
+      },
+      "78": {
+        "base": {
+          "single": 549.24,
+          "joint": 686.55
+        },
+        "cola": {
+          "0.05": 1.47,
+          "0.04": 1.378,
+          "0.03": 1.26,
+          "0.02": 1.211,
+          "0.01": 1.092
+        },
+        "tenpay": 1.68,
+        "singlepay": 12.41
+      },
+      "79": {
+        "base": {
+          "single": 601.17,
+          "joint": 751.46
+        },
+        "cola": {
+          "0.05": 1.43,
+          "0.04": 1.348,
+          "0.03": 1.25,
+          "0.02": 1.2,
+          "0.01": 1.086
+        },
+        "tenpay": 1.65,
+        "singlepay": 12.15
+      }
+    }
+  },
+  "factors": {
+    "risk_class": {
+      "Premier": 1.0
+    },
+    "elimination_period": {
+      "90": 1.0,
+      "180": 0.9
+    },
+    "payment_mode": {
+      "annual": 1.0,
+      "semiannual": 0.52,
+      "quarterly": 0.27,
+      "monthly": 0.0875
+    },
+    "benefit_period": {
+      "lifetime": 2.3,
+      "72": 1.45,
+      "60": 1.3,
+      "48": 1.18,
+      "36": 1.0,
+      "24": 0.9
+    },
+    "rider_shared_additional_by_total_bp": {
+      "72": 1.13,
+      "60": 1.16,
+      "48": 1.2,
+      "36": 1.26,
+      "24": 1.35
+    },
+    "rider_first_day_hccs": 1.1,
+    "rider_shortened_benefit_period": 1.1
+  },
+  "base_unit": 300
+};
+
+const STANDARD_SCENARIO = {
+  "label": "Standard Individual Comparison",
+  "note": "Blaine's default single-applicant run (male or female given at runtime), shown HIGH to LOW. 90-day elimination throughout.",
+  "carrier": "ngl",
+  "options": [
+    {
+      "name": "Option 3 \u2014 6k / 4-yr",
+      "monthly_benefit": 6000,
+      "benefit_period": "48",
+      "elimination": "90",
+      "inflation": 0.03
+    },
+    {
+      "name": "Option 2 \u2014 4.5k / 3-yr",
+      "monthly_benefit": 4500,
+      "benefit_period": "36",
+      "elimination": "90",
+      "inflation": 0.03
+    },
+    {
+      "name": "Option 1 \u2014 3k / 3-yr",
+      "monthly_benefit": 3000,
+      "benefit_period": "36",
+      "elimination": "90",
+      "inflation": 0.02
+    }
+  ]
+};
+
+
+function ageRow(table, age){
+  if (age <= 40) return table["18-40"];
+  if (table[String(age)]) return table[String(age)];
+  throw new Error("Issue age " + age + " is outside NGL's rated range (18–79).");
+}
+function pickTable(state, worksite){
+  if (state && state.toUpperCase() === "CO") return "CO Non-Worksite";
+  if (worksite) return "Generic Worksite";
+  return "Generic Non-Worksite";
+}
+const MODE_ANNUALIZER = {annual:1, semiannual:2, quarterly:4, monthly:12};
+
+function quote(o){
+  const f = RATES.factors;
+  const tname = pickTable(o.state, o.worksite);
+  const table = RATES.tables[tname];
+  const row = ageRow(table, o.age);
+  let pop;
+  if (o.joint) pop = "joint";
+  else if (tname === "Generic Non-Worksite") pop = (o.gender||"female").toLowerCase();
+  else pop = "single";
+  const base = row.base[pop];
+  if (base == null) throw new Error("No base rate for '"+pop+"' in "+tname+".");
+  const bp = String(o.benefitPeriod || "36");
+  const ep = String(o.elimination || "90");
+  const mode = o.mode || "monthly";
+  const pay = o.pay || "level";
+  const units = o.monthlyBenefit / RATES.base_unit;
+  let annual = base * units;
+  const steps = [["base "+base+" × "+units+" units ($"+Math.round(o.monthlyBenefit).toLocaleString()+"/mo ÷ $300)", annual]];
+  if (o.inflation){
+    const cf = row.cola[String(o.inflation)];
+    if (cf == null) throw new Error("Unsupported inflation option "+o.inflation);
+    annual *= cf; steps.push(["× "+cf+" compound COLA @ "+(o.inflation*100)+"%", annual]);
+  }
+  const bpf = f.benefit_period[bp]; if (bpf==null) throw new Error("Bad benefit period "+bp);
+  annual *= bpf; steps.push(["× "+bpf+" benefit period ("+bp+"-mo)", annual]);
+  const epf = f.elimination_period[ep]; if (epf==null) throw new Error("Bad elimination "+ep);
+  annual *= epf; steps.push(["× "+epf+" elimination ("+ep+"-day)", annual]);
+  const rcf = f.risk_class[o.riskClass||"Premier"] ?? 1.0;
+  annual *= rcf; if (rcf!==1.0) steps.push(["× "+rcf+" risk class", annual]);
+  if (o.classOne){ annual *= 1.35; steps.push(["× 1.35 Class One (substandard)", annual]); }
+  if (o.riderSharedAdditional){
+    const tbp = String(o.totalBenefitPeriod || bp);
+    const sba = f.rider_shared_additional_by_total_bp[tbp];
+    if (sba==null) throw new Error("Shared Additional rider needs valid total benefit period.");
+    annual *= sba; steps.push(["× "+sba+" Shared Additional rider (total "+tbp+"-mo)", annual]);
+  }
+  if (o.riderFirstDayHccs){ annual *= f.rider_first_day_hccs; steps.push(["× "+f.rider_first_day_hccs+" First-Day HCCS rider", annual]); }
+  if (o.riderShortenedBenefit){ annual *= f.rider_shortened_benefit_period; steps.push(["× "+f.rider_shortened_benefit_period+" Shortened Benefit rider", annual]); }
+  const res = {table:tname, population:pop, steps:steps};
+  if (pay === "single"){
+    const sp = row.singlepay; const single = annual*sp;
+    steps.push(["× "+sp+" Single-Pay factor", single]);
+    res.pay="Single-Pay"; res.singlePremium=Math.round(single*100)/100; return res;
+  }
+  let annualPremium = annual; res.pay = "Level";
+  if (pay === "10pay"){ const tp=row.tenpay; annualPremium=annual*tp; steps.push(["× "+tp+" 10-Pay factor", annualPremium]); res.pay="10-Pay"; }
+  const mf = f.payment_mode[mode]; if (mf==null) throw new Error("Bad mode "+mode);
+  res.annualPremium = Math.round(annualPremium*100)/100;
+  res.mode = mode;
+  res.modalPayment = Math.round(annualPremium*mf*100)/100;
+  return res;
+}
+
+function quoteCouple(a1,g1,a2,g2,monthlyBenefit,opts){
+  opts = opts||{};
+  let older,oldg,yng,yngg;
+  if (a1>=a2){older=a1;oldg=g1;yng=a2;yngg=g2;} else {older=a2;oldg=g2;yng=a1;yngg=g1;}
+  const combined = quote(Object.assign({}, opts, {age:older, gender:oldg, monthlyBenefit, joint:true}));
+  const survOlder = quote(Object.assign({}, opts, {age:older, gender:oldg, monthlyBenefit}));
+  const survYng = quote(Object.assign({}, opts, {age:yng, gender:yngg, monthlyBenefit}));
+  const out = {combined_joint:combined};
+  out["survivor_"+oldg] = survOlder; out["survivor_"+yngg] = survYng;
+  return out;
+}
+
+function benefitForPremium(target, age, gender, opts){
+  opts = opts||{};
+  const ref = quote(Object.assign({}, opts, {age, gender, monthlyBenefit:RATES.base_unit}));
+  const refCost = ref.singlePremium != null ? ref.singlePremium : ref.modalPayment;
+  const monthlyBenefit = RATES.base_unit * (target/refCost);
+  const full = quote(Object.assign({}, opts, {age, gender, monthlyBenefit}));
+  return {targetPremium:target, solvedMonthlyBenefit:Math.round(monthlyBenefit*100)/100, quote:full};
+}
+
+function runScenario(scenario, age, gender, opts){
+  opts = opts||{};
+  return scenario.options.map(op=>{
+    const cfg = {age, gender, monthlyBenefit:op.monthly_benefit,
+      benefitPeriod:op.benefit_period, elimination:op.elimination, inflation:op.inflation};
+    const q = quote(Object.assign({}, opts, cfg));
+    return {option:op.name, monthlyBenefit:op.monthly_benefit, benefitPeriod:op.benefit_period,
+      inflation:op.inflation, monthlyPremium:q.modalPayment, annualPremium:q.annualPremium};
+  });
+}
+
+if (typeof module !== "undefined" && module.exports){
+  module.exports = {RATES, STANDARD_SCENARIO, quote, quoteCouple, benefitForPremium, runScenario};
+}
+if (typeof window !== "undefined"){
+  window.E = {RATES, STANDARD_SCENARIO, quote, quoteCouple, benefitForPremium, runScenario};
+}
+
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0 = n => '$'+Math.round(n).toLocaleString();
+const pctL = v => v?((v*100)+'% compound'):'level (no inflation)';
+const bpL = v => v==='lifetime'?'lifetime':(parseInt(v)/12)+'-yr';
+const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  const m=t.dataset.mode;
+  document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==m);
+});
+
+function singleOpts(){
+  return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:+$('s_benefit').value,
+    benefitPeriod:$('s_bp').value, elimination:$('s_ep').value,
+    inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value,
+    state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked,
+    totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked};
+}
+function show(html){ $('resultCard').hidden=false; $('result').innerHTML=html; $('resultCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function showErr(e){ show('<div class="err">'+e.message+'</div>'); }
+function stepsBlock(steps){
+  return '<details class="steps"><summary>Show the math</summary><ul>'+
+    steps.map(s=>'<li>'+s[0]+' &rarr; '+fmt(s[1])+'</li>').join('')+'</ul></details>';
+}
+function priceHead(o){
+  if(o.pay==='Single-Pay') return '<div class="price">'+fmt(o.singlePremium)+' <small>one-time (single pay)</small></div>';
+  const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[o.mode];
+  return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div>'+
+         '<div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
+}
+
+function runSingle(){
+  try{ const o=singleOpts(); const q=E.quote(o);
+    const cfg = o.age+(o.gender==='female'?'F':'M')+' &middot; '+fmt0(o.monthlyBenefit)+'/mo &middot; '+bpL(o.benefitPeriod)+' &middot; '+o.elimination+'-day &middot; '+pctL(o.inflation)+
+      (o.riderSharedAdditional?' &middot; shared-care':'')+(o.state?' &middot; '+o.state:'');
+    show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfg+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  }catch(e){ showErr(e); }
+}
+function runCouple(){
+  try{
+    const opts={monthlyBenefit:+$('c_benefit').value,benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,
+      inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value};
+    const r=E.quoteCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,opts.monthlyBenefit,opts);
+    const c=r.combined_joint;
+    const surv=Object.keys(r).filter(k=>k.startsWith('survivor_'));
+    let rows=surv.map(k=>'<tr><td>If only the '+k.replace('survivor_','')+' remains</td><td class="p">'+fmt(r[k].modalPayment)+'/mo</td></tr>').join('');
+    show('<div class="res-head">'+priceHead(c)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
+      '<div class="config-line">'+fmt0(opts.monthlyBenefit)+'/mo each &middot; '+bpL(opts.benefitPeriod)+' &middot; '+opts.elimination+'-day &middot; '+pctL(opts.inflation)+(opts.riderSharedAdditional?' &middot; shared-care':'')+'</div>'+
+      '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+
+      stepsBlock(c.steps)+'<div class="disc">'+DISC+'</div>');
+  }catch(e){ showErr(e); }
+}
+function runBudget(){
+  try{
+    const opts={benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null};
+    const r=E.benefitForPremium(+$('b_target').value,+$('b_age').value,$('b_gender').value,opts);
+    show('<div class="res-head"><div class="price">'+fmt0(r.solvedMonthlyBenefit)+' <small>/mo of benefit</small></div></div>'+
+      '<div class="config-line">A budget of '+fmt(r.targetPremium)+'/mo buys about '+fmt0(r.solvedMonthlyBenefit)+'/mo of coverage &middot; '+
+      (+$('b_age').value)+($('b_gender').value==='female'?'F':'M')+' &middot; '+bpL($('b_bp').value)+' &middot; '+pctL(opts.inflation)+'</div>'+
+      '<div class="disc">'+DISC+'</div>');
+  }catch(e){ showErr(e); }
+}
+function runStandard(){
+  try{
+    const rows=E.runScenario(E.STANDARD_SCENARIO,+$('t_age').value,$('t_gender').value,{mode:'monthly',state:$('t_state').value||null});
+    const g=$('t_gender').value==='female'?'female':'male';
+    let body=rows.map(o=>'<tr><td><b>'+o.option+'</b></td><td class="b">'+fmt0(o.monthlyBenefit)+'/mo, '+bpL(o.benefitPeriod)+', '+pctL(o.inflation)+'</td><td class="p">'+fmt(o.monthlyPremium)+'/mo</td></tr>').join('');
+    show('<div class="config-line">Standard comparison &middot; '+(+$('t_age').value)+' '+g+'</div>'+
+      '<table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th></tr>'+body+'</table>'+
+      '<div class="disc">'+DISC+'</div>');
+  }catch(e){ showErr(e); }
+}
+
+// shorthand parser:  "62F 4500 3yr 3%"
+function parseShorthand(){
+  const t=$('sh').value.trim(); if(!t) return;
+  let m;
+  if(m=t.match(/(\d{2})\s*([mfMF])/)){ $('s_age').value=m[1]; $('s_gender').value=(m[2].toLowerCase()==='f')?'female':'male'; }
+  if(m=t.match(/\$?\s*(\d{3,5})(?!\s*%|\s*yr|\s*year)/)){ /* first big number = benefit */ }
+  const nums=t.match(/\$?\s*(\d{3,5})/g); if(nums){ const b=parseInt(nums[0].replace(/\D/g,'')); if(b>=1000) $('s_benefit').value=b; }
+  if(m=t.match(/(\d)\s*(?:yr|year)/i)){ const mo=parseInt(m[1])*12; if($('s_bp').querySelector('[value="'+mo+'"]')) $('s_bp').value=mo; }
+  if(m=t.match(/(\d)\s*%/)){ const v=(parseInt(m[1])/100).toFixed(2); if($('s_infl').querySelector('[value="'+v+'"]')) $('s_infl').value=v; }
+  if(/180/.test(t)) $('s_ep').value='180';
+  runSingle();
+}
+
+// saved combinations (localStorage)
+const KEY='ltcSavedCombos';
+function loadCombos(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ return []; } }
+function saveCombos(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
+function comboLabel(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':''); }
+function saveCombo(){
+  const o=singleOpts(); const nm=prompt('Name this combination:', comboLabel(o)); if(!nm) return;
+  const a=loadCombos(); a.push({name:nm, cfg:o}); saveCombos(a); renderCombos();
+}
+function renderCombos(){
+  const a=loadCombos(); const box=$('combos');
+  if(!a.length){ box.innerHTML='<p class="empty">No saved combinations yet. Set up a quote on the Single tab and hit “Save this combination.”</p>'; return; }
+  box.innerHTML=a.map((c,i)=>'<div class="combo"><div><div class="nm">'+c.name+'</div><div class="cfg">'+comboLabel(c.cfg)+'</div></div>'+
+    '<div class="sp"><button class="go" onclick="runSaved('+i+')">Run</button><button class="del" onclick="delCombo('+i+')">Delete</button></div></div>').join('');
+}
+function runSaved(i){
+  const c=loadCombos()[i]; const o=c.cfg;
+  $('s_age').value=o.age; $('s_gender').value=o.gender; $('s_benefit').value=o.monthlyBenefit;
+  $('s_bp').value=o.benefitPeriod; $('s_ep').value=o.elimination; $('s_infl').value=o.inflation||'0';
+  $('s_pay').value=o.pay; $('s_mode').value=o.mode; $('s_state').value=o.state||'';
+  $('s_sba').checked=!!o.riderSharedAdditional; $('s_fdc').checked=!!o.riderFirstDayHccs; $('s_sbn').checked=!!o.riderShortenedBenefit;
+  document.querySelector('.tab[data-mode="single"]').click(); runSingle();
+}
+function delCombo(i){ const a=loadCombos(); a.splice(i,1); saveCombos(a); renderCombos(); }
+
+// standard description
+$('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
+renderCombos();
+</script>
+</body>
+</html>
