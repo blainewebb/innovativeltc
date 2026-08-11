@@ -94,24 +94,29 @@ them), and **Premier is the only class** he quotes. A substandard "Class One" of
 (+35%) exists as an optional `class_one=True` toggle but stays off unless Blaine
 explicitly asks to show a rated scenario.
 
-## Saved scenarios ("run my standard 3 for a 62F")
+## Saved scenarios ("run my standard for a 62F")
 
 Blaine runs the same option sets over and over. Those live in `scripts/scenarios.json`
 as named scenarios — each option fixes everything except the applicant. At runtime he
 supplies only age + gender (+ state), and every option is quoted at once:
 
 ```
-python3 scripts/run_scenario.py --scenario standard-3 --age 62 --gender female --state TX
+python3 scripts/run_scenario.py --scenario standard --age 62 --gender female --state TX
 ```
 
-**Defining / editing a scenario:** when Blaine says "save this as my standard three:
-Option 1 is X, Option 2 is Y, Option 3 is Z," write those options into
-`scripts/scenarios.json` under a new key (or edit an existing one). Each option takes
-`name`, `monthly_benefit`, `benefit_period`, `elimination`, `inflation`, and any other
-`quote()` argument. The shipped `standard-3` is a **placeholder example** — replace it
-with Blaine's real options the first time he specifies them. A scenario names a
-`carrier` (currently `ngl`); as carriers are added, an option can name its own carrier
-so one scenario spans multiple carriers.
+**Blaine's default (`standard`)** is a single-applicant two-option run, 90-day
+elimination throughout:
+- **Option 1 — 3/3/3:** $3,000/mo, 3-year (36-mo), 3% compound.
+- **Option 2 — step-up:** $6,000/mo, 4-year (48-mo), 3% compound.
+
+He gives "single male" or "single female" plus the age; everything else is fixed.
+
+**Defining / editing a scenario:** when Blaine says "save this as my …: Option 1 is
+X, Option 2 is Y," write those options into `scripts/scenarios.json` under a new key
+(or edit an existing one). Each option takes `name`, `monthly_benefit`,
+`benefit_period`, `elimination`, `inflation`, and any other `quote()` argument. A
+scenario names a `carrier` (currently `ngl`); as carriers are added, an option can
+name its own carrier so one scenario spans multiple carriers.
 
 ## Budget / reverse quoting ("what does $300/mo buy?")
 
@@ -119,7 +124,7 @@ Given a target premium, solve for the benefit it buys — premium is exactly lin
 the monthly benefit, so this is precise, not a search:
 
 ```
-python3 scripts/run_scenario.py --scenario standard-3 --age 62 --gender female --budget 300
+python3 scripts/run_scenario.py --scenario standard --age 62 --gender female --budget 300
 ```
 
 That answers "if they can spend $300/mo, how much coverage does each option design
