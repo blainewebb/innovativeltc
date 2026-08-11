@@ -31,9 +31,9 @@ then × payment-mode factor            # monthly payment = annual × 0.0875
   person's own age.
 - Rated issue ages **18–79** (18–40 share one rate).
 
-## Verification status: VERIFIED (single-life) / VERIFIED (joint, 1 couple)
+## Verification status: FULLY VERIFIED (single-life and joint)
 
-Checked against four real NGL illustrations (HonestLTC / NLTC200P, TX, 8/11/2026) —
+Checked against six real NGL illustrations (HonestLTC / NLTC200P, TX, 8/11/2026) —
 **every figure matched to the penny.** The assembly is confirmed:
 
 - **Single-life quotes are exact.** Base comprehensive, the compound-COLA multiplier,
@@ -55,9 +55,9 @@ Settled with Blaine (not open questions):
 - **Premier is the only class.** A substandard **"Class One" offer at +35%** exists as
   an optional `class_one=True` toggle (×1.35), off by default.
 
-One minor spot-check remaining: the joint rule was confirmed on a 62/60 couple where
-the older insured was also "client 1." A couple with a **wide age gap** would confirm
-that older age (not client order) drives the joint rate — low risk, worth one check.
+The joint "older insured drives the rate" rule is confirmed on two couples with
+different age gaps (62/60 and 65/60) — both exact, including survivor premiums and
+the shared rider. No open items remain.
 
 ## Validation log
 
@@ -71,3 +71,6 @@ mainstream configs match to the dollar, the rater is trustworthy for those confi
 | 2026-08-11 | Couple M62+F60, $4,500/mo, 36-mo, 90-day, 3% comp, joint, monthly | $442.48/mo ($5,056.88/yr) | $442.48 / $5,056.88 | ✅ exact |
 | 2026-08-11 | Same couple + Shared Additional rider | $557.52/mo ($6,371.66/yr) | $557.52 / $6,371.66 | ✅ exact |
 | 2026-08-11 | Survivor singles (F60 $3,673.01 / M62 $2,458.36; +rider $4,627.99 / $3,097.53) | as shown | identical | ✅ exact |
+| 2026-08-11 | Couple M65+F60 (wide gap), $4,500/mo, 36-mo, 90-day, 3% comp, joint, monthly | $514.67/mo ($5,881.97/yr) | $514.67 / $5,881.97 | ✅ exact |
+| 2026-08-11 | Same couple + Shared Additional rider | $648.49/mo ($7,411.29/yr) | $648.49 / $7,411.29 | ✅ exact |
+| 2026-08-11 | Survivor singles (F60 $3,673.01 / M65 $2,877.71) | as shown | identical | ✅ exact |
