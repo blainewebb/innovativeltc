@@ -1481,13 +1481,14 @@ function renderDetail(){
     ${f.image?`<img src="${f.image}" class="photo-preview">`:''}
     <div style="font-weight:700; font-size:1.05rem;">${esc(f.name)}</div>
     <div style="color:var(--muted); font-size:.85rem; margin-bottom:14px;">${esc(f.brand||'')}</div>
-    <div class="field"><label>Amount (grams)</label>
-      <input id="amtInput" type="number" inputmode="decimal" value="${Math.round(addAmount)}" oninput="onAmt(this.value)">
-      ${f.servingLabelRaw?`<div style="font-size:.78rem;color:var(--muted);margin-top:6px">Package serving: ${esc(f.servingLabelRaw)}</div>`:''}</div>
-    <div class="seg">
-      ${[50,100,150,200].map(a=>`<button class="${Math.round(addAmount)===a?'on':''}" onclick="setAmt(${a})">${a}g</button>`).join('')}
-      ${f.servingG&&f.servingG!==100?`<button class="${Math.round(addAmount)===Math.round(f.servingG)?'on':''}" onclick="setAmt(${f.servingG})">1 serving</button>`:''}
+    <div class="field"><label>Servings</label>
+      <div class="seg">
+        ${[0.5,1,1.5,2,3].map(mv=>`<button class="${Math.abs((addAmount/(f.servingG||100))-mv)<0.02?'on':''}" onclick="setServings(${mv})">${servLabel(mv)}</button>`).join('')}
+      </div>
+      <div style="font-size:.78rem;color:var(--muted);margin-top:6px">1 serving ≈ ${Math.round(f.servingG||100)} g${f.servingLabelRaw?` · ${esc(f.servingLabelRaw)}`:''}</div>
     </div>
+    <div class="field"><label>Or exact grams</label>
+      <input id="amtInput" type="number" inputmode="decimal" value="${Math.round(addAmount)}" oninput="onAmt(this.value)"></div>
     ${mealSel}
     <div class="ntable">
       <div class="nrow head"><span>Calories</span><span>${val('energy-kcal')} kcal</span></div>
@@ -1506,6 +1507,8 @@ function detailFavItem(){ return { name:selectedFood.name, servingLabel:Math.rou
 function favFromDetail(){ toggleFav(detailFavItem()); renderDetail(); }
 function onAmt(v){ addAmount=parseFloat(v)||0; renderDetail(); const el=document.getElementById('amtInput'); if(el){ el.focus(); el.value=Math.round(addAmount)||''; } }
 function setAmt(a){ addAmount=a; renderDetail(); }
+function servLabel(m){ return ({0.5:'½',1:'1',1.5:'1½',2:'2',3:'3'})[m]||String(m); }
+function setServings(m){ addAmount = m*(selectedFood.servingG||100); renderDetail(); }
 function logSelected(){
   const s=scaledNutr();
   const item={ name:selectedFood.name, servingLabel:Math.round(addAmount)+' g', image:selectedFood.image||'', nutr:s, plant:!!selectedFood.plant };
