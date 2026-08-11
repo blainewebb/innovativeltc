@@ -154,6 +154,31 @@ def quote(
     return result
 
 
+def quote_couple(age1, gender1, age2, gender2, monthly_benefit, **kw):
+    """Joint (two-life) NGL policy.
+
+    Verified against NGL illustrations: the combined premium is the JOINT-column
+    rate at the OLDER insured's age (× units × that age's COLA × policy factors ×
+    riders). If either insured dies, the survivor reverts to their own single-life
+    premium — so those are returned too. `kw` accepts the same options as quote()
+    (benefit_period, elimination, inflation, pay, mode, riders, state, etc.).
+
+    Note: confirmed on a 62/60 couple where "older age" == "client 1". A couple with
+    a wide age gap is worth one spot-check to be certain the older age (not client
+    order) is what drives it.
+    """
+    (old_age, old_g), (yng_age, yng_g) = sorted(
+        [(age1, gender1), (age2, gender2)], key=lambda x: -x[0])
+    combined = quote(old_age, old_g, monthly_benefit, joint=True, **kw)
+    survivor_older = quote(old_age, old_g, monthly_benefit, **kw)
+    survivor_younger = quote(yng_age, yng_g, monthly_benefit, **kw)
+    return {
+        "combined_joint": combined,
+        "survivor_if_" + old_g: survivor_older,
+        "survivor_if_" + yng_g: survivor_younger,
+    }
+
+
 def locals_clean(d):
     keep = ("age","gender","monthly_benefit","benefit_period","elimination","inflation",
             "joint","pay","mode","risk_class","state","worksite")

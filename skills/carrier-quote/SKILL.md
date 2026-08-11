@@ -78,21 +78,29 @@ of common variants (e.g. 36-mo and 48-mo, 3% and 5% compound) so he sees the spr
   or approved by the issuers of the policies shown. Use the Insurer's forms and
   software for Insurer-approved quotes and applications."*
 
-## Validation gate (protects Blaine's license)
+## Verification status: VERIFIED
 
-The rater's factor *values* are exact, but the *assembly* (how factors combine) was
-inferred from the tables, not from NGL's formula doc. Until the validation log in
-`references/ngl-rating.md` shows real NGL illustrations matching the rater:
+The rater was checked against four real NGL illustrations (single-life and couples,
+with/without the shared rider) and **matched every figure to the penny** — see the
+validation log in `references/ngl-rating.md`. So NGL numbers can be presented as
+real quotes (still with the disclaimer), not hedged estimates.
 
-- Frame outputs as **"calculated from NGL's published rate tables — verify in NGL's
-  software before it's binding."** Do not present them as official NGL quotes.
-- Settled per Blaine: Return-of-Premium riders are **permanently off** (he doesn't
-  sell them), and **Premier is the only class** he quotes. A substandard "Class One"
-  offer (+35%) exists as an optional `class_one=True` toggle but stays off unless
-  Blaine explicitly asks to show a rated scenario.
+Keep the standard honesty anyway: it's still an independent illustration, not an
+NGL-issued quote, so the disclaimer stays and anything genuinely unusual (a config
+far outside the tested cases) is worth a spot-check in NGL's software.
 
-Once Blaine confirms a few configs match to the dollar, note it in the validation
-log and the framing can relax to a plain quote.
+Settled per Blaine: Return-of-Premium riders are **permanently off** (he doesn't sell
+them), and **Premier is the only class** he quotes. A substandard "Class One" offer
+(+35%) exists as an optional `class_one=True` toggle but stays off unless Blaine
+explicitly asks to show a rated scenario.
+
+## Quoting a couple
+
+Use `quote_couple(age1, gender1, age2, gender2, monthly_benefit, ...)` for a joint
+(two-life) policy. It returns the combined household premium plus each survivor's
+individual premium. If instead Blaine wants two **separate** individual policies for
+a couple, just quote each person with `quote()` — those single-life numbers are the
+verified survivor amounts.
 
 ## Adding a carrier later
 

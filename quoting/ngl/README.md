@@ -31,31 +31,43 @@ then × payment-mode factor            # monthly payment = annual × 0.0875
   person's own age.
 - Rated issue ages **18–79** (18–40 share one rate).
 
-## What's confirmed vs. what to verify
+## Verification status: VERIFIED (single-life) / VERIFIED (joint, 1 couple)
 
-The **base rates and every factor value** are copied straight from NGL's workbook —
-those are exact. What needs a sanity check is the **assembly** (how the factors
-combine), because the workbook lists the tables but not the formula. Before trusting
-a number in front of a client, confirm these against one real NGL-generated
-illustration:
+Checked against four real NGL illustrations (HonestLTC / NLTC200P, TX, 8/11/2026) —
+**every figure matched to the penny.** The assembly is confirmed:
 
-1. **Factor order / all-multiplicative.** The rater multiplies all factors together
-   (standard LTC practice). Confirm NGL applies COLA, benefit-period, and
-   elimination factors this way rather than some additive combination.
-2. **Return-of-Premium riders (LROP / LROPS) are permanently off** — Blaine doesn't
-   sell them, so they're excluded by design, not pending. The Shared-Additional,
-   First-Day HCCS, and Shortened-Benefit riders are wired in as multipliers (labeled
-   that way in the workbook) but should still be spot-checked if used.
-3. **Premier is the only class.** Confirmed by Blaine: NGL writes only Premier on
-   this product. Underwriting occasionally returns a substandard **"Class One" offer
-   at +35%**; that's available as an optional `class_one=True` toggle (×1.35) but is
-   off by default, since Blaine normally quotes Premier.
+- **Single-life quotes are exact.** Base comprehensive, the compound-COLA multiplier,
+  the benefit-period factor, and all four payment modes reproduced NGL's numbers
+  exactly (F60/$4,500/36-mo/3% → $3,673.01 annual / $321.39 monthly; M65/$3,000/48-mo/
+  no-inflation → $1,406.09 / $123.03).
+- **Inflation is a multiplier on the base**, which NGL *displays* as base + a
+  separate "inflation rider" line (that line is just base × (COLA−1)). The rater's
+  multiplicative approach gives the identical total.
+- **Shared Additional Policy Limit rider = ×1.26** (36-mo) confirmed exactly,
+  multiplicative on the base+inflation subtotal.
+- **Joint (couple) policies:** the combined premium is the **Joint-column rate at the
+  older insured's age** × units × that age's COLA × factors × riders; each survivor
+  reverts to their own single-life premium. Reproduced both couple illustrations
+  (with and without the shared rider) exactly. Use `quote_couple()`.
+
+Settled with Blaine (not open questions):
+- **Return-of-Premium riders (LROP / LROPS): permanently off** — he doesn't sell them.
+- **Premier is the only class.** A substandard **"Class One" offer at +35%** exists as
+  an optional `class_one=True` toggle (×1.35), off by default.
+
+One minor spot-check remaining: the joint rule was confirmed on a 62/60 couple where
+the older insured was also "client 1." A couple with a **wide age gap** would confirm
+that older age (not client order) drives the joint rate — low risk, worth one check.
 
 ## Validation log
 
 Fill this in as real NGL illustrations are compared against the rater. Once a few
 mainstream configs match to the dollar, the rater is trustworthy for those configs.
 
-| Date | Inputs (age/gender/benefit/BP/EP/inflation/pay/mode) | NGL software premium | Rater premium | Match? |
-|------|------------------------------------------------------|----------------------|---------------|--------|
-| _pending_ | | | | |
+| Date | Inputs | NGL software | Rater | Match? |
+|------|--------|--------------|-------|--------|
+| 2026-08-11 | F60, $4,500/mo, 36-mo, 90-day, 3% comp, level, monthly | $321.39/mo ($3,673.01/yr) | $321.39 / $3,673.01 | ✅ exact |
+| 2026-08-11 | M65, $3,000/mo, 48-mo, 90-day, no inflation, level, monthly | $123.03/mo ($1,406.09/yr) | $123.03 / $1,406.09 | ✅ exact |
+| 2026-08-11 | Couple M62+F60, $4,500/mo, 36-mo, 90-day, 3% comp, joint, monthly | $442.48/mo ($5,056.88/yr) | $442.48 / $5,056.88 | ✅ exact |
+| 2026-08-11 | Same couple + Shared Additional rider | $557.52/mo ($6,371.66/yr) | $557.52 / $6,371.66 | ✅ exact |
+| 2026-08-11 | Survivor singles (F60 $3,673.01 / M62 $2,458.36; +rider $4,627.99 / $3,097.53) | as shown | identical | ✅ exact |
