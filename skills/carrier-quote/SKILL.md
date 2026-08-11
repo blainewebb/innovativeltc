@@ -1,0 +1,106 @@
+---
+name: carrier-quote
+description: Blaine's real-premium calculator for carriers whose rate tables he's authorized to use. Right now that's National Guardian Life (NGL) EssentialLTC. Trigger whenever Blaine wants an ACTUAL premium number (not a ballpark range) computed from a carrier's rates — e.g. "quote NGL for a 62-year-old female, $4,500/mo, 3-yr, 3% compound," "run an NGL number for [prospect]," "what would NGL cost for...," or when a quickquote teaser needs a real figure instead of Blaine's gut range. This is the engine that produces the numbers; it pairs with `quickquote` (which formats a teaser + Gmail draft) and with `ltc-quote-to-gamma` (the full illustration-PDF deck). Use carrier-quote when Blaine has the client's parameters and wants the math done from the carrier's own rate manual. As more carriers authorize their rate tables, each gets added under scripts/<carrier>/ and this same skill quotes them.
+---
+
+# Carrier Quote — real premiums from authorized rate tables
+
+## What this is
+
+Blaine has begun getting carriers to authorize the use of their rate manuals so he
+(and Claude) can compute exact premiums without logging into each carrier's
+software. This skill is the calculator. Today it covers **NGL EssentialLTC**; the
+structure is built so a new carrier is just a new folder of rates + a rater.
+
+It answers one question: *given a client's parameters, what does this carrier
+actually charge?* — with the full math shown, not a black box. It does **not**
+invent or estimate; every number traces back to the carrier's published tables.
+
+**How it relates to the other tools:**
+- `carrier-quote` (this) → produces the real premium.
+- `quickquote` → wraps a number/range into a client teaser + Gmail draft.
+- `ltc-quote-to-gamma` → builds the full comparison deck from real illustration PDFs.
+
+A natural combo: Blaine says "quote NGL for Margaret and send her a teaser" → run
+carrier-quote to get the premium, then hand it to quickquote.
+
+## Available carriers
+
+| Carrier | Product | Script | Rating notes |
+|---|---|---|---|
+| **NGL** | EssentialLTC (NLTC200) | `scripts/ngl/rater.py` | `references/ngl-rating.md` |
+
+If Blaine names a carrier that isn't here yet, say so plainly — don't approximate
+its pricing from another carrier. Adding a carrier means getting its authorized
+rate manual and building it out (see "Adding a carrier" below).
+
+## Running an NGL quote
+
+Read `references/ngl-rating.md` once so you understand NGL's structure, then run the
+bundled calculator. From the skill directory:
+
+```
+python3 scripts/ngl/rater.py --age 62 --gender female --benefit 4500 \
+    --bp 36 --ep 90 --inflation 0.03 --pay level --mode monthly
+```
+
+Or import it: `from rater import quote; quote(age=62, gender="female", monthly_benefit=4500, ...)`.
+
+**Parse Blaine's shorthand into these inputs:**
+
+| Input | Notes |
+|---|---|
+| age | issue age, 18–79 |
+| gender | male / female (ignored for Colorado & worksite — those are unisex) |
+| monthly_benefit | dollars per month (if Blaine says a *daily* benefit, ×30; a *pool*, divide by months) |
+| benefit_period | 24 / 36 / 48 / 60 / 72 months, or lifetime |
+| elimination | 90 or 180 days |
+| inflation | none/level, or 0.01–0.05 compound COLA |
+| joint | true if it's a couple/partner (joint) rate |
+| pay | level / 10pay / single |
+| mode | annual / semiannual / quarterly / monthly |
+| state | only matters for Colorado (its own unisex table) |
+
+**When something material is missing, use these defaults and STATE them in your
+answer** so Blaine can correct a wrong assumption: 90-day elimination, Premier risk,
+reimbursement, level pay, monthly mode. But **benefit period and inflation option
+move the price a lot** — if Blaine didn't specify them, either ask or quote a couple
+of common variants (e.g. 36-mo and 48-mo, 3% and 5% compound) so he sees the spread.
+
+## Presenting the number
+
+- Lead with the headline: **monthly and annual premium** for the configuration quoted.
+- Show the **breakdown** the rater returns (base × units × each factor) — Blaine and
+  the client both trust a number more when the math is visible.
+- Name the **configuration** in plain words: "62F, $4,500/mo, 36-month, 90-day
+  elimination, 3% compound inflation, Premier, level pay, monthly."
+- Append the disclaimer verbatim: *"This is an independent illustration not provided
+  or approved by the issuers of the policies shown. Use the Insurer's forms and
+  software for Insurer-approved quotes and applications."*
+
+## Validation gate (protects Blaine's license)
+
+The rater's factor *values* are exact, but the *assembly* (how factors combine) was
+inferred from the tables, not from NGL's formula doc. Until the validation log in
+`references/ngl-rating.md` shows real NGL illustrations matching the rater:
+
+- Frame outputs as **"calculated from NGL's published rate tables — verify in NGL's
+  software before it's binding."** Do not present them as official NGL quotes.
+- A couple of specific items are known-open: Return-of-Premium riders (LROP/LROPS)
+  are intentionally **off**, and only the **Premier** risk class exists in this
+  filing. See the reference for the full list.
+
+Once Blaine confirms a few configs match to the dollar, note it in the validation
+log and the framing can relax to a plain quote.
+
+## Adding a carrier later
+
+Each newly authorized carrier follows the NGL pattern:
+1. Get the carrier's authorized rate manual (spreadsheet or PDF).
+2. Extract its base rates + factor tables into `scripts/<carrier>/rates.json`.
+3. Write `scripts/<carrier>/rater.py` implementing that carrier's assembly rules.
+4. Document its structure + a validation log in `references/<carrier>-rating.md`.
+5. Add a row to the "Available carriers" table above.
+
+The engine per carrier is small; the real work is confirming the assembly against a
+known-good illustration, same as NGL.

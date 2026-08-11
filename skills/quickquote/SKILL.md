@@ -16,6 +16,11 @@ This is deliberately the **lightweight** path. Its heavyweight sibling is **`ltc
 - No illustration PDFs, just Blaine's eligibility call + a range → **quickquote** (this skill).
 - Actual carrier illustration PDFs in hand, prospect is serious → **ltc-quote-to-gamma**.
 
+If Blaine wants the teaser to show a **real computed premium** instead of his gut
+range — and it's a carrier whose rate tables are authorized (currently NGL
+EssentialLTC) — run **`carrier-quote`** first to get the exact number, then bring it
+into the teaser here. The two are made to work together.
+
 If Blaine hands you real illustration PDFs while asking for a "quick quote," gently flag that `ltc-quote-to-gamma` will give a sharper result and ask which he wants.
 
 ## What Blaine gives you (the shorthand)
