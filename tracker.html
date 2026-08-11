@@ -789,6 +789,35 @@ const AGE = [
   {key:'sesame',       emoji:'⚫', label:'Black sesame seeds'},
   {key:'taurine',      emoji:'💊', label:'Taurine (optional)'},
 ];
+/* Keyword patterns to auto-detect Daily Dozen / How-Not-to-Age categories from
+   the names of foods you log. Each logged food that matches counts as one
+   serving toward that category. */
+const DOZEN_MATCH = {
+  beans:       /(beans?|lentils?|chickpea|garbanzo|hummus|tofu|tempeh|edamame|soybean|kidney bean|pinto|black bean|navy bean|split pea|\bdal\b|\bdahl\b|miso)/i,
+  berries:     /(berr(y|ies)|blueberr|strawberr|raspberr|blackberr|cranberr|goji|acai|cherr(y|ies)|grapes?)/i,
+  fruits:      /(apple|banana|orange|mango|peach|pear|pineapple|melon|watermelon|kiwi|plum|apricot|\bfig\b|dates?|pomegranate|papaya|guava|nectarine|clementine|tangerine|\bfruit)/i,
+  cruciferous: /(broccoli|cauliflower|cabbage|kale|brussels|bok choy|arugula|radish|collard|watercress|cruciferous|mustard green|turnip green|kohlrabi)/i,
+  greens:      /(spinach|kale|lettuce|arugula|swiss chard|\bchard\b|collard|greens|romaine|mesclun|watercress|microgreen|spring mix)/i,
+  veg:         /(carrot|tomato|pepper|onion|cucumber|zucchini|squash|celery|mushroom|asparagus|beet|eggplant|\bcorn\b|\bpeas?\b|potato|artichoke|okra|vegetable)/i,
+  flax:        /(flax|flaxseed|linseed)/i,
+  nuts:        /(almond|walnut|cashew|pecan|pistachio|peanut|hazelnut|macadamia|brazil nut|nut butter|sunflower seed|pumpkin seed|\bchia\b|sesame|\bnuts?\b|seeds?)/i,
+  spices:      /(turmeric|cinnamon|ginger|garlic|cumin|paprika|oregano|basil|cilantro|parsley|amla|sumac|saffron|nutmeg|clove|cardamom|\bspice|\bherb)/i,
+  grains:      /(oat|oatmeal|brown rice|\brice\b|quinoa|barley|bulgur|buckwheat|whole grain|whole wheat|farro|millet|couscous|tortilla|cereal|\bbread\b|\bpasta\b)/i
+};
+const AGE_MATCH = {
+  vinegar:/(vinegar)/i, coffee:/(coffee|espresso|latte|cappuccino|americano|cold brew)/i, wheatgerm:/(wheat germ)/i,
+  strawberries:/(strawberr)/i, pippali:/(pippali|long pepper)/i, greentea:/(green tea|matcha)/i,
+  ksalt:/(potassium salt|salt substitute|nu-salt|no salt)/i, chili:/(chili|chilli|cayenne|jalapen|hot pepper|chile)/i,
+  mushrooms:/(mushroom)/i, purplesp:/(purple sweet potato|purple potato|okinawa)/i, pumpkin:/(pumpkin seed|pepita)/i,
+  cranberries:/(cranberr)/i, nutyeast:/(nutritional yeast|nooch)/i, cocoa:/(cocoa|cacao|dark chocolate)/i,
+  sesame:/(black sesame|sesame)/i, taurine:/(taurine)/i
+};
+/* Count today's logged foods whose name matches a category pattern. */
+function foodMatchCount(re){
+  if(!re) return 0; const entries=dayData().entries||[]; let n=0;
+  entries.forEach(e=>{ if(re.test(e.name||'')) n++; });
+  return n;
+}
 
 /* ---------- State ---------- */
 let currentDate = new Date();
@@ -935,19 +964,20 @@ function renderPlant(entries){
   else if(pct>=100) el.textContent='100% plant-based today 🎉';
   else el.textContent=`${pct}% of today's calories are from plant-based foods (${Math.round(plant)} of ${Math.round(total)} kcal).`;
 }
-/* Beverages & Exercise auto-fill from the water and activity logs. */
+/* Auto-fill: Beverages/Exercise from water & activity, everything else from
+   the names of the foods logged today. */
 function dozenAuto(key){
   const d=dayData();
   if(key==='beverages') return Math.min(5, d.water||0);
   if(key==='exercise') return ((d.exercise&&d.exercise.length) || (d.importKcal!=null&&d.importKcal>0) || (d.steps||0)>=5000) ? 1 : 0;
-  return 0;
+  return foodMatchCount(DOZEN_MATCH[key]);
 }
 function renderDozen(){
   const dz = dayData().dozen || {}; let done=0;
   const rows = DOZEN.map(it=>{
     const auto=dozenAuto(it.key);
     const c = Math.min(it.target, Math.max(dz[it.key]||0, auto)); const complete = c>=it.target; if(complete) done++;
-    const isAuto = (it.key==='beverages'||it.key==='exercise') && auto>0;
+    const isAuto = auto>0 && auto>=(dz[it.key]||0);
     const dots = Array.from({length:it.target}, (_,i)=>
       `<button class="dz-dot${i<c?' on':''}" onclick="tapDozen('${it.key}',${i})" aria-label="${it.label} serving ${i+1}"></button>`).join('');
     return `<div class="dz-row${complete?' done':''}">
@@ -966,9 +996,10 @@ function tapDozen(key,i){
 function renderAge(){
   const ag = dayData().age || {}; let done=0;
   const rows = AGE.map(it=>{
-    const on = !!ag[it.key]; if(on) done++;
+    const auto = foodMatchCount(AGE_MATCH[it.key])>0;
+    const on = !!ag[it.key] || auto; if(on) done++;
     return `<div class="dz-row${on?' done':''}">
-      <div class="dz-name"><span class="dz-emoji">${it.emoji}</span>${it.label}</div>
+      <div class="dz-name"><span class="dz-emoji">${it.emoji}</span>${it.label}${auto?'<span class="dz-t">auto</span>':''}</div>
       <div class="dz-dots"><button class="dz-dot${on?' on':''}" onclick="tapAge('${it.key}')" aria-label="${it.label}"></button></div></div>`;
   }).join('');
   document.getElementById('ageCount').textContent = done;
