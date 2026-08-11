@@ -1,13 +1,14 @@
 {
-  "_note": "Named quote scenarios Blaine runs often. Each 'option' fixes everything EXCEPT the applicant — at runtime only age + gender (+ state) are supplied. Edit the options to match exactly what Blaine presents. Carriers reference the folders under quoting/ (currently 'ngl').",
+  "_note": "Named quote scenarios Blaine runs often. Each 'option' fixes everything EXCEPT the applicant — at runtime only age + gender (+ state) are supplied. Options are listed in the order Blaine wants them shown. Carriers reference the folders under quoting/ (currently 'ngl').",
   "scenarios": {
     "standard": {
       "label": "Standard Individual Comparison",
-      "note": "Blaine's default two-option run for a single applicant (male or female given at runtime). 90-day elimination is his standard across all illustrations.",
+      "note": "Blaine's default single-applicant run (male or female given at runtime), shown HIGH to LOW. 90-day elimination throughout.",
       "carrier": "ngl",
       "options": [
-        {"name": "Option 1 — 3/3/3",  "monthly_benefit": 3000, "benefit_period": "36", "elimination": "90", "inflation": 0.03},
-        {"name": "Option 2 — 6k / 4-yr", "monthly_benefit": 6000, "benefit_period": "48", "elimination": "90", "inflation": 0.03}
+        {"name": "Option 3 — 6k / 4-yr", "monthly_benefit": 6000, "benefit_period": "48", "elimination": "90", "inflation": 0.03},
+        {"name": "Option 2 — 4.5k / 3-yr", "monthly_benefit": 4500, "benefit_period": "36", "elimination": "90", "inflation": 0.03},
+        {"name": "Option 1 — 3k / 3-yr", "monthly_benefit": 3000, "benefit_period": "36", "elimination": "90", "inflation": 0.02}
       ]
     }
   }

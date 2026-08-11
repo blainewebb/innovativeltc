@@ -104,12 +104,14 @@ supplies only age + gender (+ state), and every option is quoted at once:
 python3 scripts/run_scenario.py --scenario standard --age 62 --gender female --state TX
 ```
 
-**Blaine's default (`standard`)** is a single-applicant two-option run, 90-day
-elimination throughout:
-- **Option 1 — 3/3/3:** $3,000/mo, 3-year (36-mo), 3% compound.
-- **Option 2 — step-up:** $6,000/mo, 4-year (48-mo), 3% compound.
+**Blaine's default (`standard`)** is a single-applicant three-option run shown
+**high to low**, 90-day elimination throughout:
+- **Option 3 — top:** $6,000/mo, 4-year (48-mo), 3% compound.
+- **Option 2 — mid:** $4,500/mo, 3-year (36-mo), 3% compound.
+- **Option 1 — entry:** $3,000/mo, 3-year (36-mo), 2% compound.
 
-He gives "single male" or "single female" plus the age; everything else is fixed.
+Keep them in that order (highest coverage first). He gives "single male" or "single
+female" plus the age; everything else is fixed.
 
 **Defining / editing a scenario:** when Blaine says "save this as my …: Option 1 is
 X, Option 2 is Y," write those options into `scripts/scenarios.json` under a new key
