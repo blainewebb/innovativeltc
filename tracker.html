@@ -600,8 +600,10 @@
         <div class="field"><label>Food name</label><input id="mName" placeholder="e.g. Homemade chili"></div>
         <div class="grid2">
           <div class="field"><label>Calories (kcal)</label><input id="mCal" type="number" inputmode="decimal" placeholder="0"></div>
-          <div class="field"><label>Serving label</label><input id="mServ" placeholder="1 bowl"></div>
+          <div class="field"><label>Servings</label><input id="mQty" type="number" inputmode="decimal" step="0.5" value="1"></div>
         </div>
+        <div class="field"><label>Serving label</label><input id="mServ" placeholder="1 bowl"></div>
+        <div class="hint" style="margin:-4px 0 10px;">Enter values for <b>one</b> serving; “Servings” multiplies them (e.g. ½ or 2).</div>
         <div class="grid2">
           <div class="field"><label>Protein (g)</label><input id="mPro" type="number" inputmode="decimal" placeholder="0"></div>
           <div class="field"><label>Carbs (g)</label><input id="mCarb" type="number" inputmode="decimal" placeholder="0"></div>
@@ -1390,14 +1392,17 @@ function updateAiBtn(){
 function saveManual(){
   const toRecipe = addTarget==='recipe';
   const num=id=>parseFloat(document.getElementById(id).value)||0;
-  const nutr={'energy-kcal':num('mCal'),'proteins':num('mPro'),'carbohydrates':num('mCarb'),'fat':num('mFat'),'fiber':num('mFib')};
+  const qty=parseFloat(document.getElementById('mQty').value)||1;
+  const nutr={'energy-kcal':num('mCal')*qty,'proteins':num('mPro')*qty,'carbohydrates':num('mCarb')*qty,'fat':num('mFat')*qty,'fiber':num('mFib')*qty};
+  const baseLabel=document.getElementById('mServ').value.trim()||'1 serving';
   const item={ name:document.getElementById('mName').value.trim()||'Custom food',
-    servingLabel:document.getElementById('mServ').value.trim()||'1 serving',
+    servingLabel: qty!==1 ? (qty+' × '+baseLabel) : baseLabel,
     image:manualPhotoData||'', nutr, plant:document.getElementById('mPlant').checked };
   if(toRecipe){ addIngredientToRecipe(item); }
   else { addEntry(Object.assign({meal:document.getElementById('mMeal').value}, item)); }
   document.getElementById('mPlant').checked=false;
   ['mName','mCal','mServ','mPro','mCarb','mFat','mFib'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('mQty').value='1';
   manualPhotoData=null; const ph=document.getElementById('manualPhoto'); ph.style.display='none'; ph.src='';
   document.getElementById('aiResults').innerHTML='';
   closeAdd();
@@ -1431,15 +1436,18 @@ function renderAiResults(items){
   if(!items.length){ out.innerHTML=`<div class="empty">No foods detected.</div>`; return; }
   window._aiItems=items;
   const rows=items.map((it,i)=>`
-    <label class="ai-item">
+    <div class="ai-item">
       <input type="checkbox" checked data-i="${i}">
       <div class="ci"><div class="cn">${esc(it.name)}</div>
         <div class="cm">${Math.round(it.grams)} g · ${Math.round(it.calories)} kcal · P ${Math.round(it.protein_g)} C ${Math.round(it.carbs_g)} F ${Math.round(it.fat_g)}</div></div>
-    </label>`).join('');
+      <input class="qtyInput" type="number" inputmode="decimal" step="0.5" value="1" data-qty="${i}" aria-label="servings"
+        style="width:58px; text-align:center; padding:7px 6px; border:1px solid var(--line); border-radius:8px;">
+    </div>`).join('');
   const mealSel = addTarget==='diary' ? `
     <div class="field" style="margin-top:6px"><label>Add to meal</label>
       <select id="aiMeal">${MEALS.map(m=>`<option ${m.id===addMeal?'selected':''}>${m.id}</option>`).join('')}</select></div>` : '';
-  out.innerHTML=`<div style="margin:10px 0 6px; font-weight:700;">Detected items</div>${rows}${mealSel}
+  out.innerHTML=`<div style="margin:10px 0 6px; font-weight:700;">Detected items</div>
+    <div class="hint" style="margin-bottom:8px;">Uncheck any you didn't eat; the number on the right is <b>servings</b> (e.g. 2 for a double portion).</div>${rows}${mealSel}
     <button class="primary-btn" onclick="addAiItems()">Add selected</button>`;
 }
 function addAiItems(){
@@ -1447,9 +1455,10 @@ function addAiItems(){
   const checks=[...document.querySelectorAll('#aiResults input[type=checkbox]:checked')];
   const meal = document.getElementById('aiMeal') ? document.getElementById('aiMeal').value : addMeal;
   checks.forEach(ch=>{
-    const it=window._aiItems[parseInt(ch.dataset.i)];
-    const item={ name:it.name, servingLabel:Math.round(it.grams)+' g', image:'', emoji:'🍽️', plant:!!it.plant_based,
-      nutr:{ 'energy-kcal':it.calories||0, 'proteins':it.protein_g||0, 'carbohydrates':it.carbs_g||0, 'fat':it.fat_g||0, 'fiber':it.fiber_g||0 } };
+    const i=parseInt(ch.dataset.i); const it=window._aiItems[i];
+    const qEl=document.querySelector('[data-qty="'+i+'"]'); const q=qEl?(parseFloat(qEl.value)||1):1;
+    const item={ name:it.name, servingLabel:(q!==1?q+' × ':'')+Math.round(it.grams)+' g', image:'', emoji:'🍽️', plant:!!it.plant_based,
+      nutr:{ 'energy-kcal':(it.calories||0)*q, 'proteins':(it.protein_g||0)*q, 'carbohydrates':(it.carbs_g||0)*q, 'fat':(it.fat_g||0)*q, 'fiber':(it.fiber_g||0)*q } };
     if(toRecipe) addIngredientToRecipe(item); else addEntry(Object.assign({meal}, item));
   });
   manualPhotoData=null; const ph=document.getElementById('manualPhoto'); ph.style.display='none'; ph.src='';
