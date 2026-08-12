@@ -9,7 +9,7 @@ IMPORTANT: Outputs are only as trustworthy as the algorithm's match to NGL's
 software. Validate against at least one real NGL-generated illustration before
 relying on a number in front of a client. See README.md ("Validation").
 """
-import json, os, argparse
+import json, os, argparse, math
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RATES = json.load(open(os.path.join(HERE, "rates.json")))
@@ -50,6 +50,10 @@ def quote(
     rider_first_day_hccs=False,      # FDC rider
     rider_shortened_benefit=False,   # SBN rider
 ):
+    # NGL sells the monthly benefit only in $300 increments — snap to the
+    # nearest quotable amount so every premium we return is bindable.
+    monthly_benefit = max(RATES["base_unit"], round(monthly_benefit / RATES["base_unit"]) * RATES["base_unit"])
+
     f = RATES["factors"]
     tname = _pick_table(state, worksite)
     table = RATES["tables"][tname]
@@ -170,11 +174,14 @@ def benefit_for_premium(target_premium, age, gender, mode="monthly", **kw):
     """
     ref = quote(age, gender, RATES["base_unit"], mode=mode, **kw)   # $300/mo = 1 unit
     ref_cost = _cost_figure(ref)
-    monthly_benefit = RATES["base_unit"] * (target_premium / ref_cost)
+    raw = RATES["base_unit"] * (target_premium / ref_cost)
+    # NGL sells in $300 increments — floor to the largest amount within budget.
+    monthly_benefit = max(RATES["base_unit"], math.floor(raw / RATES["base_unit"]) * RATES["base_unit"])
     full = quote(age, gender, monthly_benefit, mode=mode, **kw)
     return {
         "target_premium": target_premium,
-        "solved_monthly_benefit": round(monthly_benefit, 2),
+        "solved_monthly_benefit": monthly_benefit,   # a quotable $300 increment
+        "actual_premium": _cost_figure(full),        # premium at that benefit (<= target)
         "quote": full,
     }
 

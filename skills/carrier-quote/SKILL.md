@@ -61,6 +61,12 @@ Or import it: `from rater import quote; quote(age=62, gender="female", monthly_b
 | mode | annual / semiannual / quarterly / monthly |
 | state | only matters for Colorado (its own unisex table) |
 
+**Monthly benefit must be a $300 increment** — NGL rates *per $300* of monthly
+benefit, so only multiples of $300 are quotable ($3,000, $4,500, $6,000…). The
+rater snaps any off-increment amount to the nearest $300; if Blaine gives something
+like $4,000, quote it as the snapped amount and say so. Budget/reverse quotes floor
+to the largest $300 increment within the target premium.
+
 **When something material is missing, use these defaults and STATE them in your
 answer** so Blaine can correct a wrong assumption: 90-day elimination, Premier risk,
 reimbursement, level pay, monthly mode. But **benefit period and inflation option

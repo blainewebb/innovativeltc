@@ -161,7 +161,7 @@
       <div class="grid">
         <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="s_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="100"></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="300"></div>
         <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
         <div class="field"><label>Elimination period</label><select id="s_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
@@ -182,7 +182,7 @@
         <div class="field"><label>Client 1 — gender</label><select id="c_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
         <div class="field"><label>Client 2 — age</label><input id="c_age2" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Client 2 — gender</label><select id="c_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="100"></div>
+        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="300"></div>
         <div class="field"><label>Benefit period</label><select id="c_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Elimination period</label><select id="c_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="c_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
@@ -2287,6 +2287,8 @@ const fmt0 = n => '$'+Math.round(n).toLocaleString();
 const pctL = v => v?((v*100)+'% compound'):'level (no inflation)';
 const bpL = v => v==='lifetime'?'lifetime':(parseInt(v)/12)+'-yr';
 const gL = g => g==='female'?'female':'male';
+const SNAP  = b => Math.max(300, Math.round((+b||0)/300)*300);   // nearest quotable $300 increment
+const FLOOR3= b => Math.max(300, Math.floor((+b||0)/300)*300);   // largest increment within budget
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
 let MODE = 'fast';
 
@@ -2347,9 +2349,12 @@ function showCouple(a1,g1,a2,g2,opts){
     '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+stepsBlock(c.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showBudget(target,age,gender,opts){
-  const r=E.benefitForPremium(target,age,gender,opts);
-  show('<div class="res-head"><div class="price">'+fmt0(r.solvedMonthlyBenefit)+' <small>/mo of benefit</small></div></div>'+
-    '<div class="config-line">A budget of '+fmt(target)+'/mo buys about '+fmt0(r.solvedMonthlyBenefit)+'/mo of coverage &middot; '+age+(gender==='female'?'F':'M')+' &middot; '+bpL(opts.benefitPeriod)+' &middot; '+pctL(opts.inflation)+'</div><div class="disc">'+DISC+'</div>');
+  const raw=E.benefitForPremium(target,age,gender,opts).solvedMonthlyBenefit;
+  const benefit=FLOOR3(raw);   // NGL sells in $300 increments — round down to stay within budget
+  const o={age:+age,gender,monthlyBenefit:benefit,benefitPeriod:opts.benefitPeriod,elimination:opts.elimination||'90',inflation:opts.inflation||null,pay:'level',mode:opts.mode||'monthly',state:opts.state||null,riderSharedAdditional:false,totalBenefitPeriod:opts.benefitPeriod};
+  const q=E.quote(o);
+  show('<div class="res-head"><div class="price">'+fmt0(benefit)+' <small>/mo of benefit</small></div><div class="price2">≈ '+fmt(q.modalPayment)+'/mo premium</div></div>'+
+    '<div class="config-line">A budget of '+fmt(target)+'/mo buys '+fmt0(benefit)+'/mo of coverage (NGL sells in $300 increments) &middot; '+age+(gender==='female'?'F':'M')+' &middot; '+bpL(opts.benefitPeriod)+' &middot; '+pctL(opts.inflation)+'</div>'+addBtn(o)+'<div class="disc">'+DISC+'</div>');
 }
 function showStandard(age,gender,state){
   const rows=E.runScenario(E.STANDARD_SCENARIO,age,gender,{mode:'monthly',state:state||null});
@@ -2368,11 +2373,11 @@ const OPT_INFL=[[0,'level'],[0.02,'2%'],[0.03,'3%'],[0.05,'5%']];
 function computeOptimize(target,age,gender,state){
   let best={benefit:-1}; const grid=[];
   for(const [pk,pl] of OPT_PERIODS){ const row=[]; for(const [iv,il] of OPT_INFL){ let ben=null;
-    try{ ben=E.benefitForPremium(target,age,gender,{benefitPeriod:pk,elimination:'90',inflation:iv||null,mode:'monthly',state:state||null}).solvedMonthlyBenefit; }catch(e){}
+    try{ ben=FLOOR3(E.benefitForPremium(target,age,gender,{benefitPeriod:pk,elimination:'90',inflation:iv||null,mode:'monthly',state:state||null}).solvedMonthlyBenefit); }catch(e){}
     const cell={pk,pl,iv,il,ben}; row.push(cell); if(ben!=null&&ben>best.benefit) best=Object.assign({benefit:ben},cell); }
     grid.push({pl,row}); }
   const cell=(pk,iv)=>{ for(const g of grid) for(const c of g.row) if(c.pk===pk&&c.iv===iv) return c; return null; };
-  function mk(label,c){ return {label, benefit:c.ben, opts:{age:+age,gender,monthlyBenefit:c.ben,benefitPeriod:c.pk,elimination:'90',inflation:c.iv||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:c.pk}}; }
+  function mk(label,c){ const opts={age:+age,gender,monthlyBenefit:c.ben,benefitPeriod:c.pk,elimination:'90',inflation:c.iv||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:c.pk}; let prem=null; try{ prem=E.quote(opts).modalPayment; }catch(e){} return {label, benefit:c.ben, premium:prem, opts}; }
   const picks=[ mk('Biggest monthly benefit', best) ];
   const sixyr=cell('72',0.03)||cell('72',0); if(sixyr&&sixyr.ben!=null) picks.push(mk('Longest period (6-yr, 3%)', sixyr));
   const bal=cell('48',0.03); if(bal&&bal.ben!=null) picks.push(mk('Balanced (4-yr, 3%)', bal));
@@ -2381,7 +2386,7 @@ function computeOptimize(target,age,gender,state){
 function renderOptimize(d, narrative){
   const inflHdr=OPT_INFL.map(([iv,il])=>'<th style="text-align:right">'+il+'</th>').join('');
   const rows=d.grid.map(g=>'<tr><td><b>'+g.pl+'</b></td>'+g.row.map(c=>{ if(c.ben==null) return '<td class="b">—</td>'; const hi=(c.pk===d.best.pk&&c.iv===d.best.iv); return '<td class="b"'+(hi?' style="color:var(--primary);font-weight:800"':'')+'>'+fmt0(c.ben)+(hi?' ★':'')+'</td>'; }).join('')+'</tr>').join('');
-  const pickRows=d.picks.map(p=>'<tr><td><b>'+p.label+'</b></td><td class="b">'+fmt0(p.benefit)+'/mo benefit &middot; '+bpL(p.opts.benefitPeriod)+' &middot; '+pctL(p.opts.inflation)+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(p.opts)+')\'>＋ add</button></td></tr>').join('');
+  const pickRows=d.picks.map(p=>'<tr><td><b>'+p.label+'</b></td><td class="b">'+fmt0(p.benefit)+'/mo benefit &middot; '+bpL(p.opts.benefitPeriod)+' &middot; '+pctL(p.opts.inflation)+(p.premium!=null?' &middot; ≈'+fmt(p.premium)+'/mo':'')+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(p.opts)+')\'>＋ add</button></td></tr>').join('');
   show((narrative||'')+
     '<div class="config-line">At <b>'+fmt0(d.target)+'/mo</b>, a '+d.age+' '+gL(d.gender)+' can buy this much <b>monthly benefit</b> depending on the plan design (★ = biggest benefit for the budget):</div>'+
     '<table class="opts"><tr><th>Benefit period</th>'+inflHdr+'</tr>'+rows+'</table>'+
@@ -2400,9 +2405,9 @@ async function recommendAI(target,age,gender,d){
 }
 
 /* ---------- manual tabs ---------- */
-function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:+$('s_benefit').value, benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked}; }
+function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked}; }
 function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
-function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:+$('c_benefit').value,benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
+function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
 function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,$('t_state').value||null); }catch(e){ showErr(e.message); } }
 
@@ -2410,7 +2415,7 @@ function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,
 function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.03, mode:'monthly', pay:'level', state:null, riderSharedAdditional:false}; }
 function grabGender(t){ if(/\b(female|woman|women|lady|she|her)\b/i.test(t)) return 'female'; if(/\b(male|man|men|he|his|him|gentleman)\b/i.test(t)) return 'male'; return null; }
 function grabAges(t){ const a=[]; let m; const re=/\b(\d{2})\s*(?:[- ]?(?:year|yr)s?[- ]?old|yo|y\/o)\b/gi; while(m=re.exec(t)) a.push(+m[1]); if(a.length) return a; const re2=/(?:^|[^$\d.])(\d{2})(?!\s*%|\s*k|\d)/g; while(m=re2.exec(t)){ const n=+m[1]; if(n>=40&&n<=90) a.push(n);} return a; }
-function grabBenefit(t){ let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return Math.round(parseFloat(m[1])*1000); const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x; while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return n;} return null; }
+function grabBenefit(t){ let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return SNAP(parseFloat(m[1])*1000); const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x; while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return SNAP(n);} return null; }
 function grabBP(t){ if(/lifetime|life[- ]?time/i.test(t)) return 'lifetime'; let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo;} m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1]; return null; }
 function grabInfl(t){ if(/\b(no inflation|without inflation|level|no cola)\b/i.test(t)) return 0; const m=t.match(/(\d)\s*(?:%|percent)/i); if(m){ const v=+m[1]/100; if(v>=0.01&&v<=0.05) return v;} return null; }
 function grabState(t){ return /\bcolorado\b|\bco\b/i.test(t)?'CO':null; }
@@ -2464,7 +2469,7 @@ async function askAI(raw){
     runSpec(spec, raw);
   }catch(e){ setInterp('AI mode error: '+e.message+'. (Check your key in settings, or switch to ⚡ Fast.)', true); }
 }
-function mapItem(it){ return {age:+it.age, gender:it.gender, monthlyBenefit:+it.monthlyBenefit, benefitPeriod:String(it.benefitPeriod), elimination:String(it.elimination||'90'), inflation:it.inflation||null, pay:it.pay||'level', mode:it.mode||'monthly', state:it.state||null, riderSharedAdditional:!!it.sharedCare, totalBenefitPeriod:String(it.benefitPeriod)}; }
+function mapItem(it){ return {age:+it.age, gender:it.gender, monthlyBenefit:SNAP(it.monthlyBenefit), benefitPeriod:String(it.benefitPeriod), elimination:String(it.elimination||'90'), inflation:it.inflation||null, pay:it.pay||'level', mode:it.mode||'monthly', state:it.state||null, riderSharedAdditional:!!it.sharedCare, totalBenefitPeriod:String(it.benefitPeriod)}; }
 function runSpec(s, raw){
   const reply=s.reply?('<b>✨ '+s.reply+'</b>'):'';
   if(s.missing&&s.missing.length){ setInterp(reply+' — I still need: <b>'+s.missing.join(', ')+'</b>.', true); if(!(s.intent==='couple')) return; }
@@ -2472,7 +2477,7 @@ function runSpec(s, raw){
     if(s.intent==='standard'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need an age and gender.', true); return;} setInterp(reply||('Standard for '+it.age+' '+gL(it.gender)), true); showStandard(+it.age, it.gender, it.state||null); }
     else if(s.intent==='optimize'){ const b=s.budget||{}; if(!b.targetMonthly||!b.age||!b.gender){ setInterp(reply+' — I need budget, age, and gender.', true); return;} setInterp(reply||'Exploring options', true); const d=computeOptimize(+b.targetMonthly,+b.age,b.gender,b.state||null); renderOptimize(d,''); recommendAI(+b.targetMonthly,+b.age,b.gender,d); }
     else if(s.intent==='budget'){ const b=s.budget||{}; setInterp(reply||'Budget quote', true); showBudget(+b.targetMonthly, +b.age, b.gender, {benefitPeriod:String(b.benefitPeriod||'36'),elimination:'90',inflation:b.inflation||null,mode:'monthly',state:b.state||null}); }
-    else if(s.intent==='couple'){ const c=s.couple||{}; setInterp(reply||'Couple quote', true); showCouple(+c.age1,c.gender1,+c.age2,c.gender2,{monthlyBenefit:+c.monthlyBenefit,benefitPeriod:String(c.benefitPeriod||'36'),elimination:String(c.elimination||'90'),inflation:c.inflation||null,mode:c.mode||'monthly',riderSharedAdditional:!!c.sharedCare,totalBenefitPeriod:String(c.benefitPeriod||'36')}); }
+    else if(s.intent==='couple'){ const c=s.couple||{}; setInterp(reply||'Couple quote', true); showCouple(+c.age1,c.gender1,+c.age2,c.gender2,{monthlyBenefit:SNAP(c.monthlyBenefit),benefitPeriod:String(c.benefitPeriod||'36'),elimination:String(c.elimination||'90'),inflation:c.inflation||null,mode:c.mode||'monthly',riderSharedAdditional:!!c.sharedCare,totalBenefitPeriod:String(c.benefitPeriod||'36')}); }
     else if(s.intent==='compare'){ setInterp(reply||'Comparison', true); showCompare((s.items||[]).map(mapItem)); }
     else { setInterp(reply||'Quote', true); showSingle(mapItem((s.items||[])[0])); }
   }catch(e){ setInterp('AI understood the request but the inputs were off: '+e.message, true); }
