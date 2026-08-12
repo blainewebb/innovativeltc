@@ -109,6 +109,44 @@
   .modal label{font-weight:600;font-size:.82rem;display:block;margin:12px 0 5px}
   .modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
   .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:.8rem;padding:10px 12px;border-radius:9px;margin-top:14px}
+  .client .view{background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe}
+  /* client quote sheet */
+  .qsheet{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;z-index:60;overflow:auto;padding:24px 16px}
+  .qsheet.show{display:block}
+  .qs-toolbar{max-width:820px;margin:0 auto 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .qs-toolbar .seg{display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;flex-wrap:wrap}
+  .qs-toolbar .seg button{border:none;background:transparent;padding:9px 15px;border-radius:8px;font-weight:800;font-size:.85rem;cursor:pointer;color:var(--muted)}
+  .qs-toolbar .seg button.on{background:var(--primary);color:#fff}
+  .qs-toolbar .sp{margin-left:auto;display:flex;gap:8px}
+  .qs-toolbar .tb{border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:.85rem}
+  .qs-toolbar .tb.print{background:var(--success);color:#fff}
+  .qs-toolbar .tb.close{background:#fff;border:1px solid var(--border);color:#334155}
+  .sheet{max-width:820px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:34px 34px 26px}
+  .sheet .sh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid var(--primary);padding-bottom:14px}
+  .sheet .sh-brand{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+  .sheet .sh-brand span{color:var(--primary)}
+  .sheet .sh-tag{color:var(--muted);font-size:.8rem;margin-top:3px}
+  .sheet .sh-agent{text-align:right;font-size:.78rem;color:#475569;line-height:1.55}
+  .sheet .sh-agent b{color:var(--text)}
+  .sheet .sh-for{margin:18px 0 3px;font-size:1.2rem;font-weight:800}
+  .sheet .sh-sub{color:var(--muted);font-size:.84rem;line-height:1.5;margin-bottom:16px}
+  table.qtab{width:100%;border-collapse:collapse}
+  table.qtab th,table.qtab td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:center;font-size:.9rem;vertical-align:middle}
+  table.qtab thead th{background:var(--soft);font-weight:800;color:var(--text);border-bottom:2px solid var(--border)}
+  table.qtab tbody th{text-align:left;color:#475569;font-weight:600;font-size:.82rem;white-space:nowrap}
+  table.qtab tr.prem th{color:var(--text);font-weight:800;font-size:.9rem}
+  table.qtab tr.prem td{font-size:1.25rem;font-weight:800;color:var(--primary);white-space:nowrap}
+  table.qtab td .pu{font-size:.66rem;color:var(--muted);font-weight:700;letter-spacing:.02em}
+  .sheet .qs-cta{margin-top:18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:.9rem;font-weight:600;color:#1e3a8a;text-align:center}
+  .sheet .qs-cta a{color:var(--primary-d);font-weight:800;text-decoration:none}
+  @media print{
+    body{background:#fff}
+    body > *:not(.qsheet){display:none !important}
+    .qsheet{position:static !important;background:#fff !important;padding:0 !important;overflow:visible;display:block !important}
+    .qs-toolbar{display:none !important}
+    .sheet{box-shadow:none !important;max-width:100% !important;margin:0 !important;padding:0 !important;border-radius:0 !important}
+    table.qtab thead th,table.qtab tr.prem td,.sheet .sh-top,.sheet .qs-cta{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style>
 </head>
 <body>
@@ -253,6 +291,22 @@
       <button class="run" onclick="saveSettings()">Save</button>
     </div>
   </div>
+</div>
+
+<!-- client quote sheet -->
+<div class="qsheet" id="qsheet">
+  <div class="qs-toolbar">
+    <div class="seg" id="qsSeg">
+      <button data-l="essentials" onclick="setSheetLayout('essentials')">Essentials</button>
+      <button data-l="recommended" onclick="setSheetLayout('recommended')">Recommended</button>
+      <button data-l="detailed" onclick="setSheetLayout('detailed')">Detailed</button>
+    </div>
+    <div class="sp">
+      <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
+      <button class="tb close" onclick="closeSheet()">Close</button>
+    </div>
+  </div>
+  <div class="sheet" id="sheet"></div>
 </div>
 
 <script>
@@ -2535,7 +2589,62 @@ function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+
 function renderClients(){
   const c=LS.clients(), box=$('clients');
   if(!c.length){ box.innerHTML='<p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p>'; return; }
-  box.innerHTML=c.map((x,i)=>'<div class="client"><div><div class="nm">'+x.name+'</div><div class="cfg">'+(x.contact?x.contact+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+x.note:'')+'</div></div><div class="sp"><button class="go" onclick="openClient('+i+')">Open</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>').join('');
+  box.innerHTML=c.map((x,i)=>'<div class="client"><div><div class="nm">'+esc(x.name)+'</div><div class="cfg">'+(x.contact?esc(x.contact)+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+esc(x.note):'')+'</div></div><div class="sp"><button class="view" onclick="viewQuote('+i+')">View quote</button><button class="go" onclick="openClient('+i+')">Open</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>').join('');
+}
+
+/* ---------- client quote sheet (options as columns, categories as rows) ---------- */
+const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-Meeting';
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const QCATS = {
+  applicant:{label:'Applicant',            v:(o)=> o.age+' '+gL(o.gender)},
+  benefit:  {label:'Monthly benefit',      v:(o)=> fmt0(o.monthlyBenefit)+'/mo'},
+  period:   {label:'Benefit period',       v:(o)=> bpL(o.benefitPeriod)},
+  pool:     {label:'Total benefit pool',   v:(o)=> o.benefitPeriod==='lifetime' ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*parseInt(o.benefitPeriod))},
+  elim:     {label:'Elimination period',   v:(o)=> o.elimination+'-day wait'},
+  inflation:{label:'Inflation protection', v:(o)=> pctL(o.inflation)},
+  shared:   {label:'Shared-care rider',    v:(o)=> o.riderSharedAdditional?'Included':'—'},
+  annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
+  premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
+};
+const QLAYOUTS = {
+  essentials:  ['benefit','period','premium'],
+  recommended: ['benefit','period','pool','elim','inflation','premium'],
+  detailed:    ['applicant','benefit','period','pool','elim','inflation','shared','annual','premium'],
+};
+let QSHEET = {idx:-1, layout:'recommended'};
+function viewQuote(i){ QSHEET={idx:i, layout:'recommended'}; renderSheet(); $('qsheet').classList.add('show'); }
+function closeSheet(){ $('qsheet').classList.remove('show'); }
+function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
+function printSheet(){ window.print(); }
+function renderSheet(){
+  const cl = LS.clients()[QSHEET.idx]; if(!cl) return;
+  const items = cl.items||[];
+  document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
+  const quotes = items.map(o=>{ try{ return E.quote(o); }catch(e){ return null; } });
+  const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
+  let rows = QLAYOUTS[QSHEET.layout].slice();
+  if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
+  else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
+  if(items.every(o=>!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
+  const colHead = items.map((o,i)=>'<th>Option '+(i+1)+'</th>').join('');
+  const body = rows.map(key=>{ const cat=QCATS[key]; const cls=key==='premium'?' class="prem"':'';
+    return '<tr'+cls+'><th>'+cat.label+'</th>'+items.map((o,i)=>'<td>'+cat.v(o,quotes[i])+'</td>').join('')+'</tr>'; }).join('');
+  const sub = (uniform && items.length
+      ? 'Prepared for '+esc(cl.name)+' &middot; '+items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')
+      : 'Prepared for '+esc(cl.name))
+    + (cl.savedAt?' &middot; '+cl.savedAt:'')
+    + (cl.note?'<br>'+esc(cl.note):'');
+  $('sheet').innerHTML =
+    '<div class="sh-top"><div><div class="sh-brand">Innovative <span>LTC</span></div>'
+    + '<div class="sh-tag">Long-Term Care insurance illustration</div></div>'
+    + '<div class="sh-agent"><b>Blaine Webb</b><br>Innovative LTC<br>blaine@innovativeltc.com</div></div>'
+    + '<div class="sh-for">'+esc(cl.name)+'</div>'
+    + '<div class="sh-sub">'+sub+'</div>'
+    + (items.length
+        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+        : '<p class="empty">No options saved for this client.</p>')
+    + '<div class="qs-cta">Ready to talk it through? <a href="'+LEVITATE+'">Book a Benefits &amp; Pricing Zoom &rarr;</a></div>'
+    + '<div class="disc">'+DISC+'</div>';
 }
 
 /* ---------- init ---------- */
