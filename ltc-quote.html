@@ -221,6 +221,7 @@
       <span class="lbl">Tools:</span>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
       <a class="qtool link" href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener">🏥 Cost of Care ↗</a>
+      <button class="qtool" onclick="openGrowth()">📈 Inflation growth</button>
     </div>
     <div id="interp" class="interp"></div>
     <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
@@ -234,6 +235,7 @@
       <div class="tab" data-mode="budget">Budget</div>
       <div class="tab" data-mode="standard">My Standard</div>
       <div class="tab" data-mode="waiting">Cost of Waiting</div>
+      <div class="tab" data-mode="growth">Inflation Growth</div>
     </div>
     <div class="pane" data-pane="single">
       <div class="grid">
@@ -246,6 +248,7 @@
         <div class="field"><label>Payment plan</label><select id="s_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
         <div class="field"><label>Premium mode</label><select id="s_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
         <div class="field"><label>State</label><select id="s_state" class="statesel"></select></div>
+        <div class="field"><label>Show benefit growth to age</label><input id="s_projage" type="number" value="80" min="70" max="100" step="1"></div>
       </div>
       <div class="riders">
         <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
@@ -302,6 +305,17 @@
       </div>
       <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a></p>
       <div class="actions"><button class="run" onclick="runWaiting()">Show the cost of waiting</button></div>
+    </div>
+    <div class="pane" data-pane="growth" hidden>
+      <p class="hint" style="margin-top:0">See year by year how a compound-inflation benefit grows over time — the monthly benefit and the total benefit pool at each age.</p>
+      <div class="grid">
+        <div class="field"><label>Issue age (start)</label><input id="g_age" type="number" value="60" min="18" max="90"></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="g_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
+        <div class="field"><label>Inflation protection</label><select id="g_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
+        <div class="field"><label>Benefit period</label><select id="g_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+        <div class="field"><label>Grow to age</label><input id="g_endage" type="number" value="90" min="70" max="100" step="1"></div>
+      </div>
+      <div class="actions"><button class="run" onclick="runGrowth()">Show the growth</button></div>
     </div>
   </div>
 
@@ -2531,9 +2545,17 @@ function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.st
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
 function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
 
+function growthLine(o){
+  const pa = Math.max(+o.age, Math.min(100, Math.round(+($('s_projage')||{}).value||80)));
+  const yrs = pa - (+o.age);
+  const grown = Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1));
+  const pool = o.benefitPeriod==='lifetime' ? null : grown*parseInt(o.benefitPeriod);
+  if(!o.inflation) return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">No inflation protection — the benefit stays <b>'+fmt0(o.monthlyBenefit)+'/mo</b> for life.</div>';
+  return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">📈 By <b>age '+pa+'</b> (in '+yrs+' yr'+(yrs===1?'':'s')+') this grows to <b>'+fmt0(grown)+'/mo</b>'+(pool!=null?' &middot; total pool <b>'+fmt0(pool)+'</b>':'')+' at '+pctL(o.inflation)+'.</div>';
+}
 function showSingle(o){
   const q=E.quote(o);
-  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div><div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+growthLine(o)+'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showCouple(a1,g1,a2,g2,opts){
   const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
@@ -2627,6 +2649,26 @@ function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_a
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
 function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,$('t_state').value||null); }catch(e){ showErr(e.message); } }
 function runWaiting(){ try{ showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
+function openGrowth(){ $('manual').hidden=false; activateTab('growth'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
+function computeGrowth(age, benefit, inflation, benefitPeriod, endAge){
+  benefit = SNAP(benefit);                         // starting benefit is a real sold amount (≤ $12,000)
+  const end = Math.max(+age, Math.min(100, +endAge||90));
+  const rows=[];
+  for(let a=+age; a<=end; a++){ const yr=a-(+age); const m=Math.round(benefit*(inflation?Math.pow(1+inflation,yr):1));
+    const pool = benefitPeriod==='lifetime' ? null : m*parseInt(benefitPeriod);
+    rows.push({age:a, year:yr, monthly:m, pool}); }
+  return {age:+age, benefit, inflation:inflation||0, benefitPeriod, endAge:end, rows};
+}
+function showGrowth(d){
+  const body=d.rows.map(r=>'<tr'+(r.year===0?' style="background:#f0f7ff;font-weight:700"':'')+'><td>'+r.age+'</td><td>'+r.year+'</td><td class="p">'+fmt0(r.monthly)+'/mo</td><td class="b">'+(r.pool==null?'lifetime':fmt0(r.pool))+'</td></tr>').join('');
+  const first=d.rows[0], last=d.rows[d.rows.length-1];
+  const grewTxt = d.inflation ? 'From <b>'+fmt0(first.monthly)+'/mo</b> at age '+first.age+' to <b>'+fmt0(last.monthly)+'/mo</b> by age '+last.age+' ('+pctL(d.inflation)+').' : 'Level benefit — stays '+fmt0(first.monthly)+'/mo (no inflation protection).';
+  show('<div class="config-line">📈 <b>Inflation growth</b> &middot; '+fmt0(d.benefit)+'/mo &middot; '+pctL(d.inflation)+' &middot; '+bpL(d.benefitPeriod)+' &middot; age '+d.age+'→'+d.endAge+'</div>'+
+    '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">'+grewTxt+'</div>'+
+    '<table class="opts"><tr><th>Age</th><th>Year</th><th style="text-align:right">Monthly benefit</th><th style="text-align:right">Total benefit pool</th></tr>'+body+'</table>'+
+    '<div class="disc">Illustrative projection of how a compound-inflation benefit grows year by year on an issued policy (not a new-sale amount, so it may exceed NGL’s $12,000 issue cap). The total pool is the monthly benefit × the benefit period. '+DISC+'</div>');
+}
+function runGrowth(){ try{ showGrowth(computeGrowth(+$('g_age').value, +$('g_benefit').value, parseFloat($('g_infl').value)||0, $('g_bp').value, +$('g_endage').value)); }catch(e){ showErr(e.message); } }
 
 /* ---------- fast (local) parser ---------- */
 function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.03, mode:'monthly', pay:'level', state:null, riderSharedAdditional:false}; }
