@@ -59,9 +59,16 @@ Settled with Blaine (not open questions):
 - **Premier is the only class.** A substandard **"Class One" offer at +35%** exists as
   an optional `class_one=True` toggle (×1.35), off by default.
 
+Pending confirmation:
+- **Spousal / marital discount** for a married applicant applying **alone** (spouse not
+  applying): `marital_discount=True` (× 0.95), off by default, set by the
+  `MARITAL_DISCOUNT` constant atop `rater.py`. **The 5% is Blaine's recollection, NOT yet
+  verified against the NGL notes** — confirm and update the one constant. The verified
+  joint-rate path (both partners applying) is separate and unaffected.
+
 The joint "older insured drives the rate" rule is confirmed on two couples with
 different age gaps (62/60 and 65/60) — both exact, including survivor premiums and
-the shared rider. No open items remain.
+the shared rider.
 
 ## Validation log
 

@@ -14,6 +14,11 @@ import json, os, argparse, math
 HERE = os.path.dirname(os.path.abspath(__file__))
 RATES = json.load(open(os.path.join(HERE, "rates.json")))
 
+# NGL marital/spousal discount for a married applicant applying ALONE (spouse not
+# applying). 0.05 is Blaine's recollection — PENDING confirmation against the NGL
+# rate notes. Change this one value to correct it everywhere.
+MARITAL_DISCOUNT = 0.05
+
 
 def _age_row(table, age):
     if age <= 40:
@@ -43,6 +48,7 @@ def quote(
     mode="monthly",         # 'annual','semiannual','quarterly','monthly'
     risk_class="Premier",
     class_one=False,        # substandard "Class One" offer = +35% (Premier is the only standard class NGL writes)
+    marital_discount=False, # married applicant applying ALONE (spouse not applying) — spousal discount
     state=None,
     worksite=False,
     rider_shared_additional=False,   # SBA rider (needs total benefit period)
@@ -104,6 +110,10 @@ def quote(
     if class_one:
         annual *= 1.35
         steps.append(("× 1.35 Class One (substandard) offer", annual))
+    if marital_discount:
+        md = 1 - MARITAL_DISCOUNT
+        annual *= md
+        steps.append((f"× {md} spousal discount ({MARITAL_DISCOUNT:.0%} off — married, applying alone)", annual))
 
     # --- optional riders (multiplicative) ---
     if rider_shared_additional:

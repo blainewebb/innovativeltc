@@ -1930,6 +1930,11 @@ function pickTable(state, worksite){
 }
 const MODE_ANNUALIZER = {annual:1, semiannual:2, quarterly:4, monthly:12};
 
+// NGL marital/spousal discount for a married applicant applying ALONE (spouse not
+// applying). 0.05 is Blaine's recollection — pending confirmation against the NGL
+// rate notes. Change this one value to correct it everywhere.
+const MARITAL_DISCOUNT = 0.05;
+
 function quote(o){
   const f = RATES.factors;
   const tname = pickTable(o.state, o.worksite);
@@ -1960,6 +1965,7 @@ function quote(o){
   const rcf = f.risk_class[o.riskClass||"Premier"] ?? 1.0;
   annual *= rcf; if (rcf!==1.0) steps.push(["× "+rcf+" risk class", annual]);
   if (o.classOne){ annual *= 1.35; steps.push(["× 1.35 Class One (substandard)", annual]); }
+  if (o.maritalDiscount){ const md=1-MARITAL_DISCOUNT; annual *= md; steps.push(["× "+md+" spousal discount ("+(MARITAL_DISCOUNT*100)+"% off — married, applying alone)", annual]); }
   if (o.riderSharedAdditional){
     const tbp = String(o.totalBenefitPeriod || bp);
     const sba = f.rider_shared_additional_by_total_bp[tbp];

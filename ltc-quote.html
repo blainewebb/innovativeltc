@@ -228,6 +228,7 @@
         <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
         <label><input type="checkbox" id="s_fdc"> First-day HCCS rider</label>
         <label><input type="checkbox" id="s_sbn"> Shortened benefit rider</label>
+        <label><input type="checkbox" id="s_marital"> Married, spouse not applying (spousal discount)</label>
       </div>
       <div class="actions"><button class="run" onclick="runSingle()">Run quote</button></div>
     </div>
@@ -2272,6 +2273,10 @@ function pickTable(state, worksite){
 }
 const MODE_ANNUALIZER = {annual:1, semiannual:2, quarterly:4, monthly:12};
 
+// NGL marital/spousal discount for a married applicant applying ALONE (spouse not applying).
+// 0.05 is Blaine's recollection — pending confirmation against the NGL rate notes.
+// Change this ONE value to correct it everywhere.
+const MARITAL_DISCOUNT = 0.05;
 function quote(o){
   const f = RATES.factors;
   const tname = pickTable(o.state, o.worksite);
@@ -2302,6 +2307,7 @@ function quote(o){
   const rcf = f.risk_class[o.riskClass||"Premier"] ?? 1.0;
   annual *= rcf; if (rcf!==1.0) steps.push(["× "+rcf+" risk class", annual]);
   if (o.classOne){ annual *= 1.35; steps.push(["× 1.35 Class One (substandard)", annual]); }
+  if (o.maritalDiscount){ const md=1-MARITAL_DISCOUNT; annual *= md; steps.push(["× "+md+" spousal discount ("+(MARITAL_DISCOUNT*100)+"% off — married, applying alone)", annual]); }
   if (o.riderSharedAdditional){
     const tbp = String(o.totalBenefitPeriod || bp);
     const sba = f.rider_shared_additional_by_total_bp[tbp];
@@ -2449,7 +2455,7 @@ function priceHead(o){
   const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[o.mode];
   return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
 }
-function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.state?' · '+o.state:''); }
+function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
 function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
@@ -2542,7 +2548,7 @@ function showWaiting(d){
 }
 
 /* ---------- manual tabs ---------- */
-function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked}; }
+function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked, maritalDiscount:$('s_marital').checked}; }
 function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
 function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
@@ -2575,7 +2581,7 @@ function interpret(text){
   if(isCompare){ const parts=text.split(/\bvs\.?\b|\bversus\b|\bor\b/i); const items=parts.map(p=>{ const o=Object.assign(defaults(),{age:ages[0],gender,state,monthlyBenefit:grabBenefit(' '+p+' ')||grabBenefit(t),benefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36',inflation:(grabInfl(' '+p+' ')??grabInfl(t)??0.03),totalBenefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36'}); return o; }).filter(o=>o.monthlyBenefit); return {intent:'compare', gender, age:ages[0], items}; }
   if(isBudget) return {intent:'budget', gender, age:ages[0], state, target:grabTarget(t), opts:Object.assign(defaults(),{state, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)})};
   if(isCouple && ages.length>=2) return {intent:'couple', ages, gender, opts:Object.assign(defaults(),{state, monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03), riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
-  return {intent:'single', gender, age:ages[0], opts:Object.assign(defaults(),{age:ages[0], gender, state, monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', elimination:/180\s*day/i.test(t)?'180':'90', inflation:(grabInfl(t)??0.03), pay:/single[- ]?pay/i.test(t)?'single':(/10[- ]?pay|ten[- ]?pay/i.test(t)?'10pay':'level'), riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
+  return {intent:'single', gender, age:ages[0], opts:Object.assign(defaults(),{age:ages[0], gender, state, monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', elimination:/180\s*day/i.test(t)?'180':'90', inflation:(grabInfl(t)??0.03), pay:/single[- ]?pay/i.test(t)?'single':(/10[- ]?pay|ten[- ]?pay/i.test(t)?'10pay':'level'), riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), maritalDiscount:/\b(married|spousal|marital)\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
 }
 function setInterp(html, ai){ const el=$('interp'); el.innerHTML=html; el.classList.toggle('ai', !!ai); el.classList.add('show'); }
 function dispatch(p){
@@ -2594,8 +2600,8 @@ function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
 const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
-{"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false}],"couple":null,"budget":null,"missing":[]}
-Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO".`;
+{"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false,"married":false}],"couple":null,"budget":null,"missing":[]}
+Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO". Set "married":true ONLY for a single applicant who is married but applying alone (spouse not applying) — e.g. "he's married but only he's applying" — which applies NGL's spousal discount; never set it for a couple/joint quote (that uses the joint rate instead).`;
 // One call, either provider. Returns the model's text. Verified engine still does all math.
 async function callAI(system, user, {maxTokens=800, json=false}={}){
   const provider=LS.provider(), key=LS.key(), model=LS.model();
@@ -2629,7 +2635,7 @@ async function askAI(raw){
     runSpec(spec, raw);
   }catch(e){ setInterp('AI mode error: '+e.message+'. (Check your key in settings, or switch to ⚡ Fast.)', true); }
 }
-function mapItem(it){ return {age:+it.age, gender:it.gender, monthlyBenefit:SNAP(it.monthlyBenefit), benefitPeriod:String(it.benefitPeriod), elimination:String(it.elimination||'90'), inflation:it.inflation||null, pay:it.pay||'level', mode:it.mode||'monthly', state:it.state||null, riderSharedAdditional:!!it.sharedCare, totalBenefitPeriod:String(it.benefitPeriod)}; }
+function mapItem(it){ return {age:+it.age, gender:it.gender, monthlyBenefit:SNAP(it.monthlyBenefit), benefitPeriod:String(it.benefitPeriod), elimination:String(it.elimination||'90'), inflation:it.inflation||null, pay:it.pay||'level', mode:it.mode||'monthly', state:it.state||null, riderSharedAdditional:!!it.sharedCare, maritalDiscount:!!it.married, totalBenefitPeriod:String(it.benefitPeriod)}; }
 function runSpec(s, raw){
   const reply=s.reply?('<b>✨ '+s.reply+'</b>'):'';
   if(s.missing&&s.missing.length){ setInterp(reply+' — I still need: <b>'+s.missing.join(', ')+'</b>.', true); if(!(s.intent==='couple')) return; }
@@ -2685,6 +2691,7 @@ const QCATS = {
   elim:     {label:'Elimination period',   v:(o)=> o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> pctL(o.inflation)},
   shared:   {label:'Shared-care rider',    v:(o)=> o.riderSharedAdditional?'Included':'—'},
+  marital:  {label:'Spousal discount',     v:(o)=> o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—'},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
 };
@@ -2708,6 +2715,8 @@ function renderSheet(){
   if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
   else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
   if(items.every(o=>!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
+  // spousal discount: surface as a category in every layout, but only when at least one option uses it
+  if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   const colHead = items.map((o,i)=>'<th>Option '+(i+1)+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const cls=key==='premium'?' class="prem"':'';
     return '<tr'+cls+'><th>'+cat.label+'</th>'+items.map((o,i)=>'<td>'+cat.v(o,quotes[i])+'</td>').join('')+'</tr>'; }).join('');
