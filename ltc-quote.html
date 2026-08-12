@@ -81,8 +81,11 @@
   details.steps summary{cursor:pointer;color:var(--primary);font-weight:600;font-size:.85rem}
   .steps ul{margin:8px 0 0;padding-left:18px;color:#475569;font-size:.82rem;line-height:1.7}
   .disc{color:var(--muted);font-size:.72rem;line-height:1.5;margin-top:14px;border-top:1px dashed var(--border);padding-top:10px}
-  .addbtn{margin-top:12px;background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
+  .resbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .addbtn{background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
   .addbtn:hover{background:#e0e7ff}
+  .waitbtn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
+  .waitbtn:hover{background:#ffedd5}
   /* comparison tray */
   .tray-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .tray-head .sp{margin-left:auto;display:flex;gap:8px}
@@ -2448,10 +2451,12 @@ function priceHead(o){
 }
 function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.state?' · '+o.state:''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
+function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
+function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
 
 function showSingle(o){
   const q=E.quote(o);
-  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+addBtn(o)+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div><div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showCouple(a1,g1,a2,g2,opts){
   const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
@@ -2467,7 +2472,7 @@ function showBudget(target,age,gender,opts){
   const o={age:+age,gender,monthlyBenefit:benefit,benefitPeriod:opts.benefitPeriod,elimination:opts.elimination||'90',inflation:opts.inflation||null,pay:'level',mode:opts.mode||'monthly',state:opts.state||null,riderSharedAdditional:false,totalBenefitPeriod:opts.benefitPeriod};
   const q=E.quote(o);
   show('<div class="res-head"><div class="price">'+fmt0(benefit)+' <small>/mo of benefit</small></div><div class="price2">≈ '+fmt(q.modalPayment)+'/mo premium</div></div>'+
-    '<div class="config-line">A budget of '+fmt(target)+'/mo buys '+fmt0(benefit)+'/mo of coverage (NGL sells in $300 increments) &middot; '+age+(gender==='female'?'F':'M')+' &middot; '+bpL(opts.benefitPeriod)+' &middot; '+pctL(opts.inflation)+'</div>'+addBtn(o)+'<div class="disc">'+DISC+'</div>');
+    '<div class="config-line">A budget of '+fmt(target)+'/mo buys '+fmt0(benefit)+'/mo of coverage (NGL sells in $300 increments) &middot; '+age+(gender==='female'?'F':'M')+' &middot; '+bpL(opts.benefitPeriod)+' &middot; '+pctL(opts.inflation)+'</div><div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div><div class="disc">'+DISC+'</div>');
 }
 function showStandard(age,gender,state){
   const rows=E.runScenario(E.STANDARD_SCENARIO,age,gender,{mode:'monthly',state:state||null});
@@ -2647,7 +2652,7 @@ function renderTray(){
   const a=LS.tray(); $('trayCard').hidden = a.length===0; $('traycount').textContent = a.length?('('+a.length+' of 6)'):'';
   if(!a.length){ $('tray').innerHTML=''; $('traydisc').textContent=''; return; }
   const rows=a.map((o,i)=>{ let prem; try{ const q=E.quote(o); prem=q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }catch(e){ prem='—'; }
-    return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" onclick="rmTray('+i+')">remove</button></td></tr>'; }).join('');
+    return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right;white-space:nowrap"><button class="rm" style="background:#fff7ed;color:#9a3412;margin-right:6px" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 waiting</button><button class="rm" onclick="rmTray('+i+')">remove</button></td></tr>'; }).join('');
   $('tray').innerHTML='<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>';
   $('traydisc').textContent=DISC;
 }
