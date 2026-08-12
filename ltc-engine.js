@@ -1950,9 +1950,11 @@ function quote(o){
   const ep = String(o.elimination || "90");
   const mode = o.mode || "monthly";
   const pay = o.pay || "level";
-  const units = o.monthlyBenefit / RATES.base_unit;
+  // NGL sells the monthly benefit only in $300 increments — snap so every premium is bindable.
+  const mb = Math.max(RATES.base_unit, Math.round((+o.monthlyBenefit||0)/RATES.base_unit)*RATES.base_unit);
+  const units = mb / RATES.base_unit;
   let annual = base * units;
-  const steps = [["base "+base+" × "+units+" units ($"+Math.round(o.monthlyBenefit).toLocaleString()+"/mo ÷ $300)", annual]];
+  const steps = [["base "+base+" × "+units+" units ($"+Math.round(mb).toLocaleString()+"/mo ÷ $300)", annual]];
   if (o.inflation){
     const cf = row.cola[String(o.inflation)];
     if (cf == null) throw new Error("Unsupported inflation option "+o.inflation);

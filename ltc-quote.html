@@ -297,6 +297,15 @@
   </div>
 
   <div class="card">
+    <div class="tray-head">
+      <h2 style="margin:0">Quick commands</h2>
+      <div class="sp"><button class="traybtn" style="background:var(--primary);color:#fff" onclick="openPattern()">＋ New quick command</button></div>
+    </div>
+    <p class="hint" style="margin-top:6px">Save a shorthand — e.g. <b>754</b> — that locks in a plan design. Then type the code with an age, gender, and one or more benefit amounts, like <b>754 60 female 7000 5000 4000</b>, and it runs them all into a comparison. Works in either mode.</p>
+    <div id="patterns"></div>
+  </div>
+
+  <div class="card">
     <h2>Saved clients</h2>
     <div id="clients"><p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p></div>
   </div>
@@ -338,6 +347,34 @@
     </div>
   </div>
   <div class="sheet" id="sheet"></div>
+</div>
+
+<!-- quick command editor -->
+<div class="modal" id="patternModal">
+  <div class="box">
+    <h3 id="patternTitle">New quick command</h3>
+    <p>Lock in a plan design and give it a short code. Age, gender, and benefit amounts are supplied when you run it.</p>
+    <div class="grid">
+      <div class="field"><label>Trigger code</label><input id="p_trigger" placeholder="e.g. 754"></div>
+      <div class="field"><label>Name (optional)</label><input id="p_name" placeholder="e.g. 7-5-4 ladder"></div>
+      <div class="field"><label>Benefit period</label><select id="p_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+      <div class="field"><label>Inflation protection</label><select id="p_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
+      <div class="field"><label>Elimination period</label><select id="p_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
+      <div class="field"><label>Payment plan</label><select id="p_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
+      <div class="field"><label>Premium mode</label><select id="p_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
+      <div class="field"><label>State</label><select id="p_state" class="statesel"></select></div>
+      <div class="field"><label>Default benefit amounts (optional)</label><input id="p_benefits" placeholder="e.g. 7000, 5000, 4000"></div>
+    </div>
+    <div class="riders">
+      <label><input type="checkbox" id="p_sba"> Shared-care rider</label>
+      <label><input type="checkbox" id="p_marital"> Married, spouse not applying (spousal discount)</label>
+    </div>
+    <div class="warn">Tip: fill in default amounts so “<b>754 60 female</b>” runs your usual ladder with no numbers typed. Any amounts you type when running override the defaults.</div>
+    <div class="row">
+      <button class="ghost" onclick="$('patternModal').classList.remove('show')">Cancel</button>
+      <button class="run" onclick="savePattern()">Save</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -2292,9 +2329,11 @@ function quote(o){
   const ep = String(o.elimination || "90");
   const mode = o.mode || "monthly";
   const pay = o.pay || "level";
-  const units = o.monthlyBenefit / RATES.base_unit;
+  // NGL sells the monthly benefit only in $300 increments — snap so every premium is bindable.
+  const mb = Math.max(RATES.base_unit, Math.round((+o.monthlyBenefit||0)/RATES.base_unit)*RATES.base_unit);
+  const units = mb / RATES.base_unit;
   let annual = base * units;
-  const steps = [["base "+base+" × "+units+" units ($"+Math.round(o.monthlyBenefit).toLocaleString()+"/mo ÷ $300)", annual]];
+  const steps = [["base "+base+" × "+units+" units ($"+Math.round(mb).toLocaleString()+"/mo ÷ $300)", annual]];
   if (o.inflation){
     const cf = row.cola[String(o.inflation)];
     if (cf == null) throw new Error("Unsupported inflation option "+o.inflation);
@@ -2407,6 +2446,8 @@ const LS = {
   setTray(a){ localStorage.setItem('ltcTray', JSON.stringify(a)); },
   clients(){ try{return JSON.parse(localStorage.getItem('ltcClients')||'[]');}catch(e){return [];} },
   setClients(a){ localStorage.setItem('ltcClients', JSON.stringify(a)); },
+  patterns(){ try{return JSON.parse(localStorage.getItem('ltcPatterns')||'[]');}catch(e){return [];} },
+  setPatterns(a){ localStorage.setItem('ltcPatterns', JSON.stringify(a)); },
 };
 
 /* ---------- mode + settings ---------- */
@@ -2486,9 +2527,11 @@ function showStandard(age,gender,state){
     return '<tr><td><b>'+o.option+'</b></td><td class="b">'+fmt0(o.monthlyBenefit)+'/mo, '+bpL(o.benefitPeriod)+', '+pctL(o.inflation)+'</td><td class="p">'+fmt(o.monthlyPremium)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th><th></th></tr>'+body+'</table><div class="disc">'+DISC+'</div>');
 }
-function showCompare(items){
-  const rows=items.map(o=>{ const q=E.quote(o); return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+fmt(q.modalPayment)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
-  show('<div class="config-line">Comparison</div><table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
+function showCompare(items, opts){
+  opts=opts||{};
+  const rows=items.map(o=>{ let prem='—'; try{ const q=E.quote(o); prem=fmt(q.modalPayment)+'/mo'; }catch(e){} return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  const addAll = items.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+JSON.stringify(items)+')\'>＋ Add all '+items.length+' to comparison</button>' : '';
+  show('<div class="config-line">'+(opts.title||'Comparison')+'</div>'+addAll+'<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
 
 /* ---------- budget optimizer (verified engine explores; AI interprets) ---------- */
@@ -2595,7 +2638,29 @@ function dispatch(p){
   else if(p.intent==='couple'){ const g1=p.gender||'male', g2=p.gender==='female'?'male':'female'; setInterp('Running a <b>couple</b> quote — '+p.ages[0]+'/'+p.ages[1]+'.', p.ai); showCouple(p.ages[0],g1,p.ages[1],g2,p.opts); }
   else { setInterp('Quoting a <b>'+p.age+' '+gL(p.gender)+'</b> — '+fmt0(p.opts.monthlyBenefit)+'/mo, '+bpL(p.opts.benefitPeriod)+', '+pctL(p.opts.inflation)+'.', p.ai); showSingle(p.opts); }
 }
-function ask(){ const raw=$('nl').value.trim(); if(!raw) return; if(MODE==='ai') return askAI(raw); try{ dispatch(interpret(raw)); }catch(e){ setInterp('Sorry — I couldn’t read that. Try “62 female, $4,500/mo, 3 years, 3%”.'); } }
+function ask(){ const raw=$('nl').value.trim(); if(!raw) return;
+  const pat=matchPattern(raw); if(pat){ runPattern(pat, raw); return; }   // saved quick commands run instantly, either mode
+  if(MODE==='ai') return askAI(raw);
+  try{ dispatch(interpret(raw)); }catch(e){ setInterp('Sorry — I couldn’t read that. Try “62 female, $4,500/mo, 3 years, 3%”.'); } }
+
+/* ---------- saved quick commands (named patterns) ---------- */
+function grabBenefits(t){ const out=[]; let m; const reK=/\$?\s*(\d(?:\.\d)?)\s*k\b/ig; while(m=reK.exec(t)) out.push(SNAP(parseFloat(m[1])*1000));
+  const re=/\$?\s*([\d,]{4,7})\b/g; while(m=re.exec(t)){ const n=parseInt(m[1].replace(/,/g,'')); if(n>=1000&&n<=20000) out.push(SNAP(n)); } return [...new Set(out)]; }
+function matchPattern(raw){ const toks=raw.toLowerCase().split(/[\s,]+/).filter(Boolean); return LS.patterns().find(p=>toks.includes(p.trigger.toLowerCase()))||null; }
+function runPattern(p, raw){
+  const cleaned=raw.replace(new RegExp('\\b'+p.trigger.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'),' ');
+  const t=' '+cleaned+' ';
+  const gender=grabGender(t)||p.gender||null;
+  const age=(grabAges(t)[0])||p.age||null;
+  const found=grabBenefits(t); const list=(found.length?found:(p.benefits||[])).map(SNAP).slice(0,6);
+  if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
+  if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
+  if(!list.length) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — give me one or more benefit amounts, e.g. “7000 5000 4000”.');
+  const items=list.map(mb=>({age:+age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod}));
+  setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+list.map(fmt0).join(', ')+'.');
+  showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+bpL(p.benefitPeriod)+' · '+pctL(p.inflation??null)+(p.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')});
+}
+function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of items){ if(a.length>=6){ break; } a.push(o); added++; } LS.setTray(a); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); if(added<items.length) alert('Comparison holds up to 6 — added '+added+' of '+items.length+'.'); }
 function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
@@ -2680,6 +2745,46 @@ function renderClients(){
   box.innerHTML=c.map((x,i)=>'<div class="client"><div><div class="nm">'+esc(x.name)+'</div><div class="cfg">'+(x.contact?esc(x.contact)+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+esc(x.note):'')+'</div></div><div class="sp"><button class="view" onclick="viewQuote('+i+')">View quote</button><button class="go" onclick="openClient('+i+')">Open</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>').join('');
 }
 
+/* ---------- quick command CRUD ---------- */
+let EDIT_PAT = -1;
+function patternSummary(p){
+  const bits=[bpL(p.benefitPeriod), (p.elimination||'90')+'-day', pctL(p.inflation??null)];
+  if(p.pay&&p.pay!=='level') bits.push(p.pay==='10pay'?'10-Pay':'Single-Pay');
+  if(p.mode&&p.mode!=='monthly') bits.push(p.mode);
+  if(p.riderSharedAdditional) bits.push('shared-care');
+  if(p.maritalDiscount) bits.push('spousal −'+(MARITAL_DISCOUNT*100)+'%');
+  if(p.state) bits.push(p.state);
+  let s=bits.join(' · ');
+  if(p.benefits&&p.benefits.length) s+=' · defaults '+p.benefits.map(fmt0).join('/');
+  return s;
+}
+function renderPatterns(){
+  const ps=LS.patterns(), box=$('patterns');
+  if(!ps.length){ box.innerHTML='<p class="empty">No quick commands yet. Create one to run your go-to plan design with a single code.</p>'; return; }
+  box.innerHTML=ps.map((p,i)=>'<div class="client"><div><div class="nm">'+esc(p.trigger)+(p.name?' <span style="color:var(--muted);font-weight:600">'+esc(p.name)+'</span>':'')+'</div><div class="cfg">'+patternSummary(p)+'</div></div><div class="sp"><button class="view" onclick="usePattern('+i+')">Use</button><button class="go" style="background:#64748b" onclick="editPattern('+i+')">Edit</button><button class="del" onclick="delPattern('+i+')">Delete</button></div></div>').join('');
+}
+function usePattern(i){ const p=LS.patterns()[i]; if(!p) return; setMode('fast'); $('nl').value=p.trigger+' '; $('nl').focus(); $('nl').scrollIntoView({behavior:'smooth',block:'center'}); setInterp('Quick command <b>'+esc(p.trigger)+'</b> ready — add an age, gender'+((p.benefits&&p.benefits.length)?' (benefits default to '+p.benefits.map(fmt0).join(', ')+')':' and one or more benefit amounts')+', then Run.'); }
+function fillPatternForm(p){
+  $('p_trigger').value=p.trigger||''; $('p_name').value=p.name||'';
+  $('p_bp').value=p.benefitPeriod||'36'; $('p_infl').value=String(p.inflation??0); $('p_ep').value=p.elimination||'90';
+  $('p_pay').value=p.pay||'level'; $('p_mode').value=p.mode||'monthly'; $('p_state').value=p.state||'';
+  $('p_benefits').value=(p.benefits||[]).join(', '); $('p_sba').checked=!!p.riderSharedAdditional; $('p_marital').checked=!!p.maritalDiscount;
+}
+function openPattern(){ EDIT_PAT=-1; $('patternTitle').textContent='New quick command'; fillPatternForm({}); $('patternModal').classList.add('show'); $('p_trigger').focus(); }
+function editPattern(i){ const p=LS.patterns()[i]; if(!p) return; EDIT_PAT=i; $('patternTitle').textContent='Edit quick command'; fillPatternForm(p); $('patternModal').classList.add('show'); }
+function delPattern(i){ const ps=LS.patterns(); if(!confirm('Delete quick command “'+ps[i].trigger+'”?')) return; ps.splice(i,1); LS.setPatterns(ps); renderPatterns(); }
+function parseBenefitList(str){ return (str.match(/\d[\d,]*(?:\.\d)?\s*k?/gi)||[]).map(s=>{ s=s.trim().toLowerCase(); const v=/k$/.test(s)?parseFloat(s)*1000:parseInt(s.replace(/,/g,'')); return SNAP(v); }).filter(n=>n>=300); }
+function savePattern(){
+  const trig=$('p_trigger').value.trim();
+  if(!trig){ alert('Give it a trigger code, e.g. 754.'); return; }
+  const ps=LS.patterns();
+  const clash=ps.findIndex((x,ix)=>ix!==EDIT_PAT && x.trigger.toLowerCase()===trig.toLowerCase());
+  if(clash>=0){ alert('You already have a quick command “'+trig+'”. Pick a different code.'); return; }
+  const p={trigger:trig, name:$('p_name').value.trim(), benefitPeriod:$('p_bp').value, inflation:parseFloat($('p_infl').value)||null, elimination:$('p_ep').value, pay:$('p_pay').value, mode:$('p_mode').value, state:$('p_state').value||null, riderSharedAdditional:$('p_sba').checked, maritalDiscount:$('p_marital').checked, benefits:parseBenefitList($('p_benefits').value), note:''};
+  if(EDIT_PAT>=0) ps[EDIT_PAT]=p; else ps.push(p);
+  LS.setPatterns(ps); $('patternModal').classList.remove('show'); renderPatterns();
+}
+
 /* ---------- client quote sheet (options as columns, categories as rows) ---------- */
 const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-Meeting';
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -2748,7 +2853,7 @@ function fillStates(){
 /* ---------- init ---------- */
 fillStates();
 $('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
-renderTray(); renderClients();
+renderTray(); renderClients(); renderPatterns();
 </script>
 </body>
 </html>
