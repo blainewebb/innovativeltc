@@ -127,6 +127,9 @@
   .qs-toolbar .seg{display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;flex-wrap:wrap}
   .qs-toolbar .seg button{border:none;background:transparent;padding:9px 15px;border-radius:8px;font-weight:800;font-size:.85rem;cursor:pointer;color:var(--muted)}
   .qs-toolbar .seg button.on{background:var(--primary);color:#fff}
+  .qs-toolbar .qs-proj{display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);border-radius:11px;padding:7px 12px;font-size:.82rem;font-weight:700;color:#334155}
+  .qs-toolbar .qs-proj input{width:64px;padding:6px 8px;font-size:.9rem;text-align:center}
+  .qs-toolbar .qs-proj.show{display:inline-flex}
   .qs-toolbar .sp{margin-left:auto;display:flex;gap:8px}
   .qs-toolbar .tb{border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:.85rem}
   .qs-toolbar .tb.print{background:var(--success);color:#fff}
@@ -147,6 +150,8 @@
   table.qtab tr.prem th{color:var(--text);font-weight:800;font-size:.9rem}
   table.qtab tr.prem td{font-size:1.25rem;font-weight:800;color:var(--primary);white-space:nowrap}
   table.qtab td .pu{font-size:.66rem;color:var(--muted);font-weight:700;letter-spacing:.02em}
+  table.qtab tr.proj th,table.qtab tr.proj td{background:#f0f7ff}
+  table.qtab tr.proj td{color:var(--primary-d);font-weight:700}
   .sheet .qs-cta{margin-top:18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:.9rem;font-weight:600;color:#1e3a8a;text-align:center}
   .sheet .qs-cta a{color:var(--primary-d);font-weight:800;text-decoration:none}
   @media print{
@@ -155,7 +160,7 @@
     .qsheet{position:static !important;background:#fff !important;padding:0 !important;overflow:visible;display:block !important}
     .qs-toolbar{display:none !important}
     .sheet{box-shadow:none !important;max-width:100% !important;margin:0 !important;padding:0 !important;border-radius:0 !important}
-    table.qtab thead th,table.qtab tr.prem td,.sheet .sh-top,.sheet .qs-cta{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    table.qtab thead th,table.qtab tr.prem td,table.qtab tr.proj th,table.qtab tr.proj td,.sheet .sh-top,.sheet .qs-cta{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
@@ -341,6 +346,9 @@
       <button data-l="recommended" onclick="setSheetLayout('recommended')">Recommended</button>
       <button data-l="detailed" onclick="setSheetLayout('detailed')">Detailed</button>
     </div>
+    <label class="qs-proj" id="qsProj">Project benefit to age
+      <input id="qsProjAge" type="number" min="70" max="100" step="1" value="85" onchange="setProjAge(this.value)">
+    </label>
     <div class="sp">
       <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
       <button class="tb close" onclick="closeSheet()">Close</button>
@@ -2793,6 +2801,8 @@ const QCATS = {
   benefit:  {label:'Monthly benefit',      v:(o)=> fmt0(o.monthlyBenefit)+'/mo'},
   period:   {label:'Benefit period',       v:(o)=> bpL(o.benefitPeriod)},
   pool:     {label:'Total benefit pool',   v:(o)=> o.benefitPeriod==='lifetime' ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*parseInt(o.benefitPeriod))},
+  projMonthly:{label:()=>'Monthly benefit at age '+QSHEET.projAge, v:(o)=> fmt0(projBenefitAt(o))+'/mo'},
+  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> o.benefitPeriod==='lifetime' ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*parseInt(o.benefitPeriod))},
   elim:     {label:'Elimination period',   v:(o)=> o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> pctL(o.inflation)},
   shared:   {label:'Shared-care rider',    v:(o)=> o.riderSharedAdditional?'Included':'—'},
@@ -2803,10 +2813,13 @@ const QCATS = {
 const QLAYOUTS = {
   essentials:  ['benefit','period','premium'],
   recommended: ['benefit','period','pool','elim','inflation','premium'],
-  detailed:    ['applicant','benefit','period','pool','elim','inflation','shared','annual','premium'],
+  detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
-let QSHEET = {idx:-1, layout:'recommended'};
-function viewQuote(i){ QSHEET={idx:i, layout:'recommended'}; renderSheet(); $('qsheet').classList.add('show'); }
+let QSHEET = {idx:-1, layout:'recommended', projAge:85};
+// Benefit grown by the option's own compound inflation from issue age to the chosen age.
+function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||85)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
+function setProjAge(v){ let n=Math.round(+v||85); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
+function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||85)}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 function printSheet(){ window.print(); }
@@ -2814,6 +2827,8 @@ function renderSheet(){
   const cl = LS.clients()[QSHEET.idx]; if(!cl) return;
   const items = cl.items||[];
   document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
+  $('qsProj').classList.toggle('show', QSHEET.layout==='detailed');   // benefit-projection control only on the detailed sheet
+  $('qsProjAge').value = QSHEET.projAge||85;
   const quotes = items.map(o=>{ try{ return E.quote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
   let rows = QLAYOUTS[QSHEET.layout].slice();
@@ -2823,8 +2838,11 @@ function renderSheet(){
   // spousal discount: surface as a category in every layout, but only when at least one option uses it
   if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   const colHead = items.map((o,i)=>'<th>Option '+(i+1)+'</th>').join('');
-  const body = rows.map(key=>{ const cat=QCATS[key]; const cls=key==='premium'?' class="prem"':'';
-    return '<tr'+cls+'><th>'+cat.label+'</th>'+items.map((o,i)=>'<td>'+cat.v(o,quotes[i])+'</td>').join('')+'</tr>'; }).join('');
+  const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
+    const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
+    return '<tr'+cls+'><th>'+label+'</th>'+items.map((o,i)=>'<td>'+cat.v(o,quotes[i])+'</td>').join('')+'</tr>'; }).join('');
+  const showProj = QSHEET.layout==='detailed';
+  const projNote = showProj ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Values <b>at age '+QSHEET.projAge+'</b> assume each option’s compound inflation grows the monthly benefit every year to that age (level options stay flat). Illustrative — the actual benefit at claim follows the issued policy.</div>' : '';
   const sub = (uniform && items.length
       ? 'Prepared for '+esc(cl.name)+' &middot; '+items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')
       : 'Prepared for '+esc(cl.name))
@@ -2837,7 +2855,7 @@ function renderSheet(){
     + '<div class="sh-for">'+esc(cl.name)+'</div>'
     + '<div class="sh-sub">'+sub+'</div>'
     + (items.length
-        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote
         : '<p class="empty">No options saved for this client.</p>')
     + '<div class="qs-cta">Ready to talk it through? <a href="'+LEVITATE+'">Book a Benefits &amp; Pricing Zoom &rarr;</a></div>'
     + '<div class="disc">'+DISC+'</div>';
