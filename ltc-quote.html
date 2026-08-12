@@ -222,7 +222,7 @@
         <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>Payment plan</label><select id="s_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
         <div class="field"><label>Premium mode</label><select id="s_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
-        <div class="field"><label>State</label><select id="s_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+        <div class="field"><label>State</label><select id="s_state" class="statesel"></select></div>
       </div>
       <div class="riders">
         <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
@@ -253,7 +253,7 @@
         <div class="field"><label>Gender</label><select id="b_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
         <div class="field"><label>Benefit period</label><select id="b_bp"><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="b_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
-        <div class="field"><label>State</label><select id="b_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+        <div class="field"><label>State</label><select id="b_state" class="statesel"></select></div>
       </div>
       <div class="actions"><button class="run" onclick="runBudget()">Solve coverage</button></div>
     </div>
@@ -262,7 +262,7 @@
       <div class="grid">
         <div class="field"><label>Gender</label><select id="t_gender"><option value="female">Single female</option><option value="male">Single male</option></select></div>
         <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
-        <div class="field"><label>State</label><select id="t_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+        <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
       </div>
       <div class="actions"><button class="run" onclick="runStandard()">Run my standard</button></div>
     </div>
@@ -274,7 +274,7 @@
         <div class="field"><label>Monthly benefit today ($)</label><input id="w_benefit" type="number" value="4500" step="300"></div>
         <div class="field"><label>Benefit period</label><select id="w_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="w_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
-        <div class="field"><label>State</label><select id="w_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+        <div class="field"><label>State</label><select id="w_state" class="statesel"></select></div>
       </div>
       <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Genworth / CareScout Cost of Care Survey ↗</a></p>
       <div class="actions"><button class="run" onclick="runWaiting()">Show the cost of waiting</button></div>
@@ -2729,7 +2729,15 @@ function renderSheet(){
     + '<div class="disc">'+DISC+'</div>';
 }
 
+/* ---------- states (NGL: same everywhere but CO; recorded now, ready for state-rated carriers) ---------- */
+const US_STATES=[['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['DC','District of Columbia'],['FL','Florida'],['GA','Georgia'],['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming']];
+function fillStates(){
+  const opts='<option value="">Any state (non-CO)</option>'+US_STATES.map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join('');
+  document.querySelectorAll('select.statesel').forEach(s=>{ const cur=s.value; s.innerHTML=opts; s.value=cur; });
+}
+
 /* ---------- init ---------- */
+fillStates();
 $('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
 renderTray(); renderClients();
 </script>
