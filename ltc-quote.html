@@ -276,16 +276,17 @@
 <div class="modal" id="settings">
   <div class="box">
     <h3>AI mode settings</h3>
-    <p>AI mode lets you type requests in free-form English. It uses your own Anthropic API key to understand the request — <b>the exact premium is always computed by the verified NGL engine, never by the AI.</b></p>
-    <label>Anthropic API key</label>
+    <p>AI mode lets you type requests in free-form English. It uses your own AI key to understand the request — <b>the exact premium is always computed by the verified NGL engine, never by the AI.</b> Choose whichever provider you have a key for.</p>
+    <label>AI provider</label>
+    <select id="provider" onchange="syncProviderUI()">
+      <option value="claude">Claude (Anthropic)</option>
+      <option value="gemini">Gemini (Google)</option>
+    </select>
+    <label id="keylabel">Anthropic API key</label>
     <input id="apikey" type="password" placeholder="sk-ant-...">
     <label>Model</label>
-    <select id="model">
-      <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest, plenty for this</option>
-      <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
-      <option value="claude-opus-5">Claude Opus 5 — most capable</option>
-    </select>
-    <div class="warn">Your key is stored only in this browser (local storage) and sent directly to Anthropic. Don’t use this on a shared/public computer. You can clear it anytime here.</div>
+    <select id="model"></select>
+    <div class="warn" id="keyhelp"></div>
     <div class="row">
       <button class="ghost" onclick="clearKey()">Clear key</button>
       <button class="run" onclick="saveSettings()">Save</button>
@@ -2348,9 +2349,25 @@ const DISC = 'This is an independent illustration not provided or approved by th
 let MODE = 'fast';
 
 /* ---------- storage ---------- */
+const PROVIDERS = {
+  claude: {
+    label:'Anthropic', keyLabel:'Anthropic API key', placeholder:'sk-ant-...',
+    keyStore:'ltcApiKey', modelStore:'ltcModel', defaultModel:'claude-haiku-4-5',
+    models:[['claude-haiku-4-5','Claude Haiku 4.5 — cheapest, plenty for this'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-opus-5','Claude Opus 5 — most capable']],
+    help:'Your key is stored only in this browser (local storage) and sent directly to Anthropic. Don’t use this on a shared/public computer. Clear it anytime here.',
+  },
+  gemini: {
+    label:'Google Gemini', keyLabel:'Google Gemini API key', placeholder:'AIza...',
+    keyStore:'ltcGeminiKey', modelStore:'ltcGeminiModel', defaultModel:'gemini-2.5-flash',
+    models:[['gemini-2.5-flash','Gemini 2.5 Flash — cheapest, plenty for this'],['gemini-2.5-pro','Gemini 2.5 Pro — most capable'],['gemini-2.0-flash','Gemini 2.0 Flash — fast']],
+    help:'Get a free key at aistudio.google.com/apikey. It’s stored only in this browser (local storage) and sent directly to Google. Don’t use this on a shared/public computer. Clear it anytime here.',
+  },
+};
 const LS = {
-  key(){ return localStorage.getItem('ltcApiKey')||''; },
-  model(){ return localStorage.getItem('ltcModel')||'claude-haiku-4-5'; },
+  provider(){ const p=localStorage.getItem('ltcProvider'); return PROVIDERS[p]?p:'claude'; },
+  setProvider(p){ localStorage.setItem('ltcProvider', p); },
+  key(){ return localStorage.getItem(PROVIDERS[this.provider()].keyStore)||''; },
+  model(){ const P=PROVIDERS[this.provider()]; return localStorage.getItem(P.modelStore)||P.defaultModel; },
   tray(){ try{return JSON.parse(localStorage.getItem('ltcTray')||'[]');}catch(e){return [];} },
   setTray(a){ localStorage.setItem('ltcTray', JSON.stringify(a)); },
   clients(){ try{return JSON.parse(localStorage.getItem('ltcClients')||'[]');}catch(e){return [];} },
@@ -2363,13 +2380,27 @@ function setMode(m){
   document.querySelectorAll('.modebtn').forEach(b=>b.classList.toggle('on', b.dataset.m===m));
   $('askbar').classList.toggle('aimode', m==='ai');
   $('modelead').textContent = m==='ai'
-    ? 'AI mode — ask anything in plain English (uses your Anthropic key).'
+    ? 'AI mode — ask anything in plain English (uses your own AI key).'
     : 'Smart commands — type it the way you would say it.';
-  $('aikeynote').classList.toggle('show', m==='ai' && !LS.key());
+  updateAiKeyNote();
 }
-function openSettings(){ $('apikey').value=LS.key(); $('model').value=LS.model(); $('settings').classList.add('show'); }
-function saveSettings(){ localStorage.setItem('ltcApiKey', $('apikey').value.trim()); localStorage.setItem('ltcModel', $('model').value); $('settings').classList.remove('show'); if(MODE==='ai')$('aikeynote').classList.toggle('show', !LS.key()); }
-function clearKey(){ localStorage.removeItem('ltcApiKey'); $('apikey').value=''; }
+function updateAiKeyNote(){
+  const need = MODE==='ai' && !LS.key();
+  $('aikeynote').classList.toggle('show', need);
+  if(need) $('aikeynote').innerHTML='AI mode needs your '+PROVIDERS[LS.provider()].label+' API key. <a onclick="openSettings()">Add it in settings →</a>';
+}
+function syncProviderUI(){
+  const p=$('provider').value, P=PROVIDERS[p];
+  $('keylabel').textContent=P.keyLabel;
+  $('apikey').placeholder=P.placeholder;
+  $('apikey').value=localStorage.getItem(P.keyStore)||'';
+  $('model').innerHTML=P.models.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
+  $('model').value=localStorage.getItem(P.modelStore)||P.defaultModel;
+  $('keyhelp').textContent=P.help;
+}
+function openSettings(){ $('provider').value=LS.provider(); syncProviderUI(); $('settings').classList.add('show'); }
+function saveSettings(){ const p=$('provider').value, P=PROVIDERS[p]; LS.setProvider(p); localStorage.setItem(P.keyStore, $('apikey').value.trim()); localStorage.setItem(P.modelStore, $('model').value); $('settings').classList.remove('show'); updateAiKeyNote(); }
+function clearKey(){ const P=PROVIDERS[$('provider').value]; localStorage.removeItem(P.keyStore); $('apikey').value=''; }
 function toggle(id){ $(id).hidden=!$(id).hidden; }
 
 /* ---------- tabs ---------- */
@@ -2454,8 +2485,7 @@ async function recommendAI(target,age,gender,d){
   const lines=d.picks.map(p=>p.label+' = '+fmt0(p.benefit)+'/mo of benefit over '+bpL(p.opts.benefitPeriod)+' at '+pctL(p.opts.inflation)).join('; ');
   const sys='You help a long-term care agent explain budget options to a client. You are given pre-computed, VERIFIED options — never change or invent a number. Write 2-3 warm, plain-English sentences recommending choices for someone on the stated monthly budget, contrasting the biggest monthly benefit against the longest coverage period. Plain text only, no headers.';
   const u='Budget '+fmt0(target)+'/mo for a '+age+'-year-old '+gL(gender)+'. Verified options: '+lines+'.';
-  try{ const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:LS.model(),max_tokens:300,system:sys,messages:[{role:'user',content:u}]})});
-    if(!res.ok) return; const data=await res.json(); const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+  try{ const txt=(await callAI(sys, u, {maxTokens:500})).trim();
     if(txt) renderOptimize(d,'<div class="config-line" style="background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95">✨ '+txt.replace(/\n+/g,'<br>')+'</div>'); }catch(e){}
 }
 
@@ -2533,16 +2563,35 @@ function ex(btn){ $('nl').value=btn.textContent; ask(); }
 const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
 {"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false}],"couple":null,"budget":null,"missing":[]}
 Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO".`;
+// One call, either provider. Returns the model's text. Verified engine still does all math.
+async function callAI(system, user, {maxTokens=800, json=false}={}){
+  const provider=LS.provider(), key=LS.key(), model=LS.model();
+  if(!key) throw new Error('no API key');
+  if(provider==='gemini'){
+    const gc={maxOutputTokens:maxTokens, temperature:0};
+    if(json) gc.responseMimeType='application/json';
+    if(/flash/i.test(model)) gc.thinkingConfig={thinkingBudget:0};   // skip "thinking" so short budgets don't come back empty
+    const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key);
+    const res=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:gc})});
+    if(!res.ok){ const b=await res.text(); throw new Error('Gemini API '+res.status+' — '+b.slice(0,180)); }
+    const data=await res.json();
+    const cand=(data.candidates||[])[0];
+    if(cand&&cand.finishReason&&cand.finishReason!=='STOP'&&!(cand.content&&cand.content.parts)) throw new Error('Gemini stopped ('+cand.finishReason+')');
+    return (((cand||{}).content||{}).parts||[]).map(p=>p.text||'').join('');
+  }
+  const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
+    headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({ model, max_tokens:maxTokens, system, messages:[{role:'user',content:user}] }) });
+  if(!res.ok){ const b=await res.text(); throw new Error('Anthropic API '+res.status+' — '+b.slice(0,180)); }
+  const data=await res.json();
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+}
 async function askAI(raw){
-  const key=LS.key(); if(!key){ setInterp('AI mode needs your Anthropic API key. <a style="color:var(--violet);font-weight:700;cursor:pointer" onclick="openSettings()">Add it in settings →</a>', true); return; }
+  if(!LS.key()){ setInterp('AI mode needs your '+PROVIDERS[LS.provider()].label+' API key. <a style="color:var(--violet);font-weight:700;cursor:pointer" onclick="openSettings()">Add it in settings →</a>', true); return; }
   setInterp('✨ Thinking…', true);
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
-      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({ model:LS.model(), max_tokens:700, system:AI_SYSTEM, messages:[{role:'user',content:raw}] }) });
-    if(!res.ok){ const b=await res.text(); throw new Error('API '+res.status+' — '+b.slice(0,160)); }
-    const data=await res.json();
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const text=await callAI(AI_SYSTEM, raw, {maxTokens:1000, json:true});
     const spec=JSON.parse(text.replace(/```json|```/g,'').trim());
     runSpec(spec, raw);
   }catch(e){ setInterp('AI mode error: '+e.message+'. (Check your key in settings, or switch to ⚡ Fast.)', true); }
