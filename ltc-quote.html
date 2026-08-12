@@ -347,7 +347,7 @@
       <button data-l="detailed" onclick="setSheetLayout('detailed')">Detailed</button>
     </div>
     <label class="qs-proj" id="qsProj">Project benefit to age
-      <input id="qsProjAge" type="number" min="70" max="100" step="1" value="85" onchange="setProjAge(this.value)">
+      <input id="qsProjAge" type="number" min="70" max="100" step="1" value="80" onchange="setProjAge(this.value)">
     </label>
     <div class="sp">
       <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
@@ -2815,11 +2815,11 @@ const QLAYOUTS = {
   recommended: ['benefit','period','pool','elim','inflation','premium'],
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
-let QSHEET = {idx:-1, layout:'recommended', projAge:85};
+let QSHEET = {idx:-1, layout:'recommended', projAge:80};
 // Benefit grown by the option's own compound inflation from issue age to the chosen age.
-function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||85)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
-function setProjAge(v){ let n=Math.round(+v||85); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
-function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||85)}; renderSheet(); $('qsheet').classList.add('show'); }
+function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
+function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
+function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80)}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 function printSheet(){ window.print(); }
@@ -2828,7 +2828,7 @@ function renderSheet(){
   const items = cl.items||[];
   document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
   $('qsProj').classList.toggle('show', QSHEET.layout==='detailed');   // benefit-projection control only on the detailed sheet
-  $('qsProjAge').value = QSHEET.projAge||85;
+  $('qsProjAge').value = QSHEET.projAge||80;
   const quotes = items.map(o=>{ try{ return E.quote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
   let rows = QLAYOUTS[QSHEET.layout].slice();
