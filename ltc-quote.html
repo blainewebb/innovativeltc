@@ -7,36 +7,50 @@
 <style>
   :root{
     --primary:#2563eb; --primary-d:#1d4ed8; --success:#059669; --bg:#f1f5f9;
-    --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --soft:#f8fafc;
+    --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --soft:#f8fafc; --violet:#7c3aed;
   }
   *{box-sizing:border-box}
-  body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:0}
-  .wrap{max-width:920px;margin:0 auto;padding:20px 16px 60px}
-  header.top{display:flex;align-items:center;gap:12px;padding:8px 0 20px}
+  body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);margin:0}
+  .wrap{max-width:960px;margin:0 auto;padding:20px 16px 60px}
+  header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 18px}
   .brand{font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
   .brand span{color:var(--primary)}
   .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
-  .badge{margin-left:auto;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+  .topright{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .badge{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+  .gear{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:9px;padding:6px 10px;font-size:1rem}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
-  /* ask bar */
+  /* mode toggle */
+  .modes{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px}
+  .modebtn{border:none;background:transparent;padding:8px 16px;border-radius:8px;font-weight:800;font-size:.9rem;cursor:pointer;color:var(--muted)}
+  .modebtn.on[data-m="fast"]{background:var(--primary);color:#fff}
+  .modebtn.on[data-m="ai"]{background:var(--violet);color:#fff}
+  /* ask */
   .ask h2{margin:0 0 4px}
   .ask .lead{color:var(--muted);font-size:.86rem;margin:0 0 12px}
   .askbar{display:flex;gap:8px}
   .askbar input{flex:1;padding:14px;border:2px solid var(--primary);border-radius:11px;font-size:1.02rem;outline:none}
+  .askbar.aimode input{border-color:var(--violet)}
   .askbar input:focus{box-shadow:0 0 0 4px rgba(37,99,235,.15)}
+  .askbar.aimode input:focus{box-shadow:0 0 0 4px rgba(124,58,237,.15)}
+  .askbar button{background:var(--primary)}
+  .askbar.aimode button{background:var(--violet)}
   .examples{margin-top:12px;display:flex;flex-wrap:wrap;gap:7px;align-items:center}
   .examples .lbl{color:var(--muted);font-size:.8rem;font-weight:600}
   .ex{background:var(--soft);border:1px solid var(--border);color:#334155;border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer}
   .ex:hover{border-color:var(--primary);color:var(--primary)}
   .interp{margin-top:12px;font-size:.86rem;color:#334155;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:9px 12px;display:none}
   .interp.show{display:block}
+  .interp.ai{background:#f5f3ff;border-color:#ddd6fe}
   .interp b{color:var(--primary-d)}
-  /* tabs */
   .tabtoggle{color:var(--muted);font-size:.82rem;cursor:pointer;margin-top:14px;display:inline-block;font-weight:600}
   .tabtoggle:hover{color:var(--primary)}
-  .manual{margin-top:16px}
+  .aikey-note{margin-top:12px;font-size:.83rem;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:9px 12px;display:none}
+  .aikey-note.show{display:block}
+  .aikey-note a{color:var(--violet);font-weight:700;cursor:pointer}
+  /* tabs */
   .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-  .tab{flex:1;min-width:110px;text-align:center;padding:11px 8px;border-radius:10px;border:1px solid var(--border);background:var(--soft);color:var(--muted);font-weight:700;cursor:pointer;font-size:.9rem;transition:.15s}
+  .tab{flex:1;min-width:110px;text-align:center;padding:11px 8px;border-radius:10px;border:1px solid var(--border);background:var(--soft);color:var(--muted);font-weight:700;cursor:pointer;font-size:.9rem}
   .tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
   h2{font-size:1.05rem;margin:0 0 14px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -49,7 +63,7 @@
   .riders input{width:auto}
   .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
   button.run{background:var(--primary);color:#fff;border:none;padding:13px 22px;border-radius:10px;font-weight:800;font-size:1rem;cursor:pointer}
-  button.run:hover{background:var(--primary-d)}
+  button.run:hover{filter:brightness(1.05)}
   button.ghost{background:#fff;color:var(--primary);border:1px solid var(--primary);padding:13px 18px;border-radius:10px;font-weight:700;cursor:pointer}
   .hint{color:var(--muted);font-size:.8rem;margin-top:6px}
   /* results */
@@ -67,16 +81,34 @@
   details.steps summary{cursor:pointer;color:var(--primary);font-weight:600;font-size:.85rem}
   .steps ul{margin:8px 0 0;padding-left:18px;color:#475569;font-size:.82rem;line-height:1.7}
   .disc{color:var(--muted);font-size:.72rem;line-height:1.5;margin-top:14px;border-top:1px dashed var(--border);padding-top:10px}
-  /* saved combos */
-  .combo{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--soft)}
-  .combo .nm{font-weight:700;font-size:.9rem}
-  .combo .cfg{color:var(--muted);font-size:.78rem}
-  .combo .sp{margin-left:auto;display:flex;gap:6px}
-  .combo button{border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:.8rem}
-  .combo .go{background:var(--primary);color:#fff}
-  .combo .del{background:#fef2f2;color:#dc2626}
+  .addbtn{margin-top:12px;background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
+  .addbtn:hover{background:#e0e7ff}
+  /* comparison tray */
+  .tray-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .tray-head .sp{margin-left:auto;display:flex;gap:8px}
+  .traybtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:.85rem}
+  .traybtn.save{background:var(--success);color:#fff}
+  .traybtn.clear{background:#fef2f2;color:#dc2626}
+  td .rm{border:none;background:#fef2f2;color:#dc2626;border-radius:6px;padding:4px 9px;font-weight:700;cursor:pointer;font-size:.75rem}
+  /* saved clients */
+  .client{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--soft)}
+  .client .nm{font-weight:800;font-size:.95rem}
+  .client .cfg{color:var(--muted);font-size:.8rem}
+  .client .sp{margin-left:auto;display:flex;gap:6px}
+  .client button{border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:.8rem}
+  .client .go{background:var(--primary);color:#fff}
+  .client .del{background:#fef2f2;color:#dc2626}
   .empty{color:var(--muted);font-size:.85rem;font-style:italic}
   .err{background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:11px 13px;border-radius:9px;font-size:.9rem}
+  /* settings modal */
+  .modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .modal.show{display:flex}
+  .modal .box{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px}
+  .modal h3{margin:0 0 6px}
+  .modal p{color:var(--muted);font-size:.85rem;margin:0 0 14px}
+  .modal label{font-weight:600;font-size:.82rem;display:block;margin:12px 0 5px}
+  .modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:.8rem;padding:10px 12px;border-radius:9px;margin-top:14px}
 </style>
 </head>
 <body>
@@ -86,17 +118,24 @@
       <div class="brand">Innovative <span>LTC</span></div>
       <div class="sub">Instant quote engine</div>
     </div>
-    <div class="badge">✓ NGL EssentialLTC · verified rates</div>
+    <div class="topright">
+      <span class="badge">✓ NGL · verified rates</span>
+      <span class="gear" title="Settings" onclick="openSettings()">⚙︎</span>
+    </div>
   </header>
 
-  <!-- ASK / natural-language command box -->
   <div class="card ask">
-    <h2>Ask the quote engine</h2>
-    <p class="lead">Type it the way you'd say it — age, gender, and what you want.</p>
-    <div class="askbar">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="modes" id="modes">
+        <button class="modebtn on" data-m="fast" onclick="setMode('fast')">⚡ Fast</button>
+        <button class="modebtn" data-m="ai" onclick="setMode('ai')">✨ AI</button>
+      </div>
+      <div class="lead" id="modelead" style="margin:0">Smart commands — type it the way you'd say it.</div>
+    </div>
+    <div class="askbar" id="askbar">
       <input id="nl" placeholder="run my standard for a 63 year old female" autocomplete="off"
-        onkeydown="if(event.key==='Enter')runNL()">
-      <button class="run" onclick="runNL()">Run</button>
+        onkeydown="if(event.key==='Enter')ask()">
+      <button class="run" onclick="ask()">Run</button>
     </div>
     <div class="examples">
       <span class="lbl">Try:</span>
@@ -104,21 +143,19 @@
       <button class="ex" onclick="ex(this)">65 male, $4,000/mo, 4 years, 3%</button>
       <button class="ex" onclick="ex(this)">what can a 62 female get for $300 a month</button>
       <button class="ex" onclick="ex(this)">couple, 64 male and 61 female, $4,500, 3 year, 3%</button>
-      <button class="ex" onclick="ex(this)">compare $4,500 3yr vs $6,000 4yr for a 62 male 3%</button>
     </div>
     <div id="interp" class="interp"></div>
-    <span class="tabtoggle" onclick="document.getElementById('manual').hidden=!document.getElementById('manual').hidden">⚙︎ Prefer to click? Open the manual form</span>
+    <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
+    <span class="tabtoggle" onclick="toggle('manual')">⚙︎ Prefer to click? Open the manual form</span>
   </div>
 
-  <div class="card manual" id="manual" hidden>
+  <div class="card" id="manual" hidden>
     <div class="tabs" id="tabs">
       <div class="tab active" data-mode="single">Single</div>
       <div class="tab" data-mode="couple">Couple</div>
       <div class="tab" data-mode="budget">Budget</div>
       <div class="tab" data-mode="standard">My Standard</div>
     </div>
-
-    <!-- SINGLE -->
     <div class="pane" data-pane="single">
       <div class="grid">
         <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
@@ -136,13 +173,8 @@
         <label><input type="checkbox" id="s_fdc"> First-day HCCS rider</label>
         <label><input type="checkbox" id="s_sbn"> Shortened benefit rider</label>
       </div>
-      <div class="actions">
-        <button class="run" onclick="runSingle()">Run quote</button>
-        <button class="ghost" onclick="saveCombo()">Save this combination</button>
-      </div>
+      <div class="actions"><button class="run" onclick="runSingle()">Run quote</button></div>
     </div>
-
-    <!-- COUPLE -->
     <div class="pane" data-pane="couple" hidden>
       <div class="grid">
         <div class="field"><label>Client 1 — age</label><input id="c_age1" type="number" value="62" min="18" max="79"></div>
@@ -157,8 +189,6 @@
       <div class="riders"><label><input type="checkbox" id="c_sba"> Shared-care rider</label></div>
       <div class="actions"><button class="run" onclick="runCouple()">Run couple quote</button></div>
     </div>
-
-    <!-- BUDGET -->
     <div class="pane" data-pane="budget" hidden>
       <p class="hint" style="margin-top:0">“If they can spend $X a month, how much coverage does that buy?”</p>
       <div class="grid">
@@ -171,8 +201,6 @@
       </div>
       <div class="actions"><button class="run" onclick="runBudget()">Solve coverage</button></div>
     </div>
-
-    <!-- STANDARD -->
     <div class="pane" data-pane="standard" hidden>
       <p class="hint" style="margin-top:0" id="std_desc"></p>
       <div class="grid">
@@ -186,9 +214,42 @@
 
   <div class="card" id="resultCard" hidden><div id="result"></div></div>
 
+  <div class="card" id="trayCard" hidden>
+    <div class="tray-head">
+      <h2 style="margin:0">Comparison <span id="traycount" style="color:var(--muted);font-weight:600"></span></h2>
+      <div class="sp">
+        <button class="traybtn save" onclick="saveClient()">Save to client…</button>
+        <button class="traybtn clear" onclick="clearTray()">Clear</button>
+      </div>
+    </div>
+    <div id="tray"></div>
+    <div class="disc" id="traydisc"></div>
+  </div>
+
   <div class="card">
-    <h2>Saved combinations</h2>
-    <div id="combos"><p class="empty">No saved combinations yet. Set up a quote and hit “Save this combination.”</p></div>
+    <h2>Saved clients</h2>
+    <div id="clients"><p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p></div>
+  </div>
+</div>
+
+<!-- settings modal -->
+<div class="modal" id="settings">
+  <div class="box">
+    <h3>AI mode settings</h3>
+    <p>AI mode lets you type requests in free-form English. It uses your own Anthropic API key to understand the request — <b>the exact premium is always computed by the verified NGL engine, never by the AI.</b></p>
+    <label>Anthropic API key</label>
+    <input id="apikey" type="password" placeholder="sk-ant-...">
+    <label>Model</label>
+    <select id="model">
+      <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest, plenty for this</option>
+      <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+      <option value="claude-opus-5">Claude Opus 5 — most capable</option>
+    </select>
+    <div class="warn">Your key is stored only in this browser (local storage) and sent directly to Anthropic. Don’t use this on a shared/public computer. You can clear it anytime here.</div>
+    <div class="row">
+      <button class="ghost" onclick="clearKey()">Clear key</button>
+      <button class="run" onclick="saveSettings()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -2220,40 +2281,64 @@ if (typeof window !== "undefined"){
 </script>
 <script>
 const $ = id => document.getElementById(id);
-const fmt = n => '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = n => '$'+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0 = n => '$'+Math.round(n).toLocaleString();
 const pctL = v => v?((v*100)+'% compound'):'level (no inflation)';
 const bpL = v => v==='lifetime'?'lifetime':(parseInt(v)/12)+'-yr';
 const gL = g => g==='female'?'female':'male';
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
+let MODE = 'fast';
 
+/* ---------- storage ---------- */
+const LS = {
+  key(){ return localStorage.getItem('ltcApiKey')||''; },
+  model(){ return localStorage.getItem('ltcModel')||'claude-haiku-4-5'; },
+  tray(){ try{return JSON.parse(localStorage.getItem('ltcTray')||'[]');}catch(e){return [];} },
+  setTray(a){ localStorage.setItem('ltcTray', JSON.stringify(a)); },
+  clients(){ try{return JSON.parse(localStorage.getItem('ltcClients')||'[]');}catch(e){return [];} },
+  setClients(a){ localStorage.setItem('ltcClients', JSON.stringify(a)); },
+};
+
+/* ---------- mode + settings ---------- */
+function setMode(m){
+  MODE=m;
+  document.querySelectorAll('.modebtn').forEach(b=>b.classList.toggle('on', b.dataset.m===m));
+  $('askbar').classList.toggle('aimode', m==='ai');
+  $('modelead').textContent = m==='ai'
+    ? 'AI mode — ask anything in plain English (uses your Anthropic key).'
+    : 'Smart commands — type it the way you would say it.';
+  $('aikeynote').classList.toggle('show', m==='ai' && !LS.key());
+}
+function openSettings(){ $('apikey').value=LS.key(); $('model').value=LS.model(); $('settings').classList.add('show'); }
+function saveSettings(){ localStorage.setItem('ltcApiKey', $('apikey').value.trim()); localStorage.setItem('ltcModel', $('model').value); $('settings').classList.remove('show'); if(MODE==='ai')$('aikeynote').classList.toggle('show', !LS.key()); }
+function clearKey(){ localStorage.removeItem('ltcApiKey'); $('apikey').value=''; }
+function toggle(id){ $(id).hidden=!$(id).hidden; }
+
+/* ---------- tabs ---------- */
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  const m=t.dataset.mode;
-  document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==m);
+  document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==t.dataset.mode);
 });
 
+/* ---------- rendering ---------- */
 function show(html){ $('resultCard').hidden=false; $('result').innerHTML=html; $('resultCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
-function showErr(msg){ show('<div class="err">'+msg+'</div>'); }
+function showErr(m){ show('<div class="err">'+m+'</div>'); }
 function stepsBlock(steps){ return '<details class="steps"><summary>Show the math</summary><ul>'+steps.map(s=>'<li>'+s[0]+' &rarr; '+fmt(s[1])+'</li>').join('')+'</ul></details>'; }
 function priceHead(o){
   if(o.pay==='Single-Pay') return '<div class="price">'+fmt(o.singlePremium)+' <small>one-time (single pay)</small></div>';
   const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[o.mode];
   return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
 }
-function cfgLine(o){
-  return o.age+(o.gender==='female'?'F':'M')+' &middot; '+fmt0(o.monthlyBenefit)+'/mo &middot; '+bpL(o.benefitPeriod)+' &middot; '+o.elimination+'-day &middot; '+pctL(o.inflation)+(o.riderSharedAdditional?' &middot; shared-care':'')+(o.state?' &middot; '+o.state:'');
-}
+function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.state?' · '+o.state:''); }
+function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 
-/* shared render helpers (used by both the Ask box and the manual tabs) */
 function showSingle(o){
   const q=E.quote(o);
-  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgLine(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+addBtn(o)+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showCouple(a1,g1,a2,g2,opts){
-  const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts);
-  const c=r.combined_joint;
+  const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
   const surv=Object.keys(r).filter(k=>k.startsWith('survivor_'));
   const rows=surv.map(k=>'<tr><td>If only the '+k.replace('survivor_','')+' remains</td><td class="p">'+fmt(r[k].modalPayment)+'/mo</td></tr>').join('');
   show('<div class="res-head">'+priceHead(c)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
@@ -2267,80 +2352,33 @@ function showBudget(target,age,gender,opts){
 }
 function showStandard(age,gender,state){
   const rows=E.runScenario(E.STANDARD_SCENARIO,age,gender,{mode:'monthly',state:state||null});
-  const body=rows.map(o=>'<tr><td><b>'+o.option+'</b></td><td class="b">'+fmt0(o.monthlyBenefit)+'/mo, '+bpL(o.benefitPeriod)+', '+pctL(o.inflation)+'</td><td class="p">'+fmt(o.monthlyPremium)+'/mo</td></tr>').join('');
-  show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th></tr>'+body+'</table><div class="disc">'+DISC+'</div>');
+  const body=rows.map(o=>{ const cfg={age,gender,monthlyBenefit:o.monthlyBenefit,benefitPeriod:o.benefitPeriod,elimination:'90',inflation:o.inflation,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:o.benefitPeriod};
+    return '<tr><td><b>'+o.option+'</b></td><td class="b">'+fmt0(o.monthlyBenefit)+'/mo, '+bpL(o.benefitPeriod)+', '+pctL(o.inflation)+'</td><td class="p">'+fmt(o.monthlyPremium)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th><th></th></tr>'+body+'</table><div class="disc">'+DISC+'</div>');
 }
 function showCompare(items){
-  const body=items.map(it=>{ const q=E.quote(it.opts); return '<tr><td><b>'+it.label+'</b></td><td class="b">'+fmt0(it.opts.monthlyBenefit)+'/mo, '+bpL(it.opts.benefitPeriod)+', '+pctL(it.opts.inflation)+'</td><td class="p">'+fmt(q.modalPayment)+'/mo</td></tr>'; }).join('');
-  const a=items[0].opts;
-  show('<div class="config-line">Comparison &middot; '+a.age+' '+gL(a.gender)+'</div><table class="opts"><tr><th></th><th>Coverage</th><th style="text-align:right">Premium</th></tr>'+body+'</table><div class="disc">'+DISC+'</div>');
+  const rows=items.map(o=>{ const q=E.quote(o); return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+fmt(q.modalPayment)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Comparison</div><table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
 
-/* ===== manual-tab entry points ===== */
-function singleOpts(){
-  return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:+$('s_benefit').value,
-    benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null,
-    pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null,
-    riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value,
-    riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked};
-}
+/* ---------- manual tabs ---------- */
+function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:+$('s_benefit').value, benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked}; }
 function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
-function runCouple(){ try{
-  showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,
-    {monthlyBenefit:+$('c_benefit').value,benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,
-     inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value});
-}catch(e){ showErr(e.message); } }
-function runBudget(){ try{
-  showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,
-    {benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null});
-}catch(e){ showErr(e.message); } }
+function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:+$('c_benefit').value,benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
+function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
 function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,$('t_state').value||null); }catch(e){ showErr(e.message); } }
 
-/* ===== natural-language parser ===== */
+/* ---------- fast (local) parser ---------- */
 function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.03, mode:'monthly', pay:'level', state:null, riderSharedAdditional:false}; }
-function grabGender(t){
-  if(/\b(female|woman|women|lady|she|her)\b/i.test(t)) return 'female';
-  if(/\b(male|man|men|he|his|him|gentleman)\b/i.test(t)) return 'male';
-  return null;
-}
-function grabAges(t){ // ages are 2-digit numbers 40-90, or "<n> year old"/"<n> yo"
-  const ages=[]; let m;
-  const re=/\b(\d{2})\s*(?:[- ]?(?:year|yr)s?[- ]?old|yo|y\/o|[- ]?year[- ]?old)\b/gi;
-  while(m=re.exec(t)) ages.push(+m[1]);
-  if(ages.length) return ages;
-  // else: 2-digit numbers 40-90 not glued to %, k, or a benefit $
-  const re2=/(?:^|[^$\d.])(\d{2})(?!\s*%|\s*k|\d)/g;
-  while(m=re2.exec(t)){ const n=+m[1]; if(n>=40&&n<=90) ages.push(n); }
-  return ages;
-}
-function grabBenefit(t){
-  let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return Math.round(parseFloat(m[1])*1000);
-  const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x;
-  while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return n; }
-  return null;
-}
-function grabBP(t){
-  if(/lifetime|life[- ]?time/i.test(t)) return 'lifetime';
-  let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo; }
-  m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1];
-  return null;
-}
-function grabInfl(t){
-  if(/\b(no inflation|without inflation|level|no cola)\b/i.test(t)) return 0;
-  const m=t.match(/(\d)\s*(?:%|percent)/i); if(m){ const v=+m[1]/100; if(v>=0.01&&v<=0.05) return v; }
-  return null;
-}
+function grabGender(t){ if(/\b(female|woman|women|lady|she|her)\b/i.test(t)) return 'female'; if(/\b(male|man|men|he|his|him|gentleman)\b/i.test(t)) return 'male'; return null; }
+function grabAges(t){ const a=[]; let m; const re=/\b(\d{2})\s*(?:[- ]?(?:year|yr)s?[- ]?old|yo|y\/o)\b/gi; while(m=re.exec(t)) a.push(+m[1]); if(a.length) return a; const re2=/(?:^|[^$\d.])(\d{2})(?!\s*%|\s*k|\d)/g; while(m=re2.exec(t)){ const n=+m[1]; if(n>=40&&n<=90) a.push(n);} return a; }
+function grabBenefit(t){ let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return Math.round(parseFloat(m[1])*1000); const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x; while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return n;} return null; }
+function grabBP(t){ if(/lifetime|life[- ]?time/i.test(t)) return 'lifetime'; let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo;} m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1]; return null; }
+function grabInfl(t){ if(/\b(no inflation|without inflation|level|no cola)\b/i.test(t)) return 0; const m=t.match(/(\d)\s*(?:%|percent)/i); if(m){ const v=+m[1]/100; if(v>=0.01&&v<=0.05) return v;} return null; }
 function grabState(t){ return /\bcolorado\b|\bco\b/i.test(t)?'CO':null; }
-function grabTarget(t){ // budget premium: "$300", "300 a month", small $ figure
-  let m=t.match(/\$\s*([\d,]{2,5})/); if(m){ const n=parseInt(m[1].replace(/,/g,'')); if(n>=50&&n<=1500) return n; }
-  m=t.match(/\b(\d{2,4})\s*(?:\/mo|\/month|a month|per month|monthly|month)\b/i); if(m){ const n=+m[1]; if(n>=50&&n<=1500) return n; }
-  return null;
-}
-
+function grabTarget(t){ let m=t.match(/\$\s*([\d,]{2,5})/); if(m){ const n=parseInt(m[1].replace(/,/g,'')); if(n>=50&&n<=1500) return n;} m=t.match(/\b(\d{2,4})\s*(?:\/mo|\/month|a month|per month|monthly|month)\b/i); if(m){ const n=+m[1]; if(n>=50&&n<=1500) return n;} return null; }
 function interpret(text){
-  const t=' '+text.trim()+' ';
-  const gender=grabGender(t), ages=grabAges(t), state=grabState(t);
-  // intent
+  const t=' '+text.trim()+' '; const gender=grabGender(t), ages=grabAges(t), state=grabState(t);
   const moneyMonth=/\$\s*\d{2,4}\b/.test(t) && /\b(a month|per month|\/mo|\/month|monthly|month)\b/i.test(t);
   const bareMonth=/\b\d{2,4}\s*(?:a month|per month|\/mo|\/month)\b/i.test(t);
   const askVerb=/\b(get|buy|cover|coverage|what|how much|afford)\b/i.test(t);
@@ -2348,71 +2386,89 @@ function interpret(text){
   const isCompare=/\b(vs|versus|compare|comparison)\b/i.test(t);
   const isBudget=/\b(afford|budget|spend|spent)\b/i.test(t) || ((moneyMonth||bareMonth) && askVerb);
   const isCouple=/\b(couple|married|spouse|husband|wife|partners?|both|joint)\b/i.test(t) || ages.length>=2;
-
   if(isStandard) return {intent:'standard', gender, age:ages[0], state};
-  if(isCompare){
-    // split on vs / versus / "or"
-    const parts=text.split(/\bvs\.?\b|\bversus\b|\bor\b/i);
-    const items=parts.map((p,i)=>{
-      const o=Object.assign(defaults(),{age:ages[0], gender, state,
-        monthlyBenefit:grabBenefit(' '+p+' ')||grabBenefit(t),
-        benefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36',
-        inflation:(grabInfl(' '+p+' ')??grabInfl(t)??0.03)});
-      const lab=fmt0(o.monthlyBenefit)+' / '+bpL(o.benefitPeriod);
-      return {label:lab, opts:o};
-    }).filter(it=>it.opts.monthlyBenefit);
-    return {intent:'compare', gender, age:ages[0], items};
-  }
-  if(isBudget) return {intent:'budget', gender, age:ages[0], state, target:grabTarget(t),
-                        opts:Object.assign(defaults(),{state, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)})};
-  if(isCouple && ages.length>=2){
-    return {intent:'couple', ages, gender,
-      opts:Object.assign(defaults(),{state, monthlyBenefit:grabBenefit(t)||4500,
-        benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03),
-        riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
-  }
-  // default single
-  return {intent:'single', gender, age:ages[0],
-    opts:Object.assign(defaults(),{age:ages[0], gender, state,
-      monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36',
-      elimination:/180\s*day/i.test(t)?'180':'90', inflation:(grabInfl(t)??0.03),
-      pay:/single[- ]?pay/i.test(t)?'single':(/10[- ]?pay|ten[- ]?pay/i.test(t)?'10pay':'level'),
-      riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
+  if(isCompare){ const parts=text.split(/\bvs\.?\b|\bversus\b|\bor\b/i); const items=parts.map(p=>{ const o=Object.assign(defaults(),{age:ages[0],gender,state,monthlyBenefit:grabBenefit(' '+p+' ')||grabBenefit(t),benefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36',inflation:(grabInfl(' '+p+' ')??grabInfl(t)??0.03),totalBenefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36'}); return o; }).filter(o=>o.monthlyBenefit); return {intent:'compare', gender, age:ages[0], items}; }
+  if(isBudget) return {intent:'budget', gender, age:ages[0], state, target:grabTarget(t), opts:Object.assign(defaults(),{state, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)})};
+  if(isCouple && ages.length>=2) return {intent:'couple', ages, gender, opts:Object.assign(defaults(),{state, monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03), riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
+  return {intent:'single', gender, age:ages[0], opts:Object.assign(defaults(),{age:ages[0], gender, state, monthlyBenefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', elimination:/180\s*day/i.test(t)?'180':'90', inflation:(grabInfl(t)??0.03), pay:/single[- ]?pay/i.test(t)?'single':(/10[- ]?pay|ten[- ]?pay/i.test(t)?'10pay':'level'), riderSharedAdditional:/\bshared[- ]?care|shared additional\b/i.test(t), totalBenefitPeriod:grabBP(t)||'36'})};
 }
+function setInterp(html, ai){ const el=$('interp'); el.innerHTML=html; el.classList.toggle('ai', !!ai); el.classList.add('show'); }
+function dispatch(p){
+  if(!p.gender && p.intent!=='couple' && p.intent!=='compare') return setInterp('I need a <b>gender</b> — add “male” or “female”.');
+  if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
+  if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.', p.ai); showStandard(p.age,p.gender,p.state); }
+  else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+'.', p.ai); showBudget(p.target,p.age,p.gender,p.opts); }
+  else if(p.intent==='compare'){ if(!p.items||p.items.length<2) return setInterp('For a comparison, give me two or more options.'); setInterp('Comparing '+p.items.length+' options.', p.ai); showCompare(p.items); }
+  else if(p.intent==='couple'){ const g1=p.gender||'male', g2=p.gender==='female'?'male':'female'; setInterp('Running a <b>couple</b> quote — '+p.ages[0]+'/'+p.ages[1]+'.', p.ai); showCouple(p.ages[0],g1,p.ages[1],g2,p.opts); }
+  else { setInterp('Quoting a <b>'+p.age+' '+gL(p.gender)+'</b> — '+fmt0(p.opts.monthlyBenefit)+'/mo, '+bpL(p.opts.benefitPeriod)+', '+pctL(p.opts.inflation)+'.', p.ai); showSingle(p.opts); }
+}
+function ask(){ const raw=$('nl').value.trim(); if(!raw) return; if(MODE==='ai') return askAI(raw); try{ dispatch(interpret(raw)); }catch(e){ setInterp('Sorry — I couldn’t read that. Try “62 female, $4,500/mo, 3 years, 3%”.'); } }
+function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
-function setInterp(html){ const el=$('interp'); el.innerHTML=html; el.classList.add('show'); }
-function runNL(text){
-  const raw = (typeof text==='string'?text:$('nl').value).trim();
-  if(!raw){ return; }
+/* ---------- AI mode (Claude → spec → verified engine) ---------- */
+const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
+{"intent":"single|couple|budget|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false}],"couple":null,"budget":null,"missing":[]}
+Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For budget, fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"} and items []. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget, add "age" or "gender" to "missing". Colorado -> state "CO".`;
+async function askAI(raw){
+  const key=LS.key(); if(!key){ setInterp('AI mode needs your Anthropic API key. <a style="color:var(--violet);font-weight:700;cursor:pointer" onclick="openSettings()">Add it in settings →</a>', true); return; }
+  setInterp('✨ Thinking…', true);
   try{
-    const p=interpret(raw);
-    if(!p.gender && (p.intent!=='couple')) return setInterp('I got the request, but I need a <b>gender</b> — add “male” or “female”.');
-    if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
-    if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.'); showStandard(p.age,p.gender,p.state); }
-    else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' ('+bpL(p.opts.benefitPeriod)+', '+pctL(p.opts.inflation)+').'); showBudget(p.target,p.age,p.gender,p.opts); }
-    else if(p.intent==='compare'){ if(p.items.length<2) return setInterp('For a comparison, give me two options separated by “vs”.'); setInterp('Comparing '+p.items.map(i=>'<b>'+i.label+'</b>').join(' vs ')+' for a '+p.age+' '+gL(p.gender)+'.'); showCompare(p.items); }
-    else if(p.intent==='couple'){ const g1=p.gender||'male', g2=p.gender==='female'?'male':'female'; setInterp('Running a <b>couple</b> quote — '+p.ages[0]+'/'+p.ages[1]+', '+fmt0(p.opts.monthlyBenefit)+'/mo, '+bpL(p.opts.benefitPeriod)+', '+pctL(p.opts.inflation)+(p.opts.riderSharedAdditional?', shared-care':'')+'.'); showCouple(p.ages[0],g1,p.ages[1],g2,p.opts); }
-    else { setInterp('Quoting a <b>'+p.age+' '+gL(p.gender)+'</b> — '+fmt0(p.opts.monthlyBenefit)+'/mo, '+bpL(p.opts.benefitPeriod)+', '+p.opts.elimination+'-day, '+pctL(p.opts.inflation)+(p.opts.riderSharedAdditional?', shared-care':'')+'.'); showSingle(p.opts); }
-  }catch(e){ setInterp('Sorry — I couldn’t read that. Try “62 female, $4,500/mo, 3 years, 3%”. ('+e.message+')'); }
+    const res=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST',
+      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({ model:LS.model(), max_tokens:700, system:AI_SYSTEM, messages:[{role:'user',content:raw}] }) });
+    if(!res.ok){ const b=await res.text(); throw new Error('API '+res.status+' — '+b.slice(0,160)); }
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const spec=JSON.parse(text.replace(/```json|```/g,'').trim());
+    runSpec(spec, raw);
+  }catch(e){ setInterp('AI mode error: '+e.message+'. (Check your key in settings, or switch to ⚡ Fast.)', true); }
 }
-function ex(btn){ $('nl').value=btn.textContent; runNL(); }
-
-/* ===== saved combinations ===== */
-const KEY='ltcSavedCombos';
-function loadCombos(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ return []; } }
-function saveCombos(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-function comboLabel(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':''); }
-function saveCombo(){ const o=singleOpts(); const nm=prompt('Name this combination:', comboLabel(o)); if(!nm) return; const a=loadCombos(); a.push({name:nm,cfg:o}); saveCombos(a); renderCombos(); }
-function renderCombos(){
-  const a=loadCombos(), box=$('combos');
-  if(!a.length){ box.innerHTML='<p class="empty">No saved combinations yet. Set up a quote and hit “Save this combination.”</p>'; return; }
-  box.innerHTML=a.map((c,i)=>'<div class="combo"><div><div class="nm">'+c.name+'</div><div class="cfg">'+comboLabel(c.cfg)+'</div></div><div class="sp"><button class="go" onclick="runSaved('+i+')">Run</button><button class="del" onclick="delCombo('+i+')">Delete</button></div></div>').join('');
+function mapItem(it){ return {age:+it.age, gender:it.gender, monthlyBenefit:+it.monthlyBenefit, benefitPeriod:String(it.benefitPeriod), elimination:String(it.elimination||'90'), inflation:it.inflation||null, pay:it.pay||'level', mode:it.mode||'monthly', state:it.state||null, riderSharedAdditional:!!it.sharedCare, totalBenefitPeriod:String(it.benefitPeriod)}; }
+function runSpec(s, raw){
+  const reply=s.reply?('<b>✨ '+s.reply+'</b>'):'';
+  if(s.missing&&s.missing.length){ setInterp(reply+' — I still need: <b>'+s.missing.join(', ')+'</b>.', true); if(!(s.intent==='couple')) return; }
+  try{
+    if(s.intent==='standard'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need an age and gender.', true); return;} setInterp(reply||('Standard for '+it.age+' '+gL(it.gender)), true); showStandard(+it.age, it.gender, it.state||null); }
+    else if(s.intent==='budget'){ const b=s.budget||{}; setInterp(reply||'Budget quote', true); showBudget(+b.targetMonthly, +b.age, b.gender, {benefitPeriod:String(b.benefitPeriod||'36'),elimination:'90',inflation:b.inflation||null,mode:'monthly',state:b.state||null}); }
+    else if(s.intent==='couple'){ const c=s.couple||{}; setInterp(reply||'Couple quote', true); showCouple(+c.age1,c.gender1,+c.age2,c.gender2,{monthlyBenefit:+c.monthlyBenefit,benefitPeriod:String(c.benefitPeriod||'36'),elimination:String(c.elimination||'90'),inflation:c.inflation||null,mode:c.mode||'monthly',riderSharedAdditional:!!c.sharedCare,totalBenefitPeriod:String(c.benefitPeriod||'36')}); }
+    else if(s.intent==='compare'){ setInterp(reply||'Comparison', true); showCompare((s.items||[]).map(mapItem)); }
+    else { setInterp(reply||'Quote', true); showSingle(mapItem((s.items||[])[0])); }
+  }catch(e){ setInterp('AI understood the request but the inputs were off: '+e.message, true); }
 }
-function runSaved(i){ const o=loadCombos()[i].cfg; showSingle(o); }
-function delCombo(i){ const a=loadCombos(); a.splice(i,1); saveCombos(a); renderCombos(); }
 
+/* ---------- comparison tray (up to 6) ---------- */
+function addToTray(o){ const a=LS.tray(); if(a.length>=6){ alert('Comparison holds up to 6. Remove one first.'); return; } a.push(o); LS.setTray(a); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function rmTray(i){ const a=LS.tray(); a.splice(i,1); LS.setTray(a); renderTray(); }
+function clearTray(){ LS.setTray([]); renderTray(); }
+function renderTray(){
+  const a=LS.tray(); $('trayCard').hidden = a.length===0; $('traycount').textContent = a.length?('('+a.length+' of 6)'):'';
+  if(!a.length){ $('tray').innerHTML=''; $('traydisc').textContent=''; return; }
+  const rows=a.map((o,i)=>{ let prem; try{ const q=E.quote(o); prem=q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }catch(e){ prem='—'; }
+    return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" onclick="rmTray('+i+')">remove</button></td></tr>'; }).join('');
+  $('tray').innerHTML='<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>';
+  $('traydisc').textContent=DISC;
+}
+
+/* ---------- saved clients ---------- */
+function saveClient(){
+  const a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
+  const name=prompt('Client name:'); if(!name) return;
+  const contact=prompt('Contact (email / phone) — optional:')||'';
+  const note=prompt('Note — optional:')||'';
+  const c=LS.clients(); c.push({name, contact, note, items:a, savedAt:new Date().toLocaleDateString()}); LS.setClients(c); renderClients();
+  alert('Saved “'+name+'”.');
+}
+function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+'”?')) return; c.splice(i,1); LS.setClients(c); renderClients(); }
+function renderClients(){
+  const c=LS.clients(), box=$('clients');
+  if(!c.length){ box.innerHTML='<p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p>'; return; }
+  box.innerHTML=c.map((x,i)=>'<div class="client"><div><div class="nm">'+x.name+'</div><div class="cfg">'+(x.contact?x.contact+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+x.note:'')+'</div></div><div class="sp"><button class="go" onclick="openClient('+i+')">Open</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>').join('');
+}
+
+/* ---------- init ---------- */
 $('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
-renderCombos();
+renderTray(); renderClients();
 </script>
 </body>
 </html>
