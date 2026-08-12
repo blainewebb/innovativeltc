@@ -152,6 +152,23 @@
   table.qtab td .pu{font-size:.66rem;color:var(--muted);font-weight:700;letter-spacing:.02em}
   table.qtab tr.proj th,table.qtab tr.proj td{background:#f0f7ff}
   table.qtab tr.proj td{color:var(--primary-d);font-weight:700}
+  /* customize editor */
+  .qs-customizer{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;background:var(--soft)}
+  .qs-customizer .cz-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .qs-customizer .cz-head h4{margin:0;font-size:.95rem}
+  .qs-customizer .cz-head .hint{margin:0}
+  .qs-customizer .cz-reset{margin-left:auto;border:1px solid var(--border);background:#fff;color:#334155;border-radius:8px;padding:6px 12px;font-weight:700;font-size:.78rem;cursor:pointer}
+  .cz-list{display:flex;flex-direction:column;gap:6px}
+  .cz-item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:.88rem;cursor:grab}
+  .cz-item.dragging{opacity:.45}
+  .cz-item.over{border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  .cz-item .grip{color:var(--muted);font-size:1.05rem;line-height:1;cursor:grab;user-select:none}
+  .cz-item input{width:auto}
+  .cz-item .cz-lbl{font-weight:600;color:#334155}
+  .cz-item.off .cz-lbl{color:var(--muted);text-decoration:line-through}
+  table.qtab th .colmove{display:inline-flex;gap:3px;justify-content:center;margin-top:5px}
+  table.qtab th .colmove button{border:1px solid var(--border);background:#fff;color:var(--primary-d);border-radius:6px;width:22px;height:20px;line-height:1;font-size:.7rem;font-weight:800;cursor:pointer;padding:0}
+  table.qtab th .colmove button:disabled{opacity:.3;cursor:default}
   .sheet .qs-cta{margin-top:18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:.9rem;font-weight:600;color:#1e3a8a;text-align:center}
   .sheet .qs-cta a{color:var(--primary-d);font-weight:800;text-decoration:none}
   @media print{
@@ -159,6 +176,7 @@
     body > *:not(.qsheet){display:none !important}
     .qsheet{position:static !important;background:#fff !important;padding:0 !important;overflow:visible;display:block !important}
     .qs-toolbar{display:none !important}
+    .qs-customizer,table.qtab th .colmove{display:none !important}
     .sheet{box-shadow:none !important;max-width:100% !important;margin:0 !important;padding:0 !important;border-radius:0 !important}
     table.qtab thead th,table.qtab tr.prem td,table.qtab tr.proj th,table.qtab tr.proj td,.sheet .sh-top,.sheet .qs-cta{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -345,6 +363,7 @@
       <button data-l="essentials" onclick="setSheetLayout('essentials')">Essentials</button>
       <button data-l="recommended" onclick="setSheetLayout('recommended')">Recommended</button>
       <button data-l="detailed" onclick="setSheetLayout('detailed')">Detailed</button>
+      <button data-l="custom" onclick="setSheetLayout('custom')">Customize</button>
     </div>
     <label class="qs-proj" id="qsProj">Project benefit to age
       <input id="qsProjAge" type="number" min="70" max="100" step="1" value="80" onchange="setProjAge(this.value)">
@@ -2456,6 +2475,8 @@ const LS = {
   setClients(a){ localStorage.setItem('ltcClients', JSON.stringify(a)); },
   patterns(){ try{return JSON.parse(localStorage.getItem('ltcPatterns')||'[]');}catch(e){return [];} },
   setPatterns(a){ localStorage.setItem('ltcPatterns', JSON.stringify(a)); },
+  sheetCustom(){ try{return JSON.parse(localStorage.getItem('ltcSheetCustom')||'null');}catch(e){return null;} },
+  setSheetCustom(c){ localStorage.setItem('ltcSheetCustom', JSON.stringify(c)); },
 };
 
 /* ---------- mode + settings ---------- */
@@ -2815,33 +2836,64 @@ const QLAYOUTS = {
   recommended: ['benefit','period','pool','elim','inflation','premium'],
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
-let QSHEET = {idx:-1, layout:'recommended', projAge:80};
+// Customize mode: every available line item, and which are on by default.
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','marital','annual','premium'];
+const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,marital:false,annual:true,premium:true};
+function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
+  let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
+function catLabelPlain(key){ const c=QCATS[key]; if(!c) return key; return (typeof c.label==='function')?c.label():c.label; }
+let QSHEET = {idx:-1, layout:'recommended', projAge:80, colOrder:null};
 // Benefit grown by the option's own compound inflation from issue age to the chosen age.
 function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
-function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80)}; renderSheet(); $('qsheet').classList.add('show'); }
+function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 function printSheet(){ window.print(); }
+/* customize: toggle/reorder line items, move option columns */
+function czToggle(key){ const c=getCustom(); c.on[key]=!c.on[key]; LS.setSheetCustom(c); renderSheet(); }
+function resetCustom(){ localStorage.removeItem('ltcSheetCustom'); renderSheet(); }
+let CZ_DRAG=null;
+function czDragStart(e){ CZ_DRAG=e.currentTarget.dataset.key; e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; }
+function czDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('over'); }
+function czDragLeave(e){ e.currentTarget.classList.remove('over'); }
+function czDragEnd(e){ document.querySelectorAll('.cz-item').forEach(x=>x.classList.remove('over','dragging')); }
+function czDrop(e){ e.preventDefault(); const target=e.currentTarget.dataset.key; if(!CZ_DRAG||CZ_DRAG===target){ czDragEnd(e); return; }
+  const c=getCustom(); const from=c.order.indexOf(CZ_DRAG), to=c.order.indexOf(target); if(from<0||to<0){ czDragEnd(e); return; }
+  c.order.splice(to,0,c.order.splice(from,1)[0]); LS.setSheetCustom(c); CZ_DRAG=null; renderSheet(); }
+function moveCol(pos,dir){ const ord=QSHEET.colOrder; const j=pos+dir; if(!ord||j<0||j>=ord.length) return; const t=ord[pos]; ord[pos]=ord[j]; ord[j]=t; renderSheet(); }
+function customizerHtml(){
+  const c=getCustom();
+  const rows=c.order.map(key=>'<div class="cz-item'+(c.on[key]?'':' off')+'" draggable="true" data-key="'+key+'" ondragstart="czDragStart(event)" ondragover="czDragOver(event)" ondragleave="czDragLeave(event)" ondrop="czDrop(event)" ondragend="czDragEnd(event)"><span class="grip" title="Drag to reorder">⠿</span><input type="checkbox" '+(c.on[key]?'checked':'')+' onchange="czToggle(\''+key+'\')"><span class="cz-lbl">'+catLabelPlain(key)+'</span></div>').join('');
+  return '<div class="qs-customizer"><div class="cz-head"><h4>Customize this sheet</h4><span class="hint">Drag ⠿ to reorder · check to show/hide · use ◀ ▶ on the columns to move options</span><button class="cz-reset" onclick="resetCustom()">Reset</button></div><div class="cz-list" id="czList">'+rows+'</div></div>';
+}
 function renderSheet(){
   const cl = LS.clients()[QSHEET.idx]; if(!cl) return;
   const items = cl.items||[];
+  const custom = QSHEET.layout==='custom';
   document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
-  $('qsProj').classList.toggle('show', QSHEET.layout==='detailed');   // benefit-projection control only on the detailed sheet
   $('qsProjAge').value = QSHEET.projAge||80;
   const quotes = items.map(o=>{ try{ return E.quote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
-  let rows = QLAYOUTS[QSHEET.layout].slice();
-  if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
-  else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
-  if(items.every(o=>!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
-  // spousal discount: surface as a category in every layout, but only when at least one option uses it
-  if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
-  const colHead = items.map((o,i)=>'<th>Option '+(i+1)+'</th>').join('');
+  let rows;
+  if(custom){
+    const c=getCustom(); rows = c.order.filter(k=>c.on[k]);       // exactly what you chose, in your order
+  } else {
+    rows = QLAYOUTS[QSHEET.layout].slice();
+    if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
+    else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
+    if(items.every(o=>!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
+    if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
+  }
+  const showProj = rows.includes('projMonthly') || rows.includes('projPool');
+  $('qsProj').classList.toggle('show', showProj);                  // benefit-projection age control, when those rows are shown
+  // option column order (view-only; reset each time the sheet is opened)
+  if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
+  const order = QSHEET.colOrder;
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
-    return '<tr'+cls+'><th>'+label+'</th>'+items.map((o,i)=>'<td>'+cat.v(o,quotes[i])+'</td>').join('')+'</tr>'; }).join('');
-  const showProj = QSHEET.layout==='detailed';
+    return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
   const projNote = showProj ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Values <b>at age '+QSHEET.projAge+'</b> assume each option’s compound inflation grows the monthly benefit every year to that age (level options stay flat). Illustrative — the actual benefit at claim follows the issued policy.</div>' : '';
   const sub = (uniform && items.length
       ? 'Prepared for '+esc(cl.name)+' &middot; '+items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')
@@ -2849,7 +2901,8 @@ function renderSheet(){
     + (cl.savedAt?' &middot; '+cl.savedAt:'')
     + (cl.note?'<br>'+esc(cl.note):'');
   $('sheet').innerHTML =
-    '<div class="sh-top"><div><div class="sh-brand">Innovative <span>LTC</span></div>'
+    (custom ? customizerHtml() : '')
+    + '<div class="sh-top"><div><div class="sh-brand">Innovative <span>LTC</span></div>'
     + '<div class="sh-tag">Long-Term Care insurance illustration</div></div>'
     + '<div class="sh-agent"><b>Blaine Webb</b><br>Innovative LTC<br>blaine@innovativeltc.com</div></div>'
     + '<div class="sh-for">'+esc(cl.name)+'</div>'
