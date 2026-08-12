@@ -141,6 +141,17 @@ the same. When Blaine asks "what can I get across these carriers for $X," run th
 budget solve for each authorized carrier and lay the results side by side — today
 that's NGL; the same call fans out as carriers are added.
 
+## Cost of waiting (a sales tool)
+
+`cost_of_waiting(age, gender, monthly_benefit, benefit_period="36", inflation=0.03,
+state=None)` shows what delaying costs a prospect. Waiting hurts twice: they're older
+(higher rate) **and** the cost of care grows ~3%/yr, so they must buy a bigger monthly
+benefit to keep pace. It returns the premium if they buy now vs. wait 1/3/5/10 years —
+each with the coverage they'd then need (snapped to $300) and the dollar/percent
+increase. Past issue age 79 it flags them ineligible (may be uninsurable — the
+strongest reason not to wait). Present it as a short table; it pairs naturally with a
+`quickquote` teaser.
+
 ## Quoting a couple
 
 Use `quote_couple(age1, gender1, age2, gender2, monthly_benefit, ...)` for a joint

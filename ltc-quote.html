@@ -144,6 +144,7 @@
       <button class="ex" onclick="ex(this)">what can a 62 female get for $300 a month</button>
       <button class="ex" onclick="ex(this)">couple, 64 male and 61 female, $4,500, 3 year, 3%</button>
       <button class="ex" onclick="ex(this)">64 female, $300/mo — options with the most benefit or longest period</button>
+      <button class="ex" onclick="ex(this)">cost of waiting for a 60 female at $4,500/mo</button>
     </div>
     <div id="interp" class="interp"></div>
     <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
@@ -2404,6 +2405,26 @@ async function recommendAI(target,age,gender,d){
     if(txt) renderOptimize(d,'<div class="config-line" style="background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95">✨ '+txt.replace(/\n+/g,'<br>')+'</div>'); }catch(e){}
 }
 
+/* ---------- cost of waiting (older age + care-cost inflation) ---------- */
+function computeWaiting(age,gender,benefit,benefitPeriod,inflation,state){
+  const price=(a,ben)=>{ try{ return E.quote({age:a,gender,monthlyBenefit:ben,benefitPeriod,elimination:'90',inflation:inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:benefitPeriod}).modalPayment; }catch(e){ return null; } };
+  const now=price(age,benefit);
+  const rows=[0,1,3,5,10].map(yr=>{ const a=age+yr; const need=SNAP(benefit*Math.pow(1.03,yr)); const elig=a<=79; const prem=elig?price(a,need):null;
+    return {yr, age:a, need, elig, prem, delta:(prem!=null&&now!=null)?prem-now:null, pct:(prem!=null&&now!=null)?(prem/now-1):null,
+      opts:{age:a,gender,monthlyBenefit:need,benefitPeriod,elimination:'90',inflation:inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:benefitPeriod}}; });
+  return {age,gender,benefit,benefitPeriod,inflation,state,now,rows};
+}
+function showWaiting(d){
+  const rows=d.rows.map(r=>{ const label=r.yr===0?'Buy now':('Wait '+r.yr+' yr'+(r.yr>1?'s':''));
+    if(!r.elig) return '<tr><td><b>'+label+'</b></td><td>age '+r.age+'</td><td class="b">'+fmt0(r.need)+'/mo</td><td class="p" style="color:#b91c1c">may be uninsurable</td><td></td></tr>';
+    const dv=r.yr===0?'—':'<span style="color:#b91c1c;font-weight:800">+'+fmt(r.delta)+'/mo ('+(r.pct*100).toFixed(0)+'%)</span>';
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.opts)+')\'>＋</button>';
+    return '<tr><td><b>'+label+'</b></td><td>age '+r.age+'</td><td class="b">'+fmt0(r.need)+'/mo</td><td class="p">'+fmt(r.prem)+'/mo</td><td style="text-align:right">'+dv+' '+add+'</td></tr>'; }).join('');
+  show('<div class="config-line">The <b>cost of waiting</b> &middot; '+d.age+' '+gL(d.gender)+' &middot; '+fmt0(d.benefit)+'/mo of coverage today &middot; '+bpL(d.benefitPeriod)+' &middot; '+pctL(d.inflation)+'</div>'+
+    '<table class="opts"><tr><th>When they buy</th><th>Issue age</th><th>Coverage needed</th><th style="text-align:right">Monthly premium</th><th style="text-align:right">vs. buying now</th></tr>'+rows+'</table>'+
+    '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. '+DISC+'</div>');
+}
+
 /* ---------- manual tabs ---------- */
 function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked}; }
 function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
@@ -2430,7 +2451,9 @@ function interpret(text){
   const isBudget=/\b(afford|budget|spend|spent)\b/i.test(t) || ((moneyMonth||bareMonth) && askVerb);
   const isOptimize=(isBudget||moneyMonth||bareMonth) && /\b(biggest|largest|most|maximi[sz]|longest|stretch|options?|best|trade|compare)\b/i.test(t);
   const isCouple=/\b(couple|married|spouse|husband|wife|partners?|both|joint)\b/i.test(t) || ages.length>=2;
+  const isWaiting=/\b(cost of waiting|waits?|waiting|put(?:s|ting)? (?:it|this) off|delay(?:s|ed|ing)?|hold(?:s|ing)? off)\b/i.test(t);
   if(isStandard) return {intent:'standard', gender, age:ages[0], state};
+  if(isWaiting) return {intent:'waiting', gender, age:ages[0], state, benefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)};
   if(isOptimize && grabTarget(t)) return {intent:'optimize', gender, age:ages[0], state, target:grabTarget(t)};
   if(isCompare){ const parts=text.split(/\bvs\.?\b|\bversus\b|\bor\b/i); const items=parts.map(p=>{ const o=Object.assign(defaults(),{age:ages[0],gender,state,monthlyBenefit:grabBenefit(' '+p+' ')||grabBenefit(t),benefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36',inflation:(grabInfl(' '+p+' ')??grabInfl(t)??0.03),totalBenefitPeriod:grabBP(' '+p+' ')||grabBP(t)||'36'}); return o; }).filter(o=>o.monthlyBenefit); return {intent:'compare', gender, age:ages[0], items}; }
   if(isBudget) return {intent:'budget', gender, age:ages[0], state, target:grabTarget(t), opts:Object.assign(defaults(),{state, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)})};
@@ -2441,6 +2464,7 @@ function setInterp(html, ai){ const el=$('interp'); el.innerHTML=html; el.classL
 function dispatch(p){
   if(!p.gender && p.intent!=='couple' && p.intent!=='compare') return setInterp('I need a <b>gender</b> — add “male” or “female”.');
   if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
+  if(p.intent==='waiting'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing the <b>cost of waiting</b> for a '+p.age+' '+gL(p.gender)+' — premiums climb with age, and required coverage grows ~3%/yr as care gets pricier.', p.ai); showWaiting(computeWaiting(p.age,p.gender,SNAP(p.benefit),p.benefitPeriod,p.inflation,p.state)); return; }
   if(p.intent==='optimize'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Exploring what a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' across benefit periods and inflation options.', p.ai); const d=computeOptimize(p.target,p.age,p.gender,p.state); renderOptimize(d,''); if(p.ai) recommendAI(p.target,p.age,p.gender,d); return; }
   if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.', p.ai); showStandard(p.age,p.gender,p.state); }
   else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+'.', p.ai); showBudget(p.target,p.age,p.gender,p.opts); }
@@ -2453,8 +2477,8 @@ function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
 const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
-{"intent":"single|couple|budget|optimize|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false}],"couple":null,"budget":null,"missing":[]}
-Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO".`;
+{"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false}],"couple":null,"budget":null,"missing":[]}
+Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO".`;
 async function askAI(raw){
   const key=LS.key(); if(!key){ setInterp('AI mode needs your Anthropic API key. <a style="color:var(--violet);font-weight:700;cursor:pointer" onclick="openSettings()">Add it in settings →</a>', true); return; }
   setInterp('✨ Thinking…', true);
@@ -2475,6 +2499,7 @@ function runSpec(s, raw){
   if(s.missing&&s.missing.length){ setInterp(reply+' — I still need: <b>'+s.missing.join(', ')+'</b>.', true); if(!(s.intent==='couple')) return; }
   try{
     if(s.intent==='standard'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need an age and gender.', true); return;} setInterp(reply||('Standard for '+it.age+' '+gL(it.gender)), true); showStandard(+it.age, it.gender, it.state||null); }
+    else if(s.intent==='waiting'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need age and gender.', true); return;} setInterp(reply||'Cost of waiting', true); showWaiting(computeWaiting(+it.age,it.gender,SNAP(it.monthlyBenefit||4500),String(it.benefitPeriod||'36'),it.inflation||null,it.state||null)); }
     else if(s.intent==='optimize'){ const b=s.budget||{}; if(!b.targetMonthly||!b.age||!b.gender){ setInterp(reply+' — I need budget, age, and gender.', true); return;} setInterp(reply||'Exploring options', true); const d=computeOptimize(+b.targetMonthly,+b.age,b.gender,b.state||null); renderOptimize(d,''); recommendAI(+b.targetMonthly,+b.age,b.gender,d); }
     else if(s.intent==='budget'){ const b=s.budget||{}; setInterp(reply||'Budget quote', true); showBudget(+b.targetMonthly, +b.age, b.gender, {benefitPeriod:String(b.benefitPeriod||'36'),elimination:'90',inflation:b.inflation||null,mode:'monthly',state:b.state||null}); }
     else if(s.intent==='couple'){ const c=s.couple||{}; setInterp(reply||'Couple quote', true); showCouple(+c.age1,c.gender1,+c.age2,c.gender2,{monthlyBenefit:SNAP(c.monthlyBenefit),benefitPeriod:String(c.benefitPeriod||'36'),elimination:String(c.elimination||'90'),inflation:c.inflation||null,mode:c.mode||'monthly',riderSharedAdditional:!!c.sharedCare,totalBenefitPeriod:String(c.benefitPeriod||'36')}); }

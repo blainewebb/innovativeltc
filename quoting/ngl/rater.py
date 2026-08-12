@@ -158,6 +158,32 @@ def quote(
     return result
 
 
+def cost_of_waiting(age, gender, monthly_benefit, benefit_period="36", inflation=0.03,
+                    state=None, care_growth=0.03, years=(0, 1, 3, 5, 10)):
+    """Show what waiting costs: older issue age AND a bigger benefit needed because
+    the cost of care keeps rising (default 3%/yr). Returns the premium at each wait
+    horizon, the coverage they'd then need (snapped to $300), and the increase vs.
+    buying now. Past issue age 79 they're flagged ineligible (uninsurable)."""
+    def price(a, ben):
+        try:
+            return quote(a, gender, ben, benefit_period=benefit_period, elimination="90",
+                         inflation=inflation, mode="monthly", state=state)["modal_payment"]
+        except Exception:
+            return None
+    now = price(age, monthly_benefit)
+    rows = []
+    for yr in years:
+        a = age + yr
+        need = max(300, round(monthly_benefit * (1 + care_growth) ** yr / 300) * 300)
+        eligible = a <= 79
+        prem = price(a, need) if eligible else None
+        rows.append({"wait_years": yr, "issue_age": a, "coverage_needed": need,
+                     "eligible": eligible, "monthly_premium": prem,
+                     "increase_vs_now": (round(prem - now, 2) if (prem is not None and now is not None) else None)})
+    return {"age": age, "gender": gender, "benefit": monthly_benefit,
+            "buy_now_premium": now, "rows": rows}
+
+
 def _cost_figure(result):
     """The premium a quote result is 'quoting at' — single premium or modal payment."""
     return result.get("single_premium", result.get("modal_payment"))
