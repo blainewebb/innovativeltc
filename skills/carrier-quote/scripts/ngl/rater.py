@@ -56,9 +56,9 @@ def quote(
     rider_first_day_hccs=False,      # FDC rider
     rider_shortened_benefit=False,   # SBN rider
 ):
-    # NGL sells the monthly benefit only in $300 increments — snap to the
-    # nearest quotable amount so every premium we return is bindable.
-    monthly_benefit = max(RATES["base_unit"], round(monthly_benefit / RATES["base_unit"]) * RATES["base_unit"])
+    # NGL sells the monthly benefit only in $300 increments, up to $12,000 — snap
+    # to the nearest quotable amount and cap so every premium we return is bindable.
+    monthly_benefit = min(12000, max(RATES["base_unit"], round(monthly_benefit / RATES["base_unit"]) * RATES["base_unit"]))
 
     f = RATES["factors"]
     tname = _pick_table(state, worksite)
@@ -211,8 +211,8 @@ def benefit_for_premium(target_premium, age, gender, mode="monthly", **kw):
     ref = quote(age, gender, RATES["base_unit"], mode=mode, **kw)   # $300/mo = 1 unit
     ref_cost = _cost_figure(ref)
     raw = RATES["base_unit"] * (target_premium / ref_cost)
-    # NGL sells in $300 increments — floor to the largest amount within budget.
-    monthly_benefit = max(RATES["base_unit"], math.floor(raw / RATES["base_unit"]) * RATES["base_unit"])
+    # NGL sells in $300 increments up to $12,000 — floor to the largest amount within budget, capped.
+    monthly_benefit = min(12000, max(RATES["base_unit"], math.floor(raw / RATES["base_unit"]) * RATES["base_unit"]))
     full = quote(age, gender, monthly_benefit, mode=mode, **kw)
     return {
         "target_premium": target_premium,

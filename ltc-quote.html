@@ -239,7 +239,7 @@
       <div class="grid">
         <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="s_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="300"></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
         <div class="field"><label>Elimination period</label><select id="s_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
@@ -261,7 +261,7 @@
         <div class="field"><label>Client 1 — gender</label><select id="c_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
         <div class="field"><label>Client 2 — age</label><input id="c_age2" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Client 2 — gender</label><select id="c_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="300"></div>
+        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Benefit period</label><select id="c_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Elimination period</label><select id="c_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="c_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
@@ -2356,8 +2356,8 @@ function quote(o){
   const ep = String(o.elimination || "90");
   const mode = o.mode || "monthly";
   const pay = o.pay || "level";
-  // NGL sells the monthly benefit only in $300 increments — snap so every premium is bindable.
-  const mb = Math.max(RATES.base_unit, Math.round((+o.monthlyBenefit||0)/RATES.base_unit)*RATES.base_unit);
+  // NGL sells the monthly benefit only in $300 increments, up to $12,000 — snap and cap so every premium is bindable.
+  const mb = Math.min(12000, Math.max(RATES.base_unit, Math.round((+o.monthlyBenefit||0)/RATES.base_unit)*RATES.base_unit));
   const units = mb / RATES.base_unit;
   let annual = base * units;
   const steps = [["base "+base+" × "+units+" units ($"+Math.round(mb).toLocaleString()+"/mo ÷ $300)", annual]];
@@ -2444,8 +2444,9 @@ const fmt0 = n => '$'+Math.round(n).toLocaleString();
 const pctL = v => v?((v*100)+'% compound'):'level (no inflation)';
 const bpL = v => v==='lifetime'?'lifetime':(parseInt(v)/12)+'-yr';
 const gL = g => g==='female'?'female':'male';
-const SNAP  = b => Math.max(300, Math.round((+b||0)/300)*300);   // nearest quotable $300 increment
-const FLOOR3= b => Math.max(300, Math.floor((+b||0)/300)*300);   // largest increment within budget
+const MAX_BENEFIT = 12000;   // NGL sells a monthly benefit up to $12,000 — never quote above it
+const SNAP  = b => Math.min(MAX_BENEFIT, Math.max(300, Math.round((+b||0)/300)*300));   // nearest quotable $300 increment, capped
+const FLOOR3= b => Math.min(MAX_BENEFIT, Math.max(300, Math.floor((+b||0)/300)*300));   // largest increment within budget, capped
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
 let MODE = 'fast';
 
