@@ -110,6 +110,13 @@
   .modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
   .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:.8rem;padding:10px 12px;border-radius:9px;margin-top:14px}
   .client .view{background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe}
+  /* quick tools row */
+  .quicktools{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .quicktools .lbl{color:var(--muted);font-size:.8rem;font-weight:600}
+  .qtool{background:#eef2ff;border:1px solid #c7d2fe;color:var(--primary-d);border-radius:999px;padding:8px 14px;font-size:.83rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .qtool:hover{background:#e0e7ff}
+  .qtool.link{background:#fff;border-color:var(--border);color:#334155}
+  .qtool.link:hover{border-color:var(--primary);color:var(--primary)}
   /* client quote sheet */
   .qsheet{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;z-index:60;overflow:auto;padding:24px 16px}
   .qsheet.show{display:block}
@@ -184,6 +191,11 @@
       <button class="ex" onclick="ex(this)">64 female, $300/mo — options with the most benefit or longest period</button>
       <button class="ex" onclick="ex(this)">cost of waiting for a 60 female at $4,500/mo</button>
     </div>
+    <div class="quicktools">
+      <span class="lbl">Tools:</span>
+      <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
+      <a class="qtool link" href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener">🏥 Genworth / CareScout Cost of Care ↗</a>
+    </div>
     <div id="interp" class="interp"></div>
     <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
     <span class="tabtoggle" onclick="toggle('manual')">⚙︎ Prefer to click? Open the manual form</span>
@@ -195,6 +207,7 @@
       <div class="tab" data-mode="couple">Couple</div>
       <div class="tab" data-mode="budget">Budget</div>
       <div class="tab" data-mode="standard">My Standard</div>
+      <div class="tab" data-mode="waiting">Cost of Waiting</div>
     </div>
     <div class="pane" data-pane="single">
       <div class="grid">
@@ -249,6 +262,19 @@
         <div class="field"><label>State</label><select id="t_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
       </div>
       <div class="actions"><button class="run" onclick="runStandard()">Run my standard</button></div>
+    </div>
+    <div class="pane" data-pane="waiting" hidden>
+      <p class="hint" style="margin-top:0">What does delaying cost? Premiums rise because they’re older, and care costs grow ~3%/yr — so they’ll need a bigger monthly benefit to keep pace.</p>
+      <div class="grid">
+        <div class="field"><label>Issue age (today)</label><input id="w_age" type="number" value="60" min="18" max="79"></div>
+        <div class="field"><label>Gender</label><select id="w_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="field"><label>Monthly benefit today ($)</label><input id="w_benefit" type="number" value="4500" step="300"></div>
+        <div class="field"><label>Benefit period</label><select id="w_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
+        <div class="field"><label>Inflation protection</label><select id="w_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
+        <div class="field"><label>State</label><select id="w_state"><option value="">Most states</option><option value="CO">Colorado</option></select></div>
+      </div>
+      <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Genworth / CareScout Cost of Care Survey ↗</a></p>
+      <div class="actions"><button class="run" onclick="runWaiting()">Show the cost of waiting</button></div>
     </div>
   </div>
 
@@ -2404,11 +2430,12 @@ function clearKey(){ const P=PROVIDERS[$('provider').value]; localStorage.remove
 function toggle(id){ $(id).hidden=!$(id).hidden; }
 
 /* ---------- tabs ---------- */
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==t.dataset.mode);
-});
+function activateTab(mode){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.mode===mode));
+  document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==mode);
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>activateTab(t.dataset.mode));
+function openWaiting(){ $('manual').hidden=false; activateTab('waiting'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ---------- rendering ---------- */
 function show(html){ $('resultCard').hidden=false; $('result').innerHTML=html; $('resultCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
@@ -2506,7 +2533,7 @@ function showWaiting(d){
     return '<tr><td><b>'+label+'</b></td><td>age '+r.age+'</td><td class="b">'+fmt0(r.need)+'/mo</td><td class="p">'+fmt(r.prem)+'/mo</td><td style="text-align:right">'+dv+' '+add+'</td></tr>'; }).join('');
   show('<div class="config-line">The <b>cost of waiting</b> &middot; '+d.age+' '+gL(d.gender)+' &middot; '+fmt0(d.benefit)+'/mo of coverage today &middot; '+bpL(d.benefitPeriod)+' &middot; '+pctL(d.inflation)+'</div>'+
     '<table class="opts"><tr><th>When they buy</th><th>Issue age</th><th>Coverage needed</th><th style="text-align:right">Monthly premium</th><th style="text-align:right">vs. buying now</th></tr>'+rows+'</table>'+
-    '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. '+DISC+'</div>');
+    '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Genworth / CareScout Cost of Care Survey ↗</a>. '+DISC+'</div>');
 }
 
 /* ---------- manual tabs ---------- */
@@ -2515,6 +2542,7 @@ function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.messag
 function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
 function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,$('t_state').value||null); }catch(e){ showErr(e.message); } }
+function runWaiting(){ try{ showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
 
 /* ---------- fast (local) parser ---------- */
 function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.03, mode:'monthly', pay:'level', state:null, riderSharedAdditional:false}; }
