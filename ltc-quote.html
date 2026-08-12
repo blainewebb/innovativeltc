@@ -220,7 +220,7 @@
     <div class="quicktools">
       <span class="lbl">Tools:</span>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
-      <a class="qtool link" href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener">🏥 Genworth / CareScout Cost of Care ↗</a>
+      <a class="qtool link" href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener">🏥 Cost of Care ↗</a>
     </div>
     <div id="interp" class="interp"></div>
     <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
@@ -300,7 +300,7 @@
         <div class="field"><label>Inflation protection</label><select id="w_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>State</label><select id="w_state" class="statesel"></select></div>
       </div>
-      <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Genworth / CareScout Cost of Care Survey ↗</a></p>
+      <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a></p>
       <div class="actions"><button class="run" onclick="runWaiting()">Show the cost of waiting</button></div>
     </div>
   </div>
@@ -2616,7 +2616,7 @@ function showWaiting(d){
     return '<tr><td><b>'+label+'</b></td><td>age '+r.age+'</td><td class="b">'+fmt0(r.need)+'/mo</td><td class="p">'+fmt(r.prem)+'/mo</td><td style="text-align:right">'+dv+' '+add+'</td></tr>'; }).join('');
   show('<div class="config-line">The <b>cost of waiting</b> &middot; '+d.age+' '+gL(d.gender)+' &middot; '+fmt0(d.benefit)+'/mo of coverage today &middot; '+bpL(d.benefitPeriod)+' &middot; '+pctL(d.inflation)+'</div>'+
     '<table class="opts"><tr><th>When they buy</th><th>Issue age</th><th>Coverage needed</th><th style="text-align:right">Monthly premium</th><th style="text-align:right">vs. buying now</th></tr>'+rows+'</table>'+
-    '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Genworth / CareScout Cost of Care Survey ↗</a>. '+DISC+'</div>');
+    '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a> guide. '+DISC+'</div>');
 }
 
 /* ---------- manual tabs ---------- */
