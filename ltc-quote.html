@@ -299,9 +299,20 @@
     <div class="pane" data-pane="standard" hidden>
       <p class="hint" style="margin-top:0" id="std_desc"></p>
       <div class="grid">
-        <div class="field"><label>Gender</label><select id="t_gender"><option value="female">Single female</option><option value="male">Single male</option></select></div>
+        <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
+          <option value="single-female">Single female</option>
+          <option value="single-male">Single male</option>
+          <option value="married-female">Female (married)</option>
+          <option value="married-male">Male (married)</option>
+          <option value="joint">Joint (couple, shared rider)</option>
+        </select></div>
         <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
         <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
+      </div>
+      <div class="grid" id="t_couple" hidden>
+        <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
+        <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
       </div>
       <div class="actions"><button class="run" onclick="runStandard()">Run my standard</button></div>
     </div>
@@ -2552,7 +2563,7 @@ function priceHead(o){
   const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[o.mode];
   return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
 }
-function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
+function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+(o.joint?' joint':'')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
 function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
@@ -2640,12 +2651,24 @@ function showBudget(target,age,gender,opts){
   show('<div class="res-head"><div class="price">'+fmt0(benefit)+' <small>/mo of benefit</small></div><div class="price2">≈ '+fmt(q.modalPayment)+'/mo premium</div></div>'+
     '<div class="config-line">A budget of '+fmt(target)+'/mo buys '+fmt0(benefit)+'/mo of coverage (NGL sells in $300 increments) &middot; '+age+(gender==='female'?'F':'M')+' &middot; '+bpL(opts.benefitPeriod)+' &middot; '+pctL(opts.inflation)+'</div><div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div><div class="disc">'+DISC+'</div>');
 }
-function showStandard(age,gender,state){
-  const rows=E.runScenario(E.STANDARD_SCENARIO,age,gender,{mode:'monthly',state:state||null});
-  const body=rows.map(o=>{ const cfg={age,gender,monthlyBenefit:o.monthlyBenefit,benefitPeriod:o.benefitPeriod,elimination:'90',inflation:o.inflation,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:o.benefitPeriod};
-    return '<tr><td><b>'+o.option+'</b></td><td class="b">'+fmt0(o.monthlyBenefit)+'/mo, '+bpL(o.benefitPeriod)+', '+pctL(o.inflation)+'</td><td class="p">'+fmt(o.monthlyPremium)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
-  show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th><th></th></tr>'+body+'</table><div class="disc">'+DISC+'</div>');
+function showStandard(age,gender,state,married){
+  const body=E.STANDARD_SCENARIO.options.map(op=>{
+    const cfg={age:+age,gender,monthlyBenefit:op.monthly_benefit,benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,maritalDiscount:!!married,totalBenefitPeriod:op.benefit_period};
+    let prem; try{ prem=fmt(E.quote(cfg).modalPayment)+'/mo'; }catch(e){ prem='—'; }
+    return '<tr><td><b>'+op.name+'</b></td><td class="b">'+fmt0(op.monthly_benefit)+'/mo, '+bpL(op.benefit_period)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+(married?' &middot; married (spousal −'+(MARITAL_DISCOUNT*100)+'%)':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th><th></th></tr>'+body+'</table><div class="disc">'+(married?'Married applicant applying alone — NGL spousal discount applied. ':'')+DISC+'</div>');
 }
+function showStandardJoint(age1,g1,age2,g2,state){
+  const older = (+age1>=+age2) ? {age:+age1,g:g1} : {age:+age2,g:g2};
+  const body=E.STANDARD_SCENARIO.options.map(op=>{
+    const kw={benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:'36'};
+    let prem; try{ prem=fmt(E.quoteCouple(+age1,g1,+age2,g2,op.monthly_benefit,kw).combined_joint.modalPayment)+'/mo'; }catch(e){ prem='—'; }
+    // joint opts for the tray — the combined premium is the joint rate at the older insured's age
+    const jointCfg={age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:'36'};
+    return '<tr><td><b>'+op.name+'</b></td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(op.benefit_period)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; shared-care rider, 3-yr shared, on all</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table><div class="disc">Joint (two-life) policy rated on the older insured, with the Shared Additional Policy Limit rider (3-year shared pool) on every option. '+DISC+'</div>');
+}
+function stdTypeChange(){ $('t_couple').hidden = $('t_type').value!=='joint'; }
 function showCompare(items, opts){
   opts=opts||{};
   const rows=items.map(o=>{ let prem='—'; try{ const q=E.quote(o); prem=fmt(q.modalPayment)+'/mo'; }catch(e){} return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
@@ -2718,7 +2741,13 @@ function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value
 function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
 function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
-function runStandard(){ try{ showStandard(+$('t_age').value,$('t_gender').value,$('t_state').value||null); }catch(e){ showErr(e.message); } }
+function runStandard(){ try{
+  const type=$('t_type').value, age=+$('t_age').value, state=$('t_state').value||null;
+  if(type==='joint'){ showStandardJoint(age, $('t_g1').value, +$('t_age2').value, $('t_g2').value, state); return; }
+  const gender = type.indexOf('female')>=0 ? 'female' : 'male';
+  const married = type.indexOf('married')===0;
+  showStandard(age, gender, state, married);
+}catch(e){ showErr(e.message); } }
 function runWaiting(){ try{ showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
 function openGrowth(){ $('manual').hidden=false; activateTab('growth'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 function computeGrowth(age, benefit, inflation, benefitPeriod, endAge){
