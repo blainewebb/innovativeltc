@@ -2660,13 +2660,14 @@ function showStandard(age,gender,state,married){
 }
 function showStandardJoint(age1,g1,age2,g2,state){
   const older = (+age1>=+age2) ? {age:+age1,g:g1} : {age:+age2,g:g2};
+  const BP='36';   // couples cap at a 3-year benefit period (shared rider already stacks to a large pool)
   const body=E.STANDARD_SCENARIO.options.map(op=>{
-    const kw={benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:'36'};
+    const kw={benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP};
     let prem; try{ prem=fmt(E.quoteCouple(+age1,g1,+age2,g2,op.monthly_benefit,kw).combined_joint.modalPayment)+'/mo'; }catch(e){ prem='—'; }
     // joint opts for the tray — the combined premium is the joint rate at the older insured's age
-    const jointCfg={age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:'36'};
-    return '<tr><td><b>'+op.name+'</b></td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(op.benefit_period)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
-  show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; shared-care rider, 3-yr shared, on all</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table><div class="disc">Joint (two-life) policy rated on the older insured, with the Shared Additional Policy Limit rider (3-year shared pool) on every option. '+DISC+'</div>');
+    const jointCfg={age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP};
+    return '<tr><td><b>'+op.name.replace(/\/\s*4-yr/,'/ 3-yr')+'</b></td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(BP)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table><div class="disc">Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
 function stdTypeChange(){ $('t_couple').hidden = $('t_type').value!=='joint'; }
 function showCompare(items, opts){
