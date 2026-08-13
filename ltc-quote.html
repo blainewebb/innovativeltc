@@ -86,6 +86,18 @@
   .addbtn:hover{background:#e0e7ff}
   .waitbtn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
   .waitbtn:hover{background:#ffedd5}
+  .cmpbtn{background:#f5f3ff;color:#5b21b6;border:1px solid #ddd6fe;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer}
+  .cmpbtn:hover{background:#ede9fe}
+  /* value metrics */
+  .metrics{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+  .metric{flex:1;min-width:150px;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:11px 13px}
+  .metric .mv{font-size:1.15rem;font-weight:800;color:var(--primary-d);line-height:1.15}
+  .metric .ml{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:3px}
+  /* what-if variants */
+  .whatif{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:14px}
+  .whatif .lbl{color:var(--muted);font-size:.8rem;font-weight:700}
+  .wbtn{background:#fff;border:1px solid var(--border);color:#334155;border-radius:999px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer}
+  .wbtn:hover{border-color:var(--primary);color:var(--primary)}
   /* comparison tray */
   .tray-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .tray-head .sp{margin-left:auto;display:flex;gap:8px}
@@ -2553,9 +2565,64 @@ function growthLine(o){
   if(!o.inflation) return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">No inflation protection — the benefit stays <b>'+fmt0(o.monthlyBenefit)+'/mo</b> for life.</div>';
   return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">📈 By <b>age '+pa+'</b> (in '+yrs+' yr'+(yrs===1?'':'s')+') this grows to <b>'+fmt0(grown)+'/mo</b>'+(pool!=null?' &middot; total pool <b>'+fmt0(pool)+'</b>':'')+' at '+pctL(o.inflation)+'.</div>';
 }
+// --- value / leverage metrics (unique-plan-design selling numbers) ---
+function valueMetrics(o,q){
+  const months = o.benefitPeriod==='lifetime' ? null : parseInt(o.benefitPeriod);
+  const pool = months ? o.monthlyBenefit*months : null;
+  const cells=[];
+  cells.push(['Total benefit pool', pool!=null?fmt0(pool):'Unlimited (lifetime)']);
+  if(pool!=null){
+    let lev,lbl;
+    if(q.pay==='Single-Pay'){ lev=pool/q.singlePremium; lbl='pool per $1 paid (single pay)'; }
+    else if(q.pay==='10-Pay'){ lev=pool/(q.annualPremium*10); lbl='pool per $1 paid over 10 yrs'; }
+    else { lev=pool/q.annualPremium; lbl='pool per $1/yr of premium'; }
+    if(isFinite(lev)&&lev>0) cells.push(['$'+Math.round(lev).toLocaleString(), lbl]);
+  }
+  if(q.pay!=='Single-Pay'){ const per100=q.annualPremium/(o.monthlyBenefit/100); cells.push([fmt0(per100)+'/yr', 'cost per $100/mo of benefit']); }
+  return '<div class="metrics">'+cells.map(c=>'<div class="metric"><div class="mv">'+c[0]+'</div><div class="ml">'+c[1]+'</div></div>').join('')+'</div>';
+}
+// --- one-tap what-if variants (fast plan design) ---
+const V_PERIODS=['24','36','48','60','72','lifetime'];
+const V_INFLS=[0,0.01,0.02,0.03,0.04,0.05];
+function variant(o, ch){
+  const n=Object.assign({},o);
+  if(ch.benefit){ n.monthlyBenefit=SNAP((+o.monthlyBenefit)+ch.benefit); }
+  if(ch.period){ let i=V_PERIODS.indexOf(String(o.benefitPeriod)); if(i<0)i=1; i=Math.max(0,Math.min(V_PERIODS.length-1,i+ch.period)); n.benefitPeriod=V_PERIODS[i]; n.totalBenefitPeriod=V_PERIODS[i]; }
+  if(ch.inflation){ const cur=o.inflation||0; let i=V_INFLS.indexOf(cur); if(i<0)i=V_INFLS.reduce((b,v,ix)=>Math.abs(v-cur)<Math.abs(V_INFLS[b]-cur)?ix:b,0); i=Math.max(0,Math.min(V_INFLS.length-1,i+ch.inflation)); n.inflation=V_INFLS[i]||null; }
+  showSingle(n);
+}
+function whatIf(o){
+  const mk=(lbl,ch)=>'<button class="wbtn" onclick=\'variant('+JSON.stringify(o)+','+JSON.stringify(ch)+')\'>'+lbl+'</button>';
+  return '<div class="whatif"><span class="lbl">Adjust:</span>'+mk('−$300',{benefit:-300})+mk('+$300',{benefit:300})+mk('−1 yr',{period:-1})+mk('+1 yr',{period:1})+mk('Inflation −',{inflation:-1})+mk('Inflation +',{inflation:1})+'</div>';
+}
+function compareBtns(o){
+  return '<div class="resbtns"><button class="cmpbtn" onclick=\'showInflationCompare('+JSON.stringify(o)+')\'>⚖︎ Compare inflation</button><button class="cmpbtn" onclick=\'showPayCompare('+JSON.stringify(o)+')\'>⚖︎ Compare pay options</button></div>';
+}
+function showInflationCompare(o){
+  const opts=[[0,'Level'],[0.02,'2% compound'],[0.03,'3% compound'],[0.05,'5% compound']];
+  const pa=Math.max(+o.age,Math.min(100,Math.round(+($('s_projage')||{}).value||80)));
+  const yrs=pa-(+o.age);
+  const rows=opts.map(([iv,il])=>{ const c=Object.assign({},o,{inflation:iv||null}); let prem='—'; try{ prem=fmt(E.quote(c).modalPayment)+'/mo'; }catch(e){}
+    const g=Math.round((+o.monthlyBenefit)*(iv?Math.pow(1+iv,yrs):1)); const hi=(o.inflation||0)===iv;
+    return '<tr'+(hi?' style="background:#f0f7ff;font-weight:700"':'')+'><td class="b">'+il+'</td><td class="p">'+prem+'</td><td class="b">'+fmt0(g)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(c)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Inflation options &middot; '+o.age+(o.gender==='female'?'F':'M')+' &middot; '+fmt0(o.monthlyBenefit)+'/mo &middot; '+bpL(o.benefitPeriod)+'</div><table class="opts"><tr><th>Inflation</th><th style="text-align:right">Premium</th><th style="text-align:right">Benefit at age '+pa+'</th><th></th></tr>'+rows+'</table><div class="disc">Same design, different inflation option — premium today vs. how far the monthly benefit grows by age '+pa+'. '+DISC+'</div>');
+}
+function showPayCompare(o){
+  const pays=[['level','Level (to age 100)'],['10pay','10-Pay'],['single','Single-Pay']];
+  const months=o.benefitPeriod==='lifetime'?null:parseInt(o.benefitPeriod); const pool=months?o.monthlyBenefit*months:null;
+  const rows=pays.map(([pv,pl])=>{ const c=Object.assign({},o,{pay:pv}); let q; try{ q=E.quote(c); }catch(e){ return ''; }
+    let prem, outlay=null;
+    if(pv==='single'){ prem=fmt(q.singlePremium)+' once'; outlay=q.singlePremium; }
+    else { prem=fmt(q.modalPayment)+'/mo'; if(pv==='10pay') outlay=q.annualPremium*10; }
+    const outTxt = outlay!=null?fmt0(outlay):'ongoing to 100';
+    const lev = (pool&&outlay)?'$'+Math.round(pool/outlay).toLocaleString()+' per $1':'—';
+    const hi=(o.pay||'level')===pv;
+    return '<tr'+(hi?' style="background:#f0f7ff;font-weight:700"':'')+'><td class="b">'+pl+'</td><td class="p">'+prem+'</td><td class="b">'+outTxt+'</td><td class="b">'+lev+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(c)+')\'>＋</button></td></tr>'; }).join('');
+  show('<div class="config-line">Pay options &middot; '+o.age+(o.gender==='female'?'F':'M')+' &middot; '+fmt0(o.monthlyBenefit)+'/mo &middot; '+bpL(o.benefitPeriod)+' &middot; '+pctL(o.inflation)+'</div><table class="opts"><tr><th>Pay structure</th><th style="text-align:right">Premium</th><th style="text-align:right">Total outlay</th><th style="text-align:right">Leverage</th><th></th></tr>'+rows+'</table><div class="disc">Level pay is ongoing (paid to age 100), so its total isn’t fixed. Leverage = total benefit pool ÷ known premiums paid. '+DISC+'</div>');
+}
 function showSingle(o){
   const q=E.quote(o);
-  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+growthLine(o)+'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+growthLine(o)+valueMetrics(o,q)+whatIf(o)+'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+compareBtns(o)+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showCouple(a1,g1,a2,g2,opts){
   const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
@@ -2589,18 +2656,21 @@ function showCompare(items, opts){
 /* ---------- budget optimizer (verified engine explores; AI interprets) ---------- */
 const OPT_PERIODS=[['24','2-yr'],['36','3-yr'],['48','4-yr'],['60','5-yr'],['72','6-yr'],['lifetime','lifetime']];
 const OPT_INFL=[[0,'level'],[0.02,'2%'],[0.03,'3%'],[0.05,'5%']];
-function computeOptimize(target,age,gender,state){
+function computeOptimize(target,age,gender,state,priority){
   let best={benefit:-1}; const grid=[];
   for(const [pk,pl] of OPT_PERIODS){ const row=[]; for(const [iv,il] of OPT_INFL){ let ben=null;
     try{ ben=FLOOR3(E.benefitForPremium(target,age,gender,{benefitPeriod:pk,elimination:'90',inflation:iv||null,mode:'monthly',state:state||null}).solvedMonthlyBenefit); }catch(e){}
     const cell={pk,pl,iv,il,ben}; row.push(cell); if(ben!=null&&ben>best.benefit) best=Object.assign({benefit:ben},cell); }
     grid.push({pl,row}); }
   const cell=(pk,iv)=>{ for(const g of grid) for(const c of g.row) if(c.pk===pk&&c.iv===iv) return c; return null; };
-  function mk(label,c){ const opts={age:+age,gender,monthlyBenefit:c.ben,benefitPeriod:c.pk,elimination:'90',inflation:c.iv||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:c.pk}; let prem=null; try{ prem=E.quote(opts).modalPayment; }catch(e){} return {label, benefit:c.ben, premium:prem, opts}; }
-  const picks=[ mk('Biggest monthly benefit', best) ];
-  const sixyr=cell('72',0.03)||cell('72',0); if(sixyr&&sixyr.ben!=null) picks.push(mk('Longest period (6-yr, 3%)', sixyr));
-  const bal=cell('48',0.03); if(bal&&bal.ben!=null) picks.push(mk('Balanced (4-yr, 3%)', bal));
-  return {target,age,gender,state,grid,best,picks};
+  function mk(label,c,tag){ const opts={age:+age,gender,monthlyBenefit:c.ben,benefitPeriod:c.pk,elimination:'90',inflation:c.iv||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,totalBenefitPeriod:c.pk}; let prem=null; try{ prem=E.quote(opts).modalPayment; }catch(e){} return {label, tag, benefit:c.ben, premium:prem, opts}; }
+  let picks=[ mk('Biggest monthly benefit', best, 'biggest') ];
+  const sixyr=cell('72',0.03)||cell('72',0); if(sixyr&&sixyr.ben!=null) picks.push(mk('Longest period (6-yr, 3%)', sixyr, 'longest'));
+  const bal=cell('48',0.03); if(bal&&bal.ben!=null) picks.push(mk('Balanced (4-yr, 3%)', bal, 'balanced'));
+  const strongInfl=cell('48',0.05)||cell('36',0.05); if(strongInfl&&strongInfl.ben!=null) picks.push(mk('Strongest inflation (5% compound)', strongInfl, 'inflation'));
+  // lead with the design that matches a stated priority
+  if(priority){ const i=picks.findIndex(p=>p.tag===priority); if(i>0){ picks.unshift(picks.splice(i,1)[0]); } }
+  return {target,age,gender,state,priority,grid,best,picks};
 }
 function renderOptimize(d, narrative){
   const inflHdr=OPT_INFL.map(([iv,il])=>'<th style="text-align:right">'+il+'</th>').join('');
@@ -2615,9 +2685,10 @@ function renderOptimize(d, narrative){
 }
 async function recommendAI(target,age,gender,d){
   const key=LS.key(); if(!key) return;
-  const lines=d.picks.map(p=>p.label+' = '+fmt0(p.benefit)+'/mo of benefit over '+bpL(p.opts.benefitPeriod)+' at '+pctL(p.opts.inflation)).join('; ');
-  const sys='You help a long-term care agent explain budget options to a client. You are given pre-computed, VERIFIED options — never change or invent a number. Write 2-3 warm, plain-English sentences recommending choices for someone on the stated monthly budget, contrasting the biggest monthly benefit against the longest coverage period. Plain text only, no headers.';
-  const u='Budget '+fmt0(target)+'/mo for a '+age+'-year-old '+gL(gender)+'. Verified options: '+lines+'.';
+  const lines=d.picks.map(p=>p.label+' = '+fmt0(p.benefit)+'/mo of benefit over '+bpL(p.opts.benefitPeriod)+' at '+pctL(p.opts.inflation)+(p.premium!=null?' (~'+fmt0(p.premium)+'/mo)':'')).join('; ');
+  const prio = d.priority ? ' The client’s stated priority is '+d.priority+', so lead with that design.' : '';
+  const sys='You are a long-term care design assistant for an agent. You are given pre-computed, VERIFIED design options for a client on a fixed monthly budget — never change or invent a number. Write 2-4 warm, plain-English sentences that recommend how to present these designs to the client, naming the trade-offs (bigger monthly benefit vs. longer coverage vs. stronger inflation growth) and which one you would lead with and why.'+prio+' Plain text only, no headers or lists.';
+  const u='Budget '+fmt0(target)+'/mo for a '+age+'-year-old '+gL(gender)+'. Verified designs: '+lines+'.';
   try{ const txt=(await callAI(sys, u, {maxTokens:500})).trim();
     if(txt) renderOptimize(d,'<div class="config-line" style="background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95">✨ '+txt.replace(/\n+/g,'<br>')+'</div>'); }catch(e){}
 }
@@ -2738,7 +2809,7 @@ function ex(btn){ $('nl').value=btn.textContent; ask(); }
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
 const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
 {"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false,"married":false}],"couple":null,"budget":null,"missing":[]}
-Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS or the best tradeoff (biggest monthly benefit vs longest coverage period, "what are some options", "most benefit", "longest period") — fill the same "budget" object ("benefitPeriod"/"inflation" can be null) and items []; the app will compute the full option grid. Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO". Set "married":true ONLY for a single applicant who is married but applying alone (spouse not applying) — e.g. "he's married but only he's applying" — which applies NGL's spousal discount; never set it for a couple/joint quote (that uses the joint rate instead).`;
+Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS, DESIGNS, or a RECOMMENDATION — the best tradeoff (biggest monthly benefit vs longest coverage period vs strongest inflation), "what are some options", "design a few plans", "what should I recommend/offer", "build a plan", "most benefit", "longest period" — fill the "budget" object {"targetMonthly","age","gender","benefitPeriod":null,"inflation":null,"state","priority"} and items []; the app computes the full design grid. Set "priority" to one of "biggest" | "longest" | "balanced" | "inflation" | null based on what the client cares most about (e.g. "wants the longest coverage"→"longest"; "strong inflation protection"→"inflation"; "as much monthly benefit as possible"→"biggest"; otherwise null). Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO". Set "married":true ONLY for a single applicant who is married but applying alone (spouse not applying) — e.g. "he's married but only he's applying" — which applies NGL's spousal discount; never set it for a couple/joint quote (that uses the joint rate instead).`;
 // One call, either provider. Returns the model's text. Verified engine still does all math.
 async function callAI(system, user, {maxTokens=800, json=false}={}){
   const provider=LS.provider(), key=LS.key(), model=LS.model();
@@ -2779,7 +2850,7 @@ function runSpec(s, raw){
   try{
     if(s.intent==='standard'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need an age and gender.', true); return;} setInterp(reply||('Standard for '+it.age+' '+gL(it.gender)), true); showStandard(+it.age, it.gender, it.state||null); }
     else if(s.intent==='waiting'){ const it=(s.items&&s.items[0])||{}; if(!it.age||!it.gender){ setInterp(reply+' — I need age and gender.', true); return;} setInterp(reply||'Cost of waiting', true); showWaiting(computeWaiting(+it.age,it.gender,SNAP(it.monthlyBenefit||4500),String(it.benefitPeriod||'36'),it.inflation||null,it.state||null)); }
-    else if(s.intent==='optimize'){ const b=s.budget||{}; if(!b.targetMonthly||!b.age||!b.gender){ setInterp(reply+' — I need budget, age, and gender.', true); return;} setInterp(reply||'Exploring options', true); const d=computeOptimize(+b.targetMonthly,+b.age,b.gender,b.state||null); renderOptimize(d,''); recommendAI(+b.targetMonthly,+b.age,b.gender,d); }
+    else if(s.intent==='optimize'){ const b=s.budget||{}; if(!b.targetMonthly||!b.age||!b.gender){ setInterp(reply+' — I need budget, age, and gender.', true); return;} setInterp(reply||'Designing options', true); const d=computeOptimize(+b.targetMonthly,+b.age,b.gender,b.state||null,b.priority||null); renderOptimize(d,''); recommendAI(+b.targetMonthly,+b.age,b.gender,d); }
     else if(s.intent==='budget'){ const b=s.budget||{}; setInterp(reply||'Budget quote', true); showBudget(+b.targetMonthly, +b.age, b.gender, {benefitPeriod:String(b.benefitPeriod||'36'),elimination:'90',inflation:b.inflation||null,mode:'monthly',state:b.state||null}); }
     else if(s.intent==='couple'){ const c=s.couple||{}; setInterp(reply||'Couple quote', true); showCouple(+c.age1,c.gender1,+c.age2,c.gender2,{monthlyBenefit:SNAP(c.monthlyBenefit),benefitPeriod:String(c.benefitPeriod||'36'),elimination:String(c.elimination||'90'),inflation:c.inflation||null,mode:c.mode||'monthly',riderSharedAdditional:!!c.sharedCare,totalBenefitPeriod:String(c.benefitPeriod||'36')}); }
     else if(s.intent==='compare'){ setInterp(reply||'Comparison', true); showCompare((s.items||[]).map(mapItem)); }
