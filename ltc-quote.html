@@ -254,7 +254,7 @@
         <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="s_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
         <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
-        <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+        <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Elimination period</label><select id="s_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>Payment plan</label><select id="s_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
@@ -264,7 +264,7 @@
       </div>
       <div class="riders">
         <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
-        <label><input type="checkbox" id="s_fdc"> First-day HCCS rider</label>
+        <label><input type="checkbox" id="s_fdc"> First-day home care rider (waives elimination for home care)</label>
         <label><input type="checkbox" id="s_sbn"> Shortened benefit rider</label>
         <label><input type="checkbox" id="s_marital"> Married, spouse not applying (spousal discount)</label>
       </div>
@@ -335,7 +335,7 @@
         <div class="field"><label>Issue age (start)</label><input id="g_age" type="number" value="60" min="18" max="90"></div>
         <div class="field"><label>Monthly benefit ($)</label><input id="g_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Inflation protection</label><select id="g_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
-        <div class="field"><label>Benefit period</label><select id="g_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+        <div class="field"><label>Benefit period</label><select id="g_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Grow to age</label><input id="g_endage" type="number" value="90" min="70" max="100" step="1"></div>
       </div>
       <div class="actions"><button class="run" onclick="runGrowth()">Show the growth</button></div>
@@ -421,7 +421,7 @@
     <div class="grid">
       <div class="field"><label>Trigger code</label><input id="p_trigger" placeholder="e.g. 754"></div>
       <div class="field"><label>Name (optional)</label><input id="p_name" placeholder="e.g. 7-5-4 ladder"></div>
-      <div class="field"><label>Benefit period</label><select id="p_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option><option value="lifetime">Lifetime</option></select></div>
+      <div class="field"><label>Benefit period</label><select id="p_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
       <div class="field"><label>Inflation protection</label><select id="p_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
       <div class="field"><label>Elimination period</label><select id="p_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
       <div class="field"><label>Payment plan</label><select id="p_pay"><option value="level" selected>Level (to age 100)</option><option value="10pay">10-Pay</option><option value="single">Single-Pay</option></select></div>
@@ -2563,7 +2563,7 @@ function priceHead(o){
   const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[o.mode];
   return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
 }
-function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+(o.joint?' joint':'')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
+function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+(o.joint?' joint':'')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.riderFirstDayHccs?' · first-day home care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
 function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
@@ -2593,7 +2593,7 @@ function valueMetrics(o,q){
   return '<div class="metrics">'+cells.map(c=>'<div class="metric"><div class="mv">'+c[0]+'</div><div class="ml">'+c[1]+'</div></div>').join('')+'</div>';
 }
 // --- one-tap what-if variants (fast plan design) ---
-const V_PERIODS=['24','36','48','60','72','lifetime'];
+const V_PERIODS=['24','36','48','60','72'];
 const V_INFLS=[0,0.01,0.02,0.03,0.04,0.05];
 function variant(o, ch){
   const n=Object.assign({},o);
@@ -2678,7 +2678,7 @@ function showCompare(items, opts){
 }
 
 /* ---------- budget optimizer (verified engine explores; AI interprets) ---------- */
-const OPT_PERIODS=[['24','2-yr'],['36','3-yr'],['48','4-yr'],['60','5-yr'],['72','6-yr'],['lifetime','lifetime']];
+const OPT_PERIODS=[['24','2-yr'],['36','3-yr'],['48','4-yr'],['60','5-yr'],['72','6-yr']];
 const OPT_INFL=[[0,'level'],[0.02,'2%'],[0.03,'3%'],[0.05,'5%']];
 function computeOptimize(target,age,gender,state,priority){
   let best={benefit:-1}; const grid=[];
@@ -2776,7 +2776,7 @@ function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.0
 function grabGender(t){ if(/\b(female|woman|women|lady|she|her)\b/i.test(t)) return 'female'; if(/\b(male|man|men|he|his|him|gentleman)\b/i.test(t)) return 'male'; return null; }
 function grabAges(t){ const a=[]; let m; const re=/\b(\d{2})\s*(?:[- ]?(?:year|yr)s?[- ]?old|yo|y\/o)\b/gi; while(m=re.exec(t)) a.push(+m[1]); if(a.length) return a; const re2=/(?:^|[^$\d.])(\d{2})(?!\s*%|\s*k|\d)/g; while(m=re2.exec(t)){ const n=+m[1]; if(n>=40&&n<=90) a.push(n);} return a; }
 function grabBenefit(t){ let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return SNAP(parseFloat(m[1])*1000); const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x; while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return SNAP(n);} return null; }
-function grabBP(t){ if(/lifetime|life[- ]?time/i.test(t)) return 'lifetime'; let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo;} m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1]; return null; }
+function grabBP(t){ let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo;} m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1]; return null; }
 function grabInfl(t){ if(/\b(no inflation|without inflation|level|no cola)\b/i.test(t)) return 0; const m=t.match(/(\d)\s*(?:%|percent)/i); if(m){ const v=+m[1]/100; if(v>=0.01&&v<=0.05) return v;} return null; }
 function grabState(t){ return /\bcolorado\b|\bco\b/i.test(t)?'CO':null; }
 function grabTarget(t){ let m=t.match(/\$\s*([\d,]{2,5})/); if(m){ const n=parseInt(m[1].replace(/,/g,'')); if(n>=50&&n<=1500) return n;} m=t.match(/\b(\d{2,4})\s*(?:\/mo|\/month|a month|per month|monthly|month)\b/i); if(m){ const n=+m[1]; if(n>=50&&n<=1500) return n;} return null; }
@@ -2838,7 +2838,7 @@ function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
 const AI_SYSTEM = `You convert an insurance agent's plain-English request into a JSON quote spec. You do NOT compute premiums — a verified engine does that. Output ONLY a JSON object, no prose, matching:
-{"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72|lifetime","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false,"married":false}],"couple":null,"budget":null,"missing":[]}
+{"intent":"single|couple|budget|optimize|waiting|standard|compare","reply":"one short sentence describing what you understood","items":[{"age":int,"gender":"male|female","monthlyBenefit":number,"benefitPeriod":"24|36|48|60|72","elimination":"90|180","inflation":0..0.05,"pay":"level|10pay|single","mode":"monthly|quarterly|semiannual|annual","state":null,"sharedCare":false,"married":false}],"couple":null,"budget":null,"missing":[]}
 Rules: benefitPeriod is in months as a string ("36"=3 years). inflation is a decimal (0.03 = 3% compound; 0 = level/none). Defaults when unstated: elimination "90", pay "level", mode "monthly", inflation 0.03, state null. For a couple, fill "couple":{"age1","gender1","age2","gender2","monthlyBenefit","benefitPeriod","elimination","inflation","mode","state","sharedCare"} and leave items []. For a plain budget question (one answer), use intent "budget" and fill "budget":{"targetMonthly","age","gender","benefitPeriod","inflation","state"}. Use intent "optimize" when the person gives a monthly budget AND asks for OPTIONS, DESIGNS, or a RECOMMENDATION — the best tradeoff (biggest monthly benefit vs longest coverage period vs strongest inflation), "what are some options", "design a few plans", "what should I recommend/offer", "build a plan", "most benefit", "longest period" — fill the "budget" object {"targetMonthly","age","gender","benefitPeriod":null,"inflation":null,"state","priority"} and items []; the app computes the full design grid. Set "priority" to one of "biggest" | "longest" | "balanced" | "inflation" | null based on what the client cares most about (e.g. "wants the longest coverage"→"longest"; "strong inflation protection"→"inflation"; "as much monthly benefit as possible"→"biggest"; otherwise null). Use intent "waiting" when the person asks about the cost or impact of waiting / delaying / putting off buying — put one item with age, gender, monthlyBenefit (their coverage today; default 4500), benefitPeriod, inflation, state; the app models older age + 3%/yr care-cost growth. For "standard", put one item with just age+gender (the app supplies the 3 options). For a single quote or a compare, fill items (compare = 2+ items). If age or gender is missing for single/standard/budget/optimize, add "age" or "gender" to "missing". Colorado -> state "CO". Set "married":true ONLY for a single applicant who is married but applying alone (spouse not applying) — e.g. "he's married but only he's applying" — which applies NGL's spousal discount; never set it for a couple/joint quote (that uses the joint rate instead).`;
 // One call, either provider. Returns the model's text. Verified engine still does all math.
 async function callAI(system, user, {maxTokens=800, json=false}={}){

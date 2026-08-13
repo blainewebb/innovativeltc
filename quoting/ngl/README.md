@@ -30,6 +30,9 @@ then × payment-mode factor            # monthly payment = annual × 0.0875
 - **Joint** = the couple/partner rate (both partners applying), rated on each
   person's own age.
 - Rated issue ages **18–79** (18–40 share one rate).
+- **Lifetime benefit period is discontinued** — NGL no longer offers it, so it's
+  removed from the tool's UI. The `lifetime` factor remains in `rates.json` only so
+  any previously saved lifetime quote still renders; no new quote can select it.
 - **Monthly benefit is sold only in $300 increments** (the rate is *per $300*). The
   rater snaps any benefit to the nearest $300 so every premium is bindable; the
   budget solver (`benefit_for_premium`) floors to the largest $300 increment within

@@ -53,7 +53,7 @@ Or import it: `from rater import quote; quote(age=62, gender="female", monthly_b
 | age | issue age, 18–79 |
 | gender | male / female (ignored for Colorado & worksite — those are unisex) |
 | monthly_benefit | dollars per month (if Blaine says a *daily* benefit, ×30; a *pool*, divide by months) |
-| benefit_period | 24 / 36 / 48 / 60 / 72 months, or lifetime |
+| benefit_period | 24 / 36 / 48 / 60 / 72 months (NGL discontinued the lifetime option) |
 | elimination | 90 or 180 days |
 | inflation | none/level, or 0.01–0.05 compound COLA |
 | joint | true if it's a couple/partner (joint) rate |
