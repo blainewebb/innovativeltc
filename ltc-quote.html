@@ -23,6 +23,7 @@
   /* mode toggle */
   .modes{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px}
   .modebtn{border:none;background:transparent;padding:8px 16px;border-radius:8px;font-weight:800;font-size:.9rem;cursor:pointer;color:var(--muted)}
+  .modebtn.on[data-m="manual"]{background:#334155;color:#fff}
   .modebtn.on[data-m="fast"]{background:var(--primary);color:#fff}
   .modebtn.on[data-m="ai"]{background:var(--violet);color:#fff}
   /* ask */
@@ -210,6 +211,7 @@
   <div class="card ask">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <div class="modes" id="modes">
+        <button class="modebtn" data-m="manual" onclick="setMode('manual')">📝 Manual</button>
         <button class="modebtn on" data-m="fast" onclick="setMode('fast')">⚡ Fast</button>
         <button class="modebtn" data-m="ai" onclick="setMode('ai')">✨ AI</button>
       </div>
@@ -220,7 +222,7 @@
         onkeydown="if(event.key==='Enter')ask()">
       <button class="run" onclick="ask()">Run</button>
     </div>
-    <div class="examples">
+    <div class="examples" id="examples">
       <span class="lbl">Try:</span>
       <button class="ex" onclick="ex(this)">run my standard for a 60 female</button>
       <button class="ex" onclick="ex(this)">65 male, $4,000/mo, 4 years, 3%</button>
@@ -237,7 +239,6 @@
     </div>
     <div id="interp" class="interp"></div>
     <div id="aikeynote" class="aikey-note">AI mode needs your Anthropic API key. <a onclick="openSettings()">Add it in settings →</a></div>
-    <span class="tabtoggle" onclick="toggle('manual')">⚙︎ Prefer to click? Open the manual form</span>
   </div>
 
   <div class="card" id="manual" hidden>
@@ -2521,10 +2522,17 @@ const LS = {
 function setMode(m){
   MODE=m;
   document.querySelectorAll('.modebtn').forEach(b=>b.classList.toggle('on', b.dataset.m===m));
+  const manual = m==='manual';
+  // Manual mode swaps the type-a-command bar for the click-in form
+  $('manual').hidden = !manual;
+  $('askbar').style.display = manual ? 'none' : '';
+  $('examples').style.display = manual ? 'none' : '';
+  if(manual){ $('interp').classList.remove('show'); }
   $('askbar').classList.toggle('aimode', m==='ai');
-  $('modelead').textContent = m==='ai'
-    ? 'AI mode — ask anything in plain English (uses your own AI key).'
-    : 'Smart commands — type it the way you would say it.';
+  $('modelead').textContent = manual
+    ? 'Manual entry — pick a tab, fill in the fields, and run.'
+    : (m==='ai' ? 'AI mode — ask anything in plain English (uses your own AI key).'
+                : 'Smart commands — type it the way you would say it.');
   updateAiKeyNote();
 }
 function updateAiKeyNote(){
@@ -2552,7 +2560,7 @@ function activateTab(mode){
   document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==mode);
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>activateTab(t.dataset.mode));
-function openWaiting(){ $('manual').hidden=false; activateTab('waiting'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
+function openWaiting(){ setMode('manual'); activateTab('waiting'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ---------- rendering ---------- */
 function show(html){ $('resultCard').hidden=false; $('result').innerHTML=html; $('resultCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
@@ -2750,7 +2758,7 @@ function runStandard(){ try{
   showStandard(age, gender, state, married);
 }catch(e){ showErr(e.message); } }
 function runWaiting(){ try{ showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
-function openGrowth(){ $('manual').hidden=false; activateTab('growth'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
+function openGrowth(){ setMode('manual'); activateTab('growth'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 function computeGrowth(age, benefit, inflation, benefitPeriod, endAge){
   benefit = SNAP(benefit);                         // starting benefit is a real sold amount (≤ $12,000)
   const end = Math.max(+age, Math.min(100, +endAge||90));
