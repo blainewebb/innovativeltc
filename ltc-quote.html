@@ -2572,6 +2572,10 @@ function priceHead(o){
   return '<div class="price">'+fmt(o.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(o.annualPremium)+' / yr</div>';
 }
 function cfgText(o){ return o.age+(o.gender==='female'?'F':'M')+(o.joint?' joint':'')+' · '+fmt0(o.monthlyBenefit)+'/mo · '+bpL(o.benefitPeriod)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared-care':'')+(o.riderFirstDayHccs?' · first-day home care':'')+(o.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')+(o.state?' · '+o.state:''); }
+// NGL Shared Additional rider = 3 pools (his + hers + shared), so total coverage = base × 3.
+const SHARED_POOLS = 3;
+function poolMonths(o){ if(o.benefitPeriod==='lifetime') return null; const m=parseInt(o.benefitPeriod); return o.riderSharedAdditional ? m*SHARED_POOLS : m; }
+function poolYearsLabel(o){ if(o.benefitPeriod==='lifetime') return 'lifetime'; const pm=poolMonths(o); return (pm/12)+'-yr'+(o.riderSharedAdditional?' ('+SHARED_POOLS+' shared pools)':''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
 function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
@@ -2580,16 +2584,16 @@ function growthLine(o){
   const pa = Math.max(+o.age, Math.min(100, Math.round(+($('s_projage')||{}).value||80)));
   const yrs = pa - (+o.age);
   const grown = Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1));
-  const pool = o.benefitPeriod==='lifetime' ? null : grown*parseInt(o.benefitPeriod);
+  const pm = poolMonths(o); const pool = pm!=null ? grown*pm : null;
   if(!o.inflation) return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">No inflation protection — the benefit stays <b>'+fmt0(o.monthlyBenefit)+'/mo</b> for life.</div>';
-  return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">📈 By <b>age '+pa+'</b> (in '+yrs+' yr'+(yrs===1?'':'s')+') this grows to <b>'+fmt0(grown)+'/mo</b>'+(pool!=null?' &middot; total pool <b>'+fmt0(pool)+'</b>':'')+' at '+pctL(o.inflation)+'.</div>';
+  return '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">📈 By <b>age '+pa+'</b> (in '+yrs+' yr'+(yrs===1?'':'s')+') this grows to <b>'+fmt0(grown)+'/mo</b>'+(pool!=null?' &middot; total pool <b>'+fmt0(pool)+'</b>'+(o.riderSharedAdditional?' (3 shared pools)':''):'')+' at '+pctL(o.inflation)+'.</div>';
 }
 // --- value / leverage metrics (unique-plan-design selling numbers) ---
 function valueMetrics(o,q){
-  const months = o.benefitPeriod==='lifetime' ? null : parseInt(o.benefitPeriod);
-  const pool = months ? o.monthlyBenefit*months : null;
+  const months = poolMonths(o);
+  const pool = months!=null ? o.monthlyBenefit*months : null;
   const cells=[];
-  cells.push(['Total benefit pool', pool!=null?fmt0(pool):'Unlimited (lifetime)']);
+  cells.push([o.riderSharedAdditional?'Total pool (3 shared)':'Total benefit pool', pool!=null?fmt0(pool):'Unlimited (lifetime)']);
   if(pool!=null){
     let lev,lbl;
     if(q.pay==='Single-Pay'){ lev=pool/q.singlePremium; lbl='pool per $1 paid (single pay)'; }
@@ -2972,10 +2976,10 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> o.age+' '+gL(o.gender)},
   benefit:  {label:'Monthly benefit',      v:(o)=> fmt0(o.monthlyBenefit)+'/mo'},
-  period:   {label:'Benefit period',       v:(o)=> bpL(o.benefitPeriod)},
-  pool:     {label:'Total benefit pool',   v:(o)=> o.benefitPeriod==='lifetime' ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*parseInt(o.benefitPeriod))},
+  period:   {label:'Benefit period',       v:(o)=> poolYearsLabel(o)},
+  pool:     {label:'Total benefit pool',   v:(o)=> { const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
   projMonthly:{label:()=>'Monthly benefit at age '+QSHEET.projAge, v:(o)=> fmt0(projBenefitAt(o))+'/mo'},
-  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> o.benefitPeriod==='lifetime' ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*parseInt(o.benefitPeriod))},
+  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> pctL(o.inflation)},
   shared:   {label:'Shared-care rider',    v:(o)=> o.riderSharedAdditional?'Included':'—'},
