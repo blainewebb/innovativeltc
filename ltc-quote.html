@@ -2982,13 +2982,14 @@ const QCATS = {
   projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> pctL(o.inflation)},
+  inflationYN:{label:'Inflation',          v:(o)=> o.inflation ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
   shared:   {label:'Shared-care rider',    v:(o)=> o.riderSharedAdditional?'Included':'—'},
   marital:  {label:'Spousal discount',     v:(o)=> o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—'},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
 };
 const QLAYOUTS = {
-  essentials:  ['benefit','period','premium'],
+  essentials:  ['benefit','period','inflationYN','premium'],
   recommended: ['benefit','period','pool','elim','inflation','premium'],
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
