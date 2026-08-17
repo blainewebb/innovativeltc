@@ -19,6 +19,18 @@
   .topright{margin-left:auto;display:flex;align-items:center;gap:10px}
   .badge{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
   .gear{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:9px;padding:6px 10px;font-size:1rem}
+  .hdrbtn{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:9px;padding:7px 12px;font-size:.85rem;font-weight:700;color:#334155}
+  .hdrbtn:hover{border-color:var(--primary);color:var(--primary)}
+  /* clients manager */
+  .cm-head{display:flex;align-items:center;gap:10px}
+  .cm-close{margin-left:auto;border:1px solid var(--border);background:#fff;color:#334155;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.85rem}
+  .cm-controls{display:flex;gap:10px;align-items:center;margin:14px 0}
+  .cm-controls input{flex:1}
+  .segsort{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:4px;gap:4px}
+  .segsort button{border:none;background:transparent;padding:8px 14px;border-radius:7px;font-weight:800;font-size:.82rem;cursor:pointer;color:var(--muted)}
+  .segsort button.on{background:var(--primary);color:#fff}
+  .cm-list{max-height:min(60vh,520px);overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .cm-empty{color:var(--muted);font-size:.85rem;font-style:italic;padding:14px 2px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
   /* mode toggle */
   .modes{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px}
@@ -204,6 +216,7 @@
     </div>
     <div class="topright">
       <span class="badge">✓ NGL · verified rates</span>
+      <button class="hdrbtn" id="clientsBtn" onclick="openClients()">👥 Clients</button>
       <span class="gear" title="Settings" onclick="openSettings()">⚙︎</span>
     </div>
   </header>
@@ -365,11 +378,6 @@
     <p class="hint" style="margin-top:6px">Save a shorthand — e.g. <b>754</b> — that locks in a plan design. Then type the code with an age, gender, and one or more benefit amounts, like <b>754 60 female 7000 5000 4000</b>, and it runs them all into a comparison. Works in either mode.</p>
     <div id="patterns"></div>
   </div>
-
-  <div class="card">
-    <h2>Saved clients</h2>
-    <div id="clients"><p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p></div>
-  </div>
 </div>
 
 <!-- settings modal -->
@@ -438,6 +446,44 @@
     <div class="row">
       <button class="ghost" onclick="$('patternModal').classList.remove('show')">Cancel</button>
       <button class="run" onclick="savePattern()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- clients manager -->
+<div class="modal" id="clientsModal">
+  <div class="box" style="max-width:660px">
+    <div class="cm-head">
+      <h3 style="margin:0">Clients <span id="cm_count" style="color:var(--muted);font-weight:600;font-size:.9rem"></span></h3>
+      <button class="cm-close" onclick="closeClients()">Close</button>
+    </div>
+    <div class="cm-controls">
+      <input id="cm_search" placeholder="Search by name…" oninput="renderClientsList()" autocomplete="off">
+      <div class="segsort" id="cm_sort">
+        <button data-s="az" class="on" onclick="setClientSort('az')">A–Z</button>
+        <button data-s="recent" onclick="setClientSort('recent')">Recent</button>
+      </div>
+    </div>
+    <div id="clientsList" class="cm-list"></div>
+  </div>
+</div>
+
+<!-- client editor -->
+<div class="modal" id="clientModal">
+  <div class="box">
+    <h3 id="clientModalTitle">Save to client</h3>
+    <p>The details you enter here pop back up whenever you open or edit this client.</p>
+    <div class="grid">
+      <div class="field"><label>Name</label><input id="cf_name" autocomplete="off"></div>
+      <div class="field"><label>Date of birth</label><input id="cf_dob" type="date"></div>
+      <div class="field"><label>Email</label><input id="cf_email" type="email" autocomplete="off"></div>
+      <div class="field"><label>Phone</label><input id="cf_phone" autocomplete="off"></div>
+    </div>
+    <label style="font-weight:600;font-size:.82rem;display:block;margin:12px 0 5px">Notes</label>
+    <input id="cf_note" autocomplete="off" placeholder="e.g. prefers 3% compound; follow up after vacation">
+    <div class="row">
+      <button class="ghost" onclick="$('clientModal').classList.remove('show')">Cancel</button>
+      <button class="run" onclick="saveClientForm()">Save</button>
     </div>
   </div>
 </div>
@@ -2914,21 +2960,44 @@ function renderTray(){
 }
 
 /* ---------- saved clients ---------- */
-function saveClient(){
-  const a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
-  const name=prompt('Client name:'); if(!name) return;
-  const contact=prompt('Contact (email / phone) — optional:')||'';
-  const note=prompt('Note — optional:')||'';
-  const c=LS.clients(); c.push({name, contact, note, items:a, savedAt:new Date().toLocaleDateString()}); LS.setClients(c); renderClients();
-  alert('Saved “'+name+'”.');
-}
-function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+let EDIT_CLIENT=-1, PENDING_ITEMS=null, CLIENT_SORT='az';
+function ageFromDob(dob){ if(!dob) return null; const d=new Date(dob+'T00:00:00'); if(isNaN(d)) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
+function clientContact(x){ const parts=[x.email,x.phone].filter(Boolean); return parts.length?parts.join(' · '):(x.contact||''); }
+function clientTs(x){ return x.updatedAt||x.ts||0; }
+// Save-to-client (new) opens the editor pre-filled from the current comparison
+function saveClient(){ const a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
+  EDIT_CLIENT=-1; PENDING_ITEMS=a.slice(); $('clientModalTitle').textContent='Save to client';
+  ['cf_name','cf_dob','cf_email','cf_phone','cf_note'].forEach(id=>$(id).value='');
+  $('clientModal').classList.add('show'); $('cf_name').focus(); }
+function editClient(i){ const x=LS.clients()[i]; if(!x) return; EDIT_CLIENT=i; PENDING_ITEMS=null; closeClients();
+  $('clientModalTitle').textContent='Edit client'; $('cf_name').value=x.name||''; $('cf_dob').value=x.dob||'';
+  $('cf_email').value=x.email||((x.contact&&x.contact.includes('@'))?x.contact:'');
+  $('cf_phone').value=x.phone||((x.contact&&!x.contact.includes('@'))?x.contact:'');
+  $('cf_note').value=x.note||''; $('clientModal').classList.add('show'); $('cf_name').focus(); }
+function saveClientForm(){ const name=$('cf_name').value.trim(); if(!name){ alert('Please enter a name.'); return; }
+  const fields={name, dob:$('cf_dob').value||'', email:$('cf_email').value.trim(), phone:$('cf_phone').value.trim(), note:$('cf_note').value.trim()};
+  const c=LS.clients();
+  if(EDIT_CLIENT>=0){ Object.assign(c[EDIT_CLIENT], fields); c[EDIT_CLIENT].updatedAt=Date.now(); delete c[EDIT_CLIENT].contact; }
+  else { const rec=Object.assign({}, fields, {items:(PENDING_ITEMS||LS.tray()).slice(), savedAt:new Date().toLocaleDateString(), ts:Date.now()}); rec.updatedAt=rec.ts; c.push(rec); }
+  LS.setClients(c); $('clientModal').classList.remove('show'); renderClients(); openClients(); }
+function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); renderTray(); closeClients(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
 function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+'”?')) return; c.splice(i,1); LS.setClients(c); renderClients(); }
-function renderClients(){
-  const c=LS.clients(), box=$('clients');
-  if(!c.length){ box.innerHTML='<p class="empty">No saved clients yet. Build a comparison above, then “Save to client.”</p>'; return; }
-  box.innerHTML=c.map((x,i)=>'<div class="client"><div><div class="nm">'+esc(x.name)+'</div><div class="cfg">'+(x.contact?esc(x.contact)+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+esc(x.note):'')+'</div></div><div class="sp"><button class="view" onclick="viewQuote('+i+')">View quote</button><button class="go" onclick="openClient('+i+')">Open</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>').join('');
+function openClients(){ renderClientsList(); $('clientsModal').classList.add('show'); }
+function closeClients(){ $('clientsModal').classList.remove('show'); }
+function setClientSort(s){ CLIENT_SORT=s; document.querySelectorAll('#cm_sort button').forEach(b=>b.classList.toggle('on', b.dataset.s===s)); renderClientsList(); }
+function renderClientsList(){
+  const all=LS.clients(); $('cm_count').textContent = all.length?('('+all.length+')'):'';
+  const box=$('clientsList');
+  if(!all.length){ box.innerHTML='<p class="cm-empty">No clients yet. Build a comparison, add it, then “Save to client.”</p>'; return; }
+  const q=($('cm_search')&&$('cm_search').value||'').trim().toLowerCase();
+  let list=all.map((x,i)=>({x,i})).filter(o=>!q || (o.x.name||'').toLowerCase().includes(q));
+  if(CLIENT_SORT==='recent') list.sort((a,b)=>clientTs(b.x)-clientTs(a.x));
+  else list.sort((a,b)=>(a.x.name||'').localeCompare(b.x.name||'', undefined, {sensitivity:'base'}));
+  if(!list.length){ box.innerHTML='<p class="cm-empty">No clients match that search.</p>'; return; }
+  box.innerHTML=list.map(({x,i})=>{ const age=ageFromDob(x.dob); const contact=clientContact(x);
+    return '<div class="client"><div><div class="nm">'+esc(x.name)+(age!=null?' <span style="color:var(--muted);font-weight:600">· '+age+' yo</span>':'')+'</div><div class="cfg">'+(contact?esc(contact)+' &middot; ':'')+x.items.length+' option'+(x.items.length>1?'s':'')+(x.savedAt?' &middot; '+x.savedAt:'')+(x.note?' &middot; '+esc(x.note):'')+'</div></div><div class="sp"><button class="view" onclick="viewQuote('+i+')">View quote</button><button class="go" onclick="openClient('+i+')">Load</button><button class="go" style="background:#64748b" onclick="editClient('+i+')">Edit</button><button class="del" onclick="delClient('+i+')">Delete</button></div></div>'; }).join('');
 }
+function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$('clientsBtn'); if(btn){ const n=LS.clients().length; btn.textContent='👥 Clients'+(n?' ('+n+')':''); } }
 
 /* ---------- quick command CRUD ---------- */
 let EDIT_PAT = -1;
@@ -3003,7 +3072,7 @@ let QSHEET = {idx:-1, layout:'recommended', projAge:80, colOrder:null};
 // Benefit grown by the option's own compound inflation from issue age to the chosen age.
 function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
-function viewQuote(i){ QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
+function viewQuote(i){ closeClients(); QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 function printSheet(){ window.print(); }
