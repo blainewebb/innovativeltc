@@ -362,6 +362,7 @@
     <div class="tray-head">
       <h2 style="margin:0">Comparison <span id="traycount" style="color:var(--muted);font-weight:600"></span></h2>
       <div class="sp">
+        <button class="traybtn" style="background:var(--primary);color:#fff" onclick="saveTrayAsPattern()">＋ Save as quick command</button>
         <button class="traybtn save" onclick="saveClient()">Save to client…</button>
         <button class="traybtn clear" onclick="clearTray()">Clear</button>
       </div>
@@ -375,7 +376,7 @@
       <h2 style="margin:0">Quick commands</h2>
       <div class="sp"><button class="traybtn" style="background:var(--primary);color:#fff" onclick="openPattern()">＋ New quick command</button></div>
     </div>
-    <p class="hint" style="margin-top:6px">Save a shorthand — e.g. <b>754</b> — that locks in a plan design. Then type the code with an age, gender, and one or more benefit amounts, like <b>754 60 female 7000 5000 4000</b>, and it runs them all into a comparison. Works in either mode.</p>
+    <p class="hint" style="margin-top:6px"><b>Easiest way:</b> run a few quotes into the comparison above, then click <b>“＋ Save as quick command”</b> and give it a code. After that, just type the code with an age and gender — like <b>754 60 female</b> — to re-run the whole ladder. Works in either mode.</p>
     <div id="patterns"></div>
   </div>
 </div>
@@ -484,6 +485,23 @@
     <div class="row">
       <button class="ghost" onclick="$('clientModal').classList.remove('show')">Cancel</button>
       <button class="run" onclick="saveClientForm()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- save comparison as quick command -->
+<div class="modal" id="savePatternModal">
+  <div class="box">
+    <h3>Save as quick command</h3>
+    <p>Give this comparison a short code. Later, just type the code with an age and gender — like <b>754 60 female</b> — to re-run all these options instantly.</p>
+    <div class="grid">
+      <div class="field"><label>Trigger code</label><input id="sp_trigger" placeholder="e.g. 754" autocomplete="off"></div>
+      <div class="field"><label>Name (optional)</label><input id="sp_name" placeholder="e.g. my 6-4-3 ladder" autocomplete="off"></div>
+    </div>
+    <div id="sp_preview" style="margin-top:14px"></div>
+    <div class="row">
+      <button class="ghost" onclick="$('savePatternModal').classList.remove('show')">Cancel</button>
+      <button class="run" onclick="confirmSavePattern()">Save quick command</button>
     </div>
   </div>
 </div>
@@ -2883,6 +2901,15 @@ function runPattern(p, raw){
   const t=' '+cleaned+' ';
   const gender=grabGender(t)||p.gender||null;
   const age=(grabAges(t)[0])||p.age||null;
+  // Comparison-captured command: re-run the exact saved options at the given age/gender
+  if(p.options && p.options.length){
+    if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
+    if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
+    const items=p.options.map(op=> op.joint ? Object.assign({},op) : Object.assign({}, op, {age:+age, gender}));
+    setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+items.length+' option'+(items.length>1?'s':'')+'.');
+    showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
+    return;
+  }
   const found=grabBenefits(t); const list=(found.length?found:(p.benefits||[])).map(SNAP).slice(0,6);
   if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
   if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
@@ -2892,6 +2919,21 @@ function runPattern(p, raw){
   showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+bpL(p.benefitPeriod)+' · '+pctL(p.inflation??null)+(p.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')});
 }
 function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of items){ if(a.length>=6){ break; } a.push(o); added++; } LS.setTray(a); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); if(added<items.length) alert('Comparison holds up to 6 — added '+added+' of '+items.length+'.'); }
+// --- save the current comparison as a reusable quick command (no typing amounts) ---
+let PENDING_PATTERN_OPTS=null;
+function optDesignText(o){ return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
+function saveTrayAsPattern(){ const a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
+  PENDING_PATTERN_OPTS=a.map(o=>Object.assign({},o));
+  $('sp_trigger').value=''; $('sp_name').value='';
+  $('sp_preview').innerHTML='<div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:5px">Captures '+a.length+' option'+(a.length>1?'s':'')+' (age &amp; gender become variable):</div><div style="font-size:.85rem;color:#334155;line-height:1.7">'+a.map(o=>'&bull; '+optDesignText(o)).join('<br>')+'</div>';
+  $('savePatternModal').classList.add('show'); $('sp_trigger').focus(); }
+function confirmSavePattern(){ const trig=$('sp_trigger').value.trim();
+  if(!trig){ alert('Enter a trigger code, e.g. 754.'); return; }
+  const ps=LS.patterns(); if(ps.some(x=>x.trigger.toLowerCase()===trig.toLowerCase())){ alert('You already have a quick command “'+trig+'”. Pick a different code.'); return; }
+  ps.push({trigger:trig, name:$('sp_name').value.trim(), options:PENDING_PATTERN_OPTS||[]});
+  LS.setPatterns(ps); $('savePatternModal').classList.remove('show'); renderPatterns();
+  setInterp('Saved quick command <b>'+esc(trig)+'</b> — next time just type “<b>'+esc(trig)+' 60 female</b>” to re-run it. Find it in Quick commands below.');
+}
 function ex(btn){ $('nl').value=btn.textContent; ask(); }
 
 /* ---------- AI mode (Claude → spec → verified engine) ---------- */
@@ -3002,6 +3044,9 @@ function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$(
 /* ---------- quick command CRUD ---------- */
 let EDIT_PAT = -1;
 function patternSummary(p){
+  if(p.options && p.options.length){
+    return p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(o=>fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr/'+(o.inflation?(o.inflation*100)+'%':'level')).join(', ');
+  }
   const bits=[bpL(p.benefitPeriod), (p.elimination||'90')+'-day', pctL(p.inflation??null)];
   if(p.pay&&p.pay!=='level') bits.push(p.pay==='10pay'?'10-Pay':'Single-Pay');
   if(p.mode&&p.mode!=='monthly') bits.push(p.mode);
@@ -3017,7 +3062,9 @@ function renderPatterns(){
   if(!ps.length){ box.innerHTML='<p class="empty">No quick commands yet. Create one to run your go-to plan design with a single code.</p>'; return; }
   box.innerHTML=ps.map((p,i)=>'<div class="client"><div><div class="nm">'+esc(p.trigger)+(p.name?' <span style="color:var(--muted);font-weight:600">'+esc(p.name)+'</span>':'')+'</div><div class="cfg">'+patternSummary(p)+'</div></div><div class="sp"><button class="view" onclick="usePattern('+i+')">Use</button><button class="go" style="background:#64748b" onclick="editPattern('+i+')">Edit</button><button class="del" onclick="delPattern('+i+')">Delete</button></div></div>').join('');
 }
-function usePattern(i){ const p=LS.patterns()[i]; if(!p) return; setMode('fast'); $('nl').value=p.trigger+' '; $('nl').focus(); $('nl').scrollIntoView({behavior:'smooth',block:'center'}); setInterp('Quick command <b>'+esc(p.trigger)+'</b> ready — add an age, gender'+((p.benefits&&p.benefits.length)?' (benefits default to '+p.benefits.map(fmt0).join(', ')+')':' and one or more benefit amounts')+', then Run.'); }
+function usePattern(i){ const p=LS.patterns()[i]; if(!p) return; setMode('fast'); $('nl').value=p.trigger+' '; $('nl').focus(); $('nl').scrollIntoView({behavior:'smooth',block:'center'});
+  const hint = (p.options&&p.options.length) ? ' ready — add an age and gender (e.g. “60 female”)' : ((p.benefits&&p.benefits.length)?' ready — add an age, gender (benefits default to '+p.benefits.map(fmt0).join(', ')+')':' ready — add an age, gender and one or more benefit amounts');
+  setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+hint+', then Run.'); }
 function fillPatternForm(p){
   $('p_trigger').value=p.trigger||''; $('p_name').value=p.name||'';
   $('p_bp').value=p.benefitPeriod||'36'; $('p_infl').value=String(p.inflation??0); $('p_ep').value=p.elimination||'90';
