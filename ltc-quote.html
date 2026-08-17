@@ -167,6 +167,14 @@
   .sheet .sh-agent{text-align:right;font-size:.78rem;color:#475569;line-height:1.55}
   .sheet .sh-agent b{color:var(--text)}
   .sheet .sh-for{margin:18px 0 3px;font-size:1.2rem;font-weight:800}
+  .sheet input.sh-for-edit{border:none;outline:none;background:transparent;padding:0;width:100%;color:var(--text);font-family:inherit}
+  .sheet input.sh-for-edit::placeholder{color:var(--muted);font-weight:600}
+  .sheet input.sh-for-edit:focus{border-bottom:2px solid var(--primary)}
+  .noprint{}  .printonly{display:none}
+  .res-brand{border-bottom:2px solid var(--primary);padding-bottom:8px;margin-bottom:12px;font-weight:800;font-size:1.1rem}
+  .res-brand span{color:var(--primary)}
+  .res-brand small{display:block;color:var(--muted);font-size:.72rem;font-weight:600;margin-top:2px}
+  .resprint{background:var(--success);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.85rem;cursor:pointer;margin-bottom:12px}
   .sheet .sh-sub{color:var(--muted);font-size:.84rem;line-height:1.5;margin-bottom:16px}
   table.qtab{width:100%;border-collapse:collapse}
   table.qtab th,table.qtab td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:center;font-size:.9rem;vertical-align:middle}
@@ -198,10 +206,20 @@
   .sheet .qs-cta a{color:var(--primary-d);font-weight:800;text-decoration:none}
   @media print{
     body{background:#fff}
-    body > *:not(.qsheet){display:none !important}
-    .qsheet{position:static !important;background:#fff !important;padding:0 !important;overflow:visible;display:block !important}
+    .noprint{display:none !important}
+    /* --- printing a result (Inflation Growth / Cost of Waiting / comparison) --- */
+    body.print-result > *:not(.wrap){display:none !important}
+    body.print-result .wrap > *:not(#resultCard){display:none !important}
+    body.print-result #resultCard{box-shadow:none !important;border:none !important;margin:0 !important;padding:0 !important}
+    body.print-result #result button{display:none !important}
+    body.print-result .printonly{display:block !important}
+    body.print-result #result table.opts th, body.print-result #result table.opts td.p, body.print-result .res-brand{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    /* --- printing the quote sheet (default) --- */
+    body:not(.print-result) > *:not(.qsheet){display:none !important}
+    body:not(.print-result) .qsheet{position:static !important;background:#fff !important;padding:0 !important;overflow:visible;display:block !important}
     .qs-toolbar{display:none !important}
     .qs-customizer,table.qtab th .colmove{display:none !important}
+    .sheet input.sh-for-edit{border:none !important}
     .sheet{box-shadow:none !important;max-width:100% !important;margin:0 !important;padding:0 !important;border-radius:0 !important}
     table.qtab thead th,table.qtab tr.prem td,table.qtab tr.proj th,table.qtab tr.proj td,.sheet .sh-top,.sheet .qs-cta{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -362,6 +380,7 @@
     <div class="tray-head">
       <h2 style="margin:0">Comparison <span id="traycount" style="color:var(--muted);font-weight:600"></span></h2>
       <div class="sp">
+        <button class="traybtn" style="background:#334155;color:#fff" onclick="viewTrayQuote()">⎙ View / Print quote</button>
         <button class="traybtn" style="background:var(--primary);color:#fff" onclick="saveTrayAsPattern()">＋ Save as quick command</button>
         <button class="traybtn save" onclick="saveClient()">Save to client…</button>
         <button class="traybtn clear" onclick="clearTray()">Clear</button>
@@ -2808,7 +2827,7 @@ function showWaiting(d){
     const dv=r.yr===0?'—':'<span style="color:#b91c1c;font-weight:800">+'+fmt(r.delta)+'/mo ('+(r.pct*100).toFixed(0)+'%)</span>';
     const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.opts)+')\'>＋</button>';
     return '<tr><td><b>'+label+'</b></td><td>age '+r.age+'</td><td class="b">'+fmt0(r.need)+'/mo</td><td class="p">'+fmt(r.prem)+'/mo</td><td style="text-align:right">'+dv+' '+add+'</td></tr>'; }).join('');
-  show('<div class="config-line">The <b>cost of waiting</b> &middot; '+d.age+' '+gL(d.gender)+' &middot; '+fmt0(d.benefit)+'/mo of coverage today &middot; '+bpL(d.benefitPeriod)+' &middot; '+pctL(d.inflation)+'</div>'+
+  show(resultBrand('The Cost of Waiting')+printBtn()+'<div class="config-line">The <b>cost of waiting</b> &middot; '+d.age+' '+gL(d.gender)+' &middot; '+fmt0(d.benefit)+'/mo of coverage today &middot; '+bpL(d.benefitPeriod)+' &middot; '+pctL(d.inflation)+'</div>'+
     '<table class="opts"><tr><th>When they buy</th><th>Issue age</th><th>Coverage needed</th><th style="text-align:right">Monthly premium</th><th style="text-align:right">vs. buying now</th></tr>'+rows+'</table>'+
     '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a> guide. '+DISC+'</div>');
 }
@@ -2840,7 +2859,7 @@ function showGrowth(d){
   const body=d.rows.map(r=>'<tr'+(r.year===0?' style="background:#f0f7ff;font-weight:700"':'')+'><td>'+r.age+'</td><td>'+r.year+'</td><td class="p">'+fmt0(r.monthly)+'/mo</td><td class="b">'+(r.pool==null?'lifetime':fmt0(r.pool))+'</td></tr>').join('');
   const first=d.rows[0], last=d.rows[d.rows.length-1];
   const grewTxt = d.inflation ? 'From <b>'+fmt0(first.monthly)+'/mo</b> at age '+first.age+' to <b>'+fmt0(last.monthly)+'/mo</b> by age '+last.age+' ('+pctL(d.inflation)+').' : 'Level benefit — stays '+fmt0(first.monthly)+'/mo (no inflation protection).';
-  show('<div class="config-line">📈 <b>Inflation growth</b> &middot; '+fmt0(d.benefit)+'/mo &middot; '+pctL(d.inflation)+' &middot; '+bpL(d.benefitPeriod)+' &middot; age '+d.age+'→'+d.endAge+'</div>'+
+  show(resultBrand('Inflation Growth')+printBtn()+'<div class="config-line">📈 <b>Inflation growth</b> &middot; '+fmt0(d.benefit)+'/mo &middot; '+pctL(d.inflation)+' &middot; '+bpL(d.benefitPeriod)+' &middot; age '+d.age+'→'+d.endAge+'</div>'+
     '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">'+grewTxt+'</div>'+
     '<table class="opts"><tr><th>Age</th><th>Year</th><th style="text-align:right">Monthly benefit</th><th style="text-align:right">Total benefit pool</th></tr>'+body+'</table>'+
     '<div class="disc">Illustrative projection of how a compound-inflation benefit grows year by year on an issued policy (not a new-sale amount, so it may exceed NGL’s $12,000 issue cap). The total pool is the monthly benefit × the benefit period. '+DISC+'</div>');
@@ -3119,10 +3138,17 @@ let QSHEET = {idx:-1, layout:'recommended', projAge:80, colOrder:null};
 // Benefit grown by the option's own compound inflation from issue age to the chosen age.
 function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
-function viewQuote(i){ closeClients(); QSHEET={idx:i, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
+function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
+// Print a quote straight from the comparison — no need to save a client first
+function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add at least one quote to the comparison first.'); return; }
+  QSHEET={client:{name:'', items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 function printSheet(){ window.print(); }
+// Print just the current result card (Inflation Growth / Cost of Waiting / comparison)
+function printResult(){ const done=()=>{ document.body.classList.remove('print-result'); window.removeEventListener('afterprint',done); }; window.addEventListener('afterprint',done); document.body.classList.add('print-result'); window.print(); }
+function resultBrand(title){ return '<div class="printonly res-brand">Innovative <span>LTC</span> — '+title+'<small>Blaine Webb · Innovative LTC · blaine@innovativeltc.com</small></div>'; }
+function printBtn(){ return '<button class="resprint noprint" onclick="printResult()">⎙ Print / Save PDF</button>'; }
 /* customize: toggle/reorder line items, move option columns */
 function czToggle(key){ const c=getCustom(); c.on[key]=!c.on[key]; LS.setSheetCustom(c); renderSheet(); }
 function resetCustom(){ localStorage.removeItem('ltcSheetCustom'); renderSheet(); }
@@ -3141,7 +3167,7 @@ function customizerHtml(){
   return '<div class="qs-customizer"><div class="cz-head"><h4>Customize this sheet</h4><span class="hint">Drag ⠿ to reorder · check to show/hide · use ◀ ▶ on the columns to move options</span><button class="cz-reset" onclick="resetCustom()">Reset</button></div><div class="cz-list" id="czList">'+rows+'</div></div>';
 }
 function renderSheet(){
-  const cl = LS.clients()[QSHEET.idx]; if(!cl) return;
+  const cl = QSHEET.client; if(!cl) return;
   const items = cl.items||[];
   const custom = QSHEET.layout==='custom';
   document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
@@ -3168,17 +3194,20 @@ function renderSheet(){
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
   const projNote = showProj ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Values <b>at age '+QSHEET.projAge+'</b> assume each option’s compound inflation grows the monthly benefit every year to that age (level options stay flat). Illustrative — the actual benefit at claim follows the issued policy.</div>' : '';
-  const sub = (uniform && items.length
-      ? 'Prepared for '+esc(cl.name)+' &middot; '+items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')
-      : 'Prepared for '+esc(cl.name))
-    + (cl.savedAt?' &middot; '+cl.savedAt:'')
-    + (cl.note?'<br>'+esc(cl.note):'');
+  const applicant = (uniform && items.length) ? items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'') : '';
+  const sub = QSHEET.adhoc
+    ? (applicant?applicant+' &middot; ':'')+(cl.savedAt||'')
+    : ((uniform && items.length ? 'Prepared for '+esc(cl.name)+' &middot; '+applicant : 'Prepared for '+esc(cl.name))
+       + (cl.savedAt?' &middot; '+cl.savedAt:'') + (cl.note?'<br>'+esc(cl.note):''));
+  const nameHtml = QSHEET.adhoc
+    ? '<input class="sh-for sh-for-edit" placeholder="Client name (optional)" value="'+esc(cl.name||'')+'" oninput="QSHEET.client.name=this.value">'
+    : '<div class="sh-for">'+esc(cl.name)+'</div>';
   $('sheet').innerHTML =
     (custom ? customizerHtml() : '')
     + '<div class="sh-top"><div><div class="sh-brand">Innovative <span>LTC</span></div>'
     + '<div class="sh-tag">Long-Term Care insurance illustration</div></div>'
     + '<div class="sh-agent"><b>Blaine Webb</b><br>Innovative LTC<br>blaine@innovativeltc.com</div></div>'
-    + '<div class="sh-for">'+esc(cl.name)+'</div>'
+    + nameHtml
     + '<div class="sh-sub">'+sub+'</div>'
     + (items.length
         ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote
