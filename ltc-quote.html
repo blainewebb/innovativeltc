@@ -242,26 +242,18 @@
   <div class="card ask">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <div class="modes" id="modes">
-        <button class="modebtn" data-m="manual" onclick="setMode('manual')">📝 Manual</button>
-        <button class="modebtn on" data-m="fast" onclick="setMode('fast')">⚡ Fast</button>
+        <button class="modebtn on" data-m="manual" onclick="setMode('manual')">📝 Manual</button>
+        <button class="modebtn" data-m="fast" onclick="setMode('fast')">⚡ Fast</button>
         <button class="modebtn" data-m="ai" onclick="setMode('ai')">✨ AI</button>
       </div>
       <div class="lead" id="modelead" style="margin:0">Smart commands — type it the way you'd say it.</div>
     </div>
     <div class="askbar" id="askbar">
-      <input id="nl" placeholder="run my standard for a 63 year old female" autocomplete="off"
+      <input id="nl" placeholder="65 male, 4500 month, 4 years, 3%" autocomplete="off"
         onkeydown="if(event.key==='Enter')ask()">
       <button class="run" onclick="ask()">Run</button>
     </div>
-    <div class="examples" id="examples">
-      <span class="lbl">Try:</span>
-      <button class="ex" onclick="ex(this)">run my standard for a 60 female</button>
-      <button class="ex" onclick="ex(this)">65 male, $4,000/mo, 4 years, 3%</button>
-      <button class="ex" onclick="ex(this)">what can a 62 female get for $300 a month</button>
-      <button class="ex" onclick="ex(this)">couple, 64 male and 61 female, $4,500, 3 year, 3%</button>
-      <button class="ex" onclick="ex(this)">64 female, $300/mo — options with the most benefit or longest period</button>
-      <button class="ex" onclick="ex(this)">cost of waiting for a 60 female at $4,500/mo</button>
-    </div>
+    <div class="examples" id="examples"></div>
     <div class="quicktools">
       <span class="lbl">Tools:</span>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
@@ -2571,7 +2563,7 @@ const MAX_BENEFIT = 12000;   // NGL sells a monthly benefit up to $12,000 — ne
 const SNAP  = b => Math.min(MAX_BENEFIT, Math.max(300, Math.round((+b||0)/300)*300));   // nearest quotable $300 increment, capped
 const FLOOR3= b => Math.min(MAX_BENEFIT, Math.max(300, Math.floor((+b||0)/300)*300));   // largest increment within budget, capped
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
-let MODE = 'fast';
+let MODE = 'manual';
 
 /* ---------- storage ---------- */
 const PROVIDERS = {
@@ -3084,8 +3076,15 @@ function patternSummary(p){
 }
 function renderPatterns(){
   const ps=LS.patterns(), box=$('patterns');
-  if(!ps.length){ box.innerHTML='<p class="empty">No quick commands yet. Create one to run your go-to plan design with a single code.</p>'; return; }
-  box.innerHTML=ps.map((p,i)=>'<div class="client"><div><div class="nm">'+esc(p.trigger)+(p.name?' <span style="color:var(--muted);font-weight:600">'+esc(p.name)+'</span>':'')+'</div><div class="cfg">'+patternSummary(p)+'</div></div><div class="sp"><button class="view" onclick="usePattern('+i+')">Use</button><button class="go" style="background:#64748b" onclick="editPattern('+i+')">Edit</button><button class="del" onclick="delPattern('+i+')">Delete</button></div></div>').join('');
+  if(!ps.length){ box.innerHTML='<p class="empty">No quick commands yet. Create one to run your go-to plan design with a single code.</p>'; }
+  else box.innerHTML=ps.map((p,i)=>'<div class="client"><div><div class="nm">'+esc(p.trigger)+(p.name?' <span style="color:var(--muted);font-weight:600">'+esc(p.name)+'</span>':'')+'</div><div class="cfg">'+patternSummary(p)+'</div></div><div class="sp"><button class="view" onclick="usePattern('+i+')">Use</button><button class="go" style="background:#64748b" onclick="editPattern('+i+')">Edit</button><button class="del" onclick="delPattern('+i+')">Delete</button></div></div>').join('');
+  renderQuickChips();
+}
+// Saved quick commands shown as one-tap chips under the command bar
+function renderQuickChips(){
+  const box=$('examples'); if(!box) return; const ps=LS.patterns();
+  if(!ps.length){ box.innerHTML='<span class="lbl">Quick commands:</span> <span style="color:var(--muted);font-size:.8rem">none yet — build a comparison, then “＋ Save as quick command.”</span>'; return; }
+  box.innerHTML='<span class="lbl">Quick commands:</span>'+ps.map((p,i)=>'<button class="ex" onclick="usePattern('+i+')">'+esc(p.trigger)+(p.name?' · '+esc(p.name):'')+'</button>').join('');
 }
 function usePattern(i){ const p=LS.patterns()[i]; if(!p) return; setMode('fast'); $('nl').value=p.trigger+' '; $('nl').focus(); $('nl').scrollIntoView({behavior:'smooth',block:'center'});
   const hint = (p.options&&p.options.length) ? ' ready — add an age and gender (e.g. “60 female”)' : ((p.benefits&&p.benefits.length)?' ready — add an age, gender (benefits default to '+p.benefits.map(fmt0).join(', ')+')':' ready — add an age, gender and one or more benefit amounts');
@@ -3233,6 +3232,7 @@ function fillStates(){
 fillStates();
 $('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
 renderTray(); renderClients(); renderPatterns();
+setMode('manual');   // start on the click-in form
 </script>
 </body>
 </html>
