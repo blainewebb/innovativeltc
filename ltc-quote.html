@@ -29,7 +29,7 @@
   .segsort{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:4px;gap:4px}
   .segsort button{border:none;background:transparent;padding:8px 14px;border-radius:7px;font-weight:800;font-size:.82rem;cursor:pointer;color:var(--muted)}
   .segsort button.on{background:var(--primary);color:#fff}
-  .cm-list{max-height:min(60vh,520px);overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .cm-list{max-height:min(60vh,520px);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:8px}
   .cm-empty{color:var(--muted);font-size:.85rem;font-style:italic;padding:14px 2px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
   /* mode toggle */
@@ -67,7 +67,25 @@
   .tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
   h2{font-size:1.05rem;margin:0 0 14px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  @media(max-width:560px){
+    .grid{grid-template-columns:1fr}
+    body,html{overflow-x:hidden}
+    .wrap{padding:16px 12px 48px}
+    /* stack row actions full-width so nothing runs off a phone screen */
+    .client .sp{margin-left:0;width:100%}
+    .client .sp button{flex:1;min-width:calc(50% - 6px)}
+    .tray-head .sp{margin-left:0;width:100%;margin-top:8px}
+    .tray-head .sp .traybtn{flex:1;min-width:calc(50% - 8px)}
+    .cm-controls{flex-wrap:wrap}
+    .cm-controls input{min-width:100%}
+    table.opts th,table.opts td{padding:9px 7px;font-size:.85rem}
+    .modal .box{padding:18px 16px}
+    .qs-toolbar .seg{width:100%;justify-content:center}
+    .qs-toolbar .sp{width:100%}
+    .qs-toolbar .sp .tb{flex:1}
+    .sheet{padding:22px 16px 20px}
+    .metric{min-width:calc(50% - 5px)}
+  }
   .field label{display:block;font-weight:600;font-size:.82rem;margin-bottom:5px;color:#334155}
   input,select{width:100%;padding:11px;border:1px solid var(--border);border-radius:9px;font-size:1rem;background:#fff;outline:none}
   input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
@@ -113,16 +131,16 @@
   .wbtn:hover{border-color:var(--primary);color:var(--primary)}
   /* comparison tray */
   .tray-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .tray-head .sp{margin-left:auto;display:flex;gap:8px}
+  .tray-head .sp{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
   .traybtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:.85rem}
   .traybtn.save{background:var(--success);color:#fff}
   .traybtn.clear{background:#fef2f2;color:#dc2626}
   td .rm{border:none;background:#fef2f2;color:#dc2626;border-radius:6px;padding:4px 9px;font-weight:700;cursor:pointer;font-size:.75rem}
   /* saved clients */
-  .client{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--soft)}
+  .client{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--soft)}
   .client .nm{font-weight:800;font-size:.95rem}
   .client .cfg{color:var(--muted);font-size:.8rem}
-  .client .sp{margin-left:auto;display:flex;gap:6px}
+  .client .sp{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
   .client button{border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:.8rem}
   .client .go{background:var(--primary);color:#fff}
   .client .del{background:#fef2f2;color:#dc2626}
