@@ -275,7 +275,7 @@
     <div class="quicktools">
       <span class="lbl">Tools:</span>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
-      <a class="qtool link" href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener">🏥 Cost of Care ↗</a>
+      <button class="qtool" onclick="openCare()">🏥 Cost of Care</button>
       <button class="qtool" onclick="openGrowth()">📈 Inflation growth</button>
     </div>
     <div id="interp" class="interp"></div>
@@ -290,6 +290,7 @@
       <div class="tab" data-mode="standard">My Standard</div>
       <div class="tab" data-mode="waiting">Cost of Waiting</div>
       <div class="tab" data-mode="growth">Inflation Growth</div>
+      <div class="tab" data-mode="care">Cost of Care</div>
     </div>
     <div class="pane" data-pane="single">
       <div class="grid">
@@ -381,6 +382,18 @@
         <div class="field"><label>Grow to age</label><input id="g_endage" type="number" value="90" min="70" max="100" step="1"></div>
       </div>
       <div class="actions"><button class="run" onclick="runGrowth()">Show the growth</button></div>
+    </div>
+    <div class="pane" data-pane="care" hidden>
+      <p class="hint" style="margin-top:0">Enter a city, state, or ZIP and it designs 3 plans sized to cover local care costs. National medians are from CareScout’s 2025 survey; state/metro figures are estimates — paste the exact figure from CareScout to price it precisely.</p>
+      <div class="grid">
+        <div class="field"><label>City, state, or ZIP</label><input id="coc_loc" placeholder="e.g. Houston, TX or 77002 or Texas" autocomplete="off" oninput="careAutofill()"></div>
+        <div class="field"><label>Type of care</label><select id="coc_type" onchange="careAutofill()"><option value="home">Home care (in-home caregiver)</option><option value="assisted" selected>Assisted living</option><option value="nursing">Nursing home (semi-private)</option></select></div>
+        <div class="field"><label>Median monthly cost ($) — edit to your CareScout figure</label><input id="coc_median" type="number" step="50" placeholder="auto"></div>
+        <div class="field"><label>Issue age</label><input id="coc_age" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>Gender</label><select id="coc_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+        <div class="field"><label>State (for rate table)</label><select id="coc_state" class="statesel"></select></div>
+      </div>
+      <div class="actions"><button class="run" onclick="runCare()">Design plans for this area</button></div>
     </div>
   </div>
 
@@ -2877,6 +2890,54 @@ function showGrowth(d){
     '<div class="disc">Illustrative projection of how a compound-inflation benefit grows year by year on an issued policy (not a new-sale amount, so it may exceed NGL’s $12,000 issue cap). The total pool is the monthly benefit × the benefit period. '+DISC+'</div>');
 }
 function runGrowth(){ try{ showGrowth(computeGrowth(+$('g_age').value, +$('g_benefit').value, parseFloat($('g_infl').value)||0, $('g_bp').value, +$('g_endage').value)); }catch(e){ showErr(e.message); } }
+
+/* ---------- cost-of-care benefit designer ----------
+   CareScout 2025 national medians (monthly) are REAL. State/metro figures are ESTIMATES
+   (national median × a regional cost index) — a planning starting point, not survey-exact.
+   The median is editable so an agent can paste the precise figure from carescout.com. */
+const COC_YEAR=2025;
+const COC_NATIONAL={home:6673, assisted:6200, nursing:9581};   // in-home caregiver (44h/wk), assisted living, nursing home semi-private
+const COC_CARE=[['home','Home care (in-home caregiver)'],['assisted','Assisted living'],['nursing','Nursing home (semi-private)']];
+// regional cost index vs national (estimate)
+const COC_ST={AL:.80,AK:1.35,AZ:.95,AR:.80,CA:1.20,CO:1.10,CT:1.30,DE:1.10,DC:1.30,FL:.95,GA:.88,HI:1.25,ID:.92,IL:1.05,IN:.90,IA:1.00,KS:.90,KY:.85,LA:.85,ME:1.20,MD:1.15,MA:1.35,MI:1.00,MN:1.30,MS:.78,MO:.88,MT:1.05,NE:.98,NV:.98,NH:1.25,NJ:1.20,NM:.90,NY:1.25,NC:.90,ND:1.30,OH:.95,OK:.82,OR:1.25,PA:1.05,RI:1.25,SC:.88,SD:1.05,TN:.85,TX:.90,UT:.98,VT:1.25,VA:1.00,WA:1.20,WV:.90,WI:1.15,WY:1.05};
+const COC_STN={alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV','new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY','north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA','west virginia':'WV',wisconsin:'WI',wyoming:'WY','washington dc':'DC','district of columbia':'DC'};
+const COC_METROS=[{c:'New York, NY',s:'NY',i:1.35},{c:'Los Angeles, CA',s:'CA',i:1.25},{c:'San Francisco, CA',s:'CA',i:1.5},{c:'San Diego, CA',s:'CA',i:1.2},{c:'Sacramento, CA',s:'CA',i:1.2},{c:'Boston, MA',s:'MA',i:1.45},{c:'Chicago, IL',s:'IL',i:1.1},{c:'Houston, TX',s:'TX',i:.9},{c:'Dallas, TX',s:'TX',i:.95},{c:'Austin, TX',s:'TX',i:1.0},{c:'San Antonio, TX',s:'TX',i:.85},{c:'Miami, FL',s:'FL',i:1.0},{c:'Tampa, FL',s:'FL',i:.95},{c:'Orlando, FL',s:'FL',i:.95},{c:'Seattle, WA',s:'WA',i:1.35},{c:'Denver, CO',s:'CO',i:1.2},{c:'Atlanta, GA',s:'GA',i:.95},{c:'Phoenix, AZ',s:'AZ',i:1.0},{c:'Minneapolis, MN',s:'MN',i:1.35},{c:'Philadelphia, PA',s:'PA',i:1.15},{c:'Washington, DC',s:'DC',i:1.3},{c:'Portland, OR',s:'OR',i:1.3},{c:'Nashville, TN',s:'TN',i:.9},{c:'Charlotte, NC',s:'NC',i:.95},{c:'Las Vegas, NV',s:'NV',i:1.0},{c:'Detroit, MI',s:'MI',i:1.0},{c:'St. Louis, MO',s:'MO',i:.9},{c:'Kansas City, MO',s:'MO',i:.95},{c:'Indianapolis, IN',s:'IN',i:.95},{c:'Columbus, OH',s:'OH',i:1.0},{c:'Salt Lake City, UT',s:'UT',i:1.0},{c:'New Orleans, LA',s:'LA',i:.9},{c:'Hartford, CT',s:'CT',i:1.35},{c:'Providence, RI',s:'RI',i:1.3},{c:'Portland, ME',s:'ME',i:1.25}];
+const COC_ZIP=[[5,5,'NY'],[10,27,'MA'],[28,29,'RI'],[30,38,'NH'],[39,49,'ME'],[50,59,'VT'],[60,69,'CT'],[70,89,'NJ'],[100,149,'NY'],[150,196,'PA'],[197,199,'DE'],[200,205,'DC'],[206,219,'MD'],[220,246,'VA'],[247,268,'WV'],[270,289,'NC'],[290,299,'SC'],[300,319,'GA'],[320,349,'FL'],[350,369,'AL'],[370,385,'TN'],[386,397,'MS'],[398,399,'GA'],[400,427,'KY'],[430,459,'OH'],[460,479,'IN'],[480,499,'MI'],[500,528,'IA'],[530,549,'WI'],[550,567,'MN'],[570,577,'SD'],[580,588,'ND'],[590,599,'MT'],[600,629,'IL'],[630,658,'MO'],[660,679,'KS'],[680,693,'NE'],[700,714,'LA'],[716,729,'AR'],[730,749,'OK'],[750,799,'TX'],[800,816,'CO'],[820,831,'WY'],[832,838,'ID'],[840,847,'UT'],[850,865,'AZ'],[870,884,'NM'],[889,898,'NV'],[900,961,'CA'],[967,968,'HI'],[970,979,'OR'],[980,994,'WA'],[995,999,'AK']];
+function zip3ToState(z){ const n=+z; for(const [a,b,s] of COC_ZIP){ if(n>=a&&n<=b) return s; } return null; }
+function cocLookup(q){ q=(q||'').trim(); if(!q) return null;
+  if(/^\d{5}$/.test(q)){ const s=zip3ToState(+q.slice(0,3)); if(s&&COC_ST[s]!=null) return {label:s+' (ZIP '+q+')', st:s, idx:COC_ST[s], level:'state'}; }
+  const first=q.toLowerCase().split(',')[0].trim();
+  if(first.length>=3){ const m=COC_METROS.find(x=>x.c.toLowerCase().split(',')[0]===first || x.c.toLowerCase().includes(first)); if(m) return {label:m.c, st:m.s, idx:m.i, level:'metro'}; }
+  const up=q.toUpperCase(); if(COC_ST[up]!=null) return {label:up, st:up, idx:COC_ST[up], level:'state'};
+  const sn=COC_STN[q.toLowerCase()]; if(sn) return {label:q.replace(/\b\w/g,c=>c.toUpperCase()), st:sn, idx:(COC_ST[sn]||1), level:'state'};
+  return null;
+}
+function cocMedian(care, idx){ return Math.round((COC_NATIONAL[care]||COC_NATIONAL.assisted)*(idx||1)); }
+function runCare(){ try{
+  const loc=cocLookup($('coc_loc').value);
+  const care=$('coc_type').value;
+  let median=parseInt(($('coc_median').value||'').replace(/[^\d]/g,''))||0;
+  const est = loc ? cocMedian(care, loc.idx) : COC_NATIONAL[care];
+  if(!median) median=est;           // use the estimate if the agent didn't override
+  showCare({loc, care, median, est, age:+$('coc_age').value, gender:$('coc_gender').value, state:$('coc_state').value||null});
+}catch(e){ showErr(e.message); } }
+function careAutofill(){ const loc=cocLookup($('coc_loc').value); const care=$('coc_type').value; const est=loc?cocMedian(care,loc.idx):COC_NATIONAL[care]; $('coc_median').value=est; $('coc_median').placeholder=fmt0(est); }
+function showCare(d){
+  const careLbl=(COC_CARE.find(c=>c[0]===d.care)||[])[1]||'care';
+  const locLbl = d.loc ? d.loc.label+(d.loc.level==='metro'?' (metro)':'') : 'national';
+  // design 3 options covering ~60% / 80% / 100% of the median monthly cost
+  const tiers=[[0.6,'Covers ~60% of care cost'],[0.8,'Covers ~80% of care cost'],[1.0,'Covers 100% of care cost']];
+  const rows=tiers.map(([pct,label])=>{ const ben=SNAP(d.median*pct); const cfg={age:d.age,gender:d.gender,monthlyBenefit:ben,benefitPeriod:'36',elimination:'90',inflation:0.03,pay:'level',mode:'monthly',state:d.state,riderSharedAdditional:false,maritalDiscount:false,totalBenefitPeriod:'36'};
+    let prem='—'; try{ prem=fmt(E.quote(cfg).modalPayment)+'/mo'; }catch(e){}
+    return '<tr><td><b>'+Math.round(pct*100)+'%</b> <span style="color:var(--muted)">'+label.replace(/^Covers ~?\d+% of care cost/,'')+'</span></td><td class="b">'+fmt0(ben)+'/mo · 3-yr · 3%</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
+  const overridden = d.median!==d.est;
+  show(resultBrand('Cost of Care — '+careLbl)+printBtn()+
+    '<div class="config-line">🏥 <b>'+careLbl+'</b> in <b>'+locLbl+'</b> — median <b>'+fmt0(d.median)+'/mo</b>'+(overridden?' (your figure)':'')+' · designs for a '+d.age+' '+gL(d.gender)+'</div>'+
+    '<div class="config-line" style="background:#f0f7ff;border:1px solid #bfdbfe">Three plans sized to cover part or all of that monthly cost (3-yr, 3% compound, 90-day) — priced by the verified NGL engine:</div>'+
+    '<table class="opts"><tr><th>Coverage</th><th>Monthly benefit</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+
+    '<div class="disc">National medians are from the CareScout '+COC_YEAR+' Cost of Care Survey; <b>state/metro figures are estimates</b> (national median adjusted for the area) — confirm the exact local cost in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a> tool and type it in the median box to price it precisely. '+DISC+'</div>');
+}
+function openCare(){ setMode('manual'); activateTab('care'); careAutofill(); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ---------- fast (local) parser ---------- */
 function defaults(){ return {benefitPeriod:'36', elimination:'90', inflation:0.03, mode:'monthly', pay:'level', state:null, riderSharedAdditional:false}; }
