@@ -492,15 +492,17 @@
 <div class="modal" id="clientModal">
   <div class="box">
     <h3 id="clientModalTitle">Save to client</h3>
-    <p>The details you enter here pop back up whenever you open or edit this client.</p>
+    <p id="clientModalIntro">Just a name to save it. You can add a birthday and contact info anytime with <b>Edit</b>.</p>
     <div class="grid">
       <div class="field"><label>Name</label><input id="cf_name" autocomplete="off"></div>
-      <div class="field"><label>Date of birth</label><input id="cf_dob" type="date"></div>
-      <div class="field"><label>Email</label><input id="cf_email" type="email" autocomplete="off"></div>
-      <div class="field"><label>Phone</label><input id="cf_phone" autocomplete="off"></div>
+      <div class="field cf-extra"><label>Date of birth</label><input id="cf_dob" type="date"></div>
+      <div class="field cf-extra"><label>Email</label><input id="cf_email" type="email" autocomplete="off"></div>
+      <div class="field cf-extra"><label>Phone</label><input id="cf_phone" autocomplete="off"></div>
     </div>
-    <label style="font-weight:600;font-size:.82rem;display:block;margin:12px 0 5px">Notes</label>
-    <input id="cf_note" autocomplete="off" placeholder="e.g. prefers 3% compound; follow up after vacation">
+    <div class="cf-extra">
+      <label style="font-weight:600;font-size:.82rem;display:block;margin:12px 0 5px">Notes</label>
+      <input id="cf_note" autocomplete="off" placeholder="e.g. prefers 3% compound; follow up after vacation">
+    </div>
     <div class="row">
       <button class="ghost" onclick="$('clientModal').classList.remove('show')">Cancel</button>
       <button class="run" onclick="saveClientForm()">Save</button>
@@ -3026,12 +3028,16 @@ function ageFromDob(dob){ if(!dob) return null; const d=new Date(dob+'T00:00:00'
 function clientContact(x){ const parts=[x.email,x.phone].filter(Boolean); return parts.length?parts.join(' · '):(x.contact||''); }
 function clientTs(x){ return x.updatedAt||x.ts||0; }
 // Save-to-client (new) opens the editor pre-filled from the current comparison
+function clientModalExtras(show){ document.querySelectorAll('#clientModal .cf-extra').forEach(el=>el.style.display = show?'':'none'); }
 function saveClient(){ const a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
   EDIT_CLIENT=-1; PENDING_ITEMS=a.slice(); $('clientModalTitle').textContent='Save to client';
+  $('clientModalIntro').innerHTML='Just a name to save it. You can add a birthday and contact info anytime with <b>Edit</b>.';
   ['cf_name','cf_dob','cf_email','cf_phone','cf_note'].forEach(id=>$(id).value='');
+  clientModalExtras(false);   // new save = name only
   $('clientModal').classList.add('show'); $('cf_name').focus(); }
 function editClient(i){ const x=LS.clients()[i]; if(!x) return; EDIT_CLIENT=i; PENDING_ITEMS=null; closeClients();
-  $('clientModalTitle').textContent='Edit client'; $('cf_name').value=x.name||''; $('cf_dob').value=x.dob||'';
+  $('clientModalTitle').textContent='Edit client'; $('clientModalIntro').textContent='Update this client’s details — they pop back up here anytime.'; clientModalExtras(true);
+  $('cf_name').value=x.name||''; $('cf_dob').value=x.dob||'';
   $('cf_email').value=x.email||((x.contact&&x.contact.includes('@'))?x.contact:'');
   $('cf_phone').value=x.phone||((x.contact&&!x.contact.includes('@'))?x.contact:'');
   $('cf_note').value=x.note||''; $('clientModal').classList.add('show'); $('cf_name').focus(); }
