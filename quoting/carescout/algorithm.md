@@ -77,6 +77,14 @@ per premium dollar even at CareScout's own sweet spot — for ~$429/mo NGL gives
 is underwriting/eligibility and its pooled daily design, not price. Reachable by button and by
 typed command ("sweet spot for a 60 year old female in TX").
 
+**Shared-care is a per-carrier capability.** A carrier that offers shared care defines a
+`sharedSweet(p)` method; the sweet-spot tool then shows an extra shared-care row for it when
+"Also show a shared-care version" is checked. NGL has it (its Shared Additional Policy Limit
+rider — 3 shared pools). CareScout's Care Assurance has **no** shared-care option (confirmed:
+no "shared" anywhere in the state file, and the Survivorship Benefit is "Not offered"), so it
+simply shows no shared row and a note says so. Any future carrier that adds `sharedSweet`
+appears automatically.
+
 **Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
 (CareScout's illustration software) quotes through age 70 and the rate workbook carries
 base rates to 70 — so the webpage allows 40–70. Save-age convention (rate one year younger
