@@ -260,8 +260,8 @@
     <div class="topright">
       <label class="carriersel" title="Carrier"><span>Carrier</span>
         <select id="carrier" onchange="setCarrier(this.value)">
-          <option value="ngl">NGL — EssentialLTC</option>
-          <option value="carescout">CareScout — Form 005</option>
+          <option value="ngl">NGL — HonestLTC</option>
+          <option value="carescout">CareScout</option>
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
@@ -414,7 +414,7 @@
 
   <div class="card" id="cscard" hidden>
     <div class="cs-head">
-      <h2 style="margin:0 0 2px">CareScout <span style="color:var(--muted);font-weight:600;font-size:.9rem">Policy Form 005</span></h2>
+      <h2 style="margin:0 0 2px">CareScout</h2>
       <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–70, lifetime pay. Verified against CareScout's own rate workbook.</p>
     </div>
     <div class="grid">
@@ -639,12 +639,12 @@
 </div>
 
 <script>
-// ltc-engine.js — NGL EssentialLTC quoting engine (browser + node).
+// ltc-engine.js — NGL HonestLTC (NLTC200P) quoting engine (browser + node).
 // Data and algorithm ported verbatim from the verified Python rater (quoting/ngl).
 // Verified to the penny against 6 real NGL illustrations. Do not hand-edit the data.
 
 const RATES = {
-  "product": "NGL EssentialLTC (NLTC200)",
+  "product": "NGL HonestLTC (NLTC200P)",
   "base_config": "Annual / 36-Month Benefit Period / Premier Risk / 90-Day Elimination / Reimbursement / per $300 monthly benefit",
   "tables": {
     "Generic Non-Worksite": {
@@ -2938,7 +2938,7 @@ const SWEETSPOT = {
 // its best-value lead design. Add a carrier here and it joins every budget comparison AND the
 // sweet-spot tool automatically. p = {budget,age,gender,years,inflation,uw,marital,state}.
 const CARRIERS = [
-  { id:'ngl', label:'NGL — EssentialLTC',
+  { id:'ngl', label:'NGL — HonestLTC',
     solve(p){
       const bp=String(p.years*12);
       if(!['24','36','48','60','72'].includes(bp)) return {label:this.label, fits:false, note:'NGL benefit periods run 2–6 years.'};
@@ -2984,7 +2984,7 @@ const CARRIERS = [
       return {label:this.label+' · joint + shared pool', fits:true, premium:c.modalPayment, annual:c.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo each · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · shared pool', sub:'Shared pool · '+fmt0(pool)+' household total', trayObjs:[trayObj]};
     } },
-  { id:'carescout', label:'CareScout — Care Assurance',
+  { id:'carescout', label:'CareScout',
     solve(p){
       const st=p.state||'';
       if(!csAvailableState(st)) return {label:this.label, fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
