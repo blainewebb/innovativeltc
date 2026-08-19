@@ -11,9 +11,25 @@ Individual LTC; inputs done individually per applicant. Pre-designed product pla
 factors, ages 40–70, all 12 cohorts). It was cross-checked against `rater.py` over 9,600
 input combinations — 9,526 exact, the other 74 off by a single penny from half-cent rounding.
 CareScout is selectable from the header carrier dropdown and its quotes drop into the same
-comparison tray, client records, and printable quote sheet as NGL. Still held out of the
-webpage until confirmed by a real CareScout illustration: the **0-day home-care rider**
-(its own additive table).
+comparison tray, client records, and printable quote sheet as NGL. The **0-day home-care
+rider** is now in the webpage (additive 0HC table, offered only with the 90-day deductible).
+
+### End-to-end verification against real CareScout illustrations
+
+`care_scout_quote.pdf` — two StrateCision illustrations (TX, 55M, Standard, $200/day,
+$250k pool, 3% compound, 90-day, marital "One Insured", annual), identical except the
+0-day home-care rider. Both reproduced **to the penny**:
+
+| Config | CareScout illustration | Webpage / rater |
+|---|---|---|
+| Base (no 0-day HC) | $3,759.80 / yr | $3,759.80 |
+| + 0-day home-care rider | $4,683.40 / yr | $4,683.40 |
+
+Confirms the base calc end-to-end, the additive 0-day HC rider (+$923.60 here), the
+"One Insured" → `Married1buy` cohort mapping, and the age-80 benefit growth
+($12,730/mo · $523,444 pool = daily/pool × 1.03^25). Note: "Contingent" nonforfeiture on
+these illustrations is the standard included benefit, not the optional Nonforfeiture Benefit
+Rider (×1.26) — that optional rider is still awaiting its own sample confirmation.
 
 ## State availability & variations (from CareAssurance_state_variability.xlsx)
 
