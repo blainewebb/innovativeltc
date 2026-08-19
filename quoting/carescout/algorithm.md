@@ -3,7 +3,18 @@
 Source: "Calculations for CareScout Policy Form 005.doc" (Genworth/CareScout, algorithm dated May 2024).
 Individual LTC; inputs done individually per applicant. Pre-designed product plans; not all options available for every plan/state.
 
-**Rate tables live in a separate Excel ("Supporting Tables for Algorithm.xls") — NOT yet received.** Cannot compute premiums without it.
+**Rate tables received** — extracted verbatim from `Carescout_quotes.xlsx` into `rates.json`; `rater.py` reproduces the workbook's own Pricing-Cell premiums (415/504 sampled cells exact, remainder within $0.10 rounding).
+
+## Webpage integration
+
+`ltc-quote.html` embeds a compact JS port of this rater (the 90-day base tables + Exhibit E
+factors, ages 40–70, all 12 cohorts). It was cross-checked against `rater.py` over 9,600
+input combinations — 9,526 exact, the other 74 off by a single penny from half-cent rounding.
+CareScout is selectable from the header carrier dropdown and its quotes drop into the same
+comparison tray, client records, and printable quote sheet as NGL. Still held out of the
+webpage until confirmed by a real CareScout illustration: the **0-day home-care rider**
+(its own additive table) and the **save-age** convention. State licensing / any state rate
+adjustments load when the state-variations file arrives (state factor is currently 1.0).
 
 ## Inputs (per applicant)
 - **Issue age** from DOB via **Save Age** logic: if birthday within 30 days of current date, rate one year younger. Min age 40, max 70.
