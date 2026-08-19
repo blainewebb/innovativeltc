@@ -420,7 +420,7 @@
       <div class="field"><label>State</label><select id="cs_state" onchange="csSyncState()"></select></div>
       <div class="field"><label>Issue age (40–70)</label><input id="cs_age" type="number" value="62" min="40" max="70"></div>
       <div class="field"><label>Gender</label><select id="cs_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Underwriting class</label><select id="cs_uw"><option value="Standard">Standard</option><option value="Preferred" selected>Preferred</option></select></div>
+      <div class="field"><label>Underwriting class</label><select id="cs_uw"><option value="Standard" selected>Standard</option><option value="Preferred">Preferred</option></select></div>
       <div class="field"><label>Marital status</label><select id="cs_marital">
         <option value="Single" selected>Single</option>
         <option value="Married">Married — both applying</option>
@@ -454,7 +454,7 @@
       <div class="field"><label>Gender</label><select id="ba_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Target years of coverage</label><select id="ba_years"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
       <div class="field"><label>Inflation protection</label><select id="ba_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
-      <div class="field"><label>Underwriting (CareScout)</label><select id="ba_uw"><option value="Standard">Standard</option><option value="Preferred" selected>Preferred</option></select></div>
+      <div class="field"><label>Underwriting (CareScout)</label><select id="ba_uw"><option value="Standard" selected>Standard</option><option value="Preferred">Preferred</option></select></div>
       <div class="field"><label>Marital status</label><select id="ba_marital"><option value="single" selected>Single</option><option value="married-both">Married — both applying</option><option value="married-one">Married — one applying</option></select></div>
       <div class="field"><label>State</label><select id="ba_state" class="statesel"></select></div>
     </div>
@@ -2919,8 +2919,12 @@ const CARRIERS = [
       let q=E.quote(o);
       while(mb>300 && q.modalPayment>p.budget+0.005){ mb=FLOOR3(mb-300); o.monthlyBenefit=mb; q=E.quote(o); }
       if(q.modalPayment>p.budget+0.005) return {label:this.label, fits:false, note:'Even a $300/mo benefit is above this budget.'};
+      // next $300 increment, if it lands just over budget (within ~12%)
+      let stepUp=null; const mbUp=Math.min(12000,mb+300);
+      if(mbUp>mb){ const oUp=Object.assign({},o,{monthlyBenefit:mbUp}); const qUp=E.quote(oUp);
+        if(qUp.modalPayment>p.budget+0.005 && qUp.modalPayment<=p.budget*1.12) stepUp={design:fmt0(mbUp)+'/mo · '+p.years+'-yr', premium:qUp.modalPayment, trayObj:oUp}; }
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
-        design:fmt0(mb)+'/mo · '+p.years+'-yr · '+pctL(p.inflation), sub:'Total pool '+fmt0(mb*parseInt(bp)), trayObj:o};
+        design:fmt0(mb)+'/mo · '+p.years+'-yr · '+pctL(p.inflation), sub:'Total pool '+fmt0(mb*parseInt(bp)), trayObj:o, stepUp:stepUp};
     } },
   { id:'carescout', label:'CareScout — Care Assurance',
     solve(p){
@@ -2930,29 +2934,39 @@ const CARRIERS = [
       const bio=inflToBio(p.inflation);
       const marital=p.marital==='married-both'?'Married':(p.marital==='married-one'?'Married1buy':'Single');
       const uw=p.uw||'Standard';
-      let best=null;
+      let best=null, up=null;   // best = richest that fits; up = a richer daily tier just over budget
       for(const daily of csDailies(st)){
         for(const pool of csPoolsFor(daily,st)){
-          if((pool/daily/365.25) < p.years-0.5) continue;         // pool must last about the target or longer
+          const ratio=pool/daily/365.25;
+          if(ratio < p.years-0.5) continue;                        // pool must last about the target or longer
           const o={carrier:'carescout', age:p.age, gender:p.gender, uwClass:uw, marital, dailyBenefit:daily, coverageMax:pool, inflation:bio, deductible:90, mode:'monthly', state:st||null};
           let q; try{ q=CS.quote(o); }catch(e){ continue; }
-          if(q.modalPayment>p.budget+0.005) continue;
-          if(!best || daily>best.daily || (daily===best.daily && pool>best.pool)) best={daily, pool, ratio:pool/daily/365.25, premium:q.modalPayment, annual:q.annualPremium, o};
+          const cand={daily, pool, ratio, premium:q.modalPayment, annual:q.annualPremium, o};
+          if(q.modalPayment<=p.budget+0.005){
+            // prefer the highest daily benefit; among equal daily, the duration closest to the target
+            if(!best || daily>best.daily || (daily===best.daily && Math.abs(ratio-p.years) < Math.abs(best.ratio-p.years))) best=cand;
+          } else if(q.modalPayment<=p.budget*1.12){
+            if(!up || daily>up.daily || (daily===up.daily && Math.abs(ratio-p.years) < Math.abs(up.ratio-p.years))) up=cand;
+          }
         }
       }
-      if(!best) return {label:this.label, fits:false, note:'No ≈'+p.years+'-yr design fits '+fmt0(p.budget)+'/mo here.'};
+      if(!best && !up) return {label:this.label, fits:false, note:'No ≈'+p.years+'-yr design fits '+fmt0(p.budget)+'/mo here.'};
+      // only show a step-up when it's a richer daily benefit than the fitting option
+      const stepUp = (up && (!best || up.daily>best.daily)) ? {design:'$'+up.daily+'/day · '+fmt0(up.pool)+' pool (≈'+up.ratio.toFixed(1)+' yr)', premium:up.premium, trayObj:up.o} : null;
+      if(!best) return {label:this.label, fits:false, note:'Closest ≈'+p.years+'-yr design is just over: '+stepUp.design+' at '+fmt(stepUp.premium)+'/mo.', stepUp:stepUp};
       return {label:this.label, fits:true, premium:best.premium, annual:best.annual,
-        design:'$'+best.daily+'/day · '+fmt0(best.pool)+' pool (≈'+best.ratio.toFixed(1)+' yr) · '+csInflLabel(bio), sub:'Uses '+uw+' class', trayObj:best.o};
+        design:'$'+best.daily+'/day · '+fmt0(best.pool)+' pool (≈'+best.ratio.toFixed(1)+' yr) · '+csInflLabel(bio), sub:'Uses '+uw+' class', trayObj:best.o, stepUp:stepUp};
     } },
 ];
 function budgetSolveAll(p){ return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
 function showBudgetAll(p){
   const results=budgetSolveAll(p);
   const head='<div class="config-line">💰 <b>Most coverage for '+fmt0(p.budget)+'/mo</b> &middot; '+p.age+' '+gL(p.gender)+' &middot; '+p.years+'-yr &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
+  const stepRow=(r)=> r.stepUp ? '<tr style="background:#fffdf5"><td style="color:#92400e;font-size:.78rem">▲ Step up (just over budget)</td><td class="b" style="color:#92400e">'+r.stepUp.design+'</td><td class="p" style="color:#92400e">'+fmt(r.stepUp.premium)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#fef3c7;color:#92400e" onclick=\'addToTray('+JSON.stringify(r.stepUp.trayObj)+')\'>＋ add</button></td></tr>' : '';
   const rows=results.map(r=>{
-    if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td colspan="2" style="color:var(--muted)">'+(r.note||'No design fits')+'</td><td></td></tr>';
+    if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td colspan="2" style="color:var(--muted)">'+(r.note||'No design fits')+'</td><td></td></tr>'+stepRow(r);
     const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.trayObj)+')\'>＋ add</button>';
-    return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>';
+    return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>'+stepRow(r);
   }).join('');
   show(resultBrand('Most I Can Buy')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Most coverage that fits</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="hint" style="margin-top:8px">Each carrier shows the richest design at or under your budget for about '+p.years+' year'+(p.years===1?'':'s')+' of coverage. Tap ＋ to drop any into the comparison, then print a side-by-side sheet.</div><div class="disc">'+DISC+'</div>');
 }
@@ -3265,7 +3279,7 @@ function interpret(text){
   const isWaiting=/\b(cost of waiting|waits?|waiting|put(?:s|ting)? (?:it|this) off|delay(?:s|ed|ing)?|hold(?:s|ing)? off)\b/i.test(t);
   const wantsAll=/\b(compan(?:y|ies)|carriers?|insurers?|ngl|carescout)\b/i.test(t) || /\bboth\b/i.test(t);
   const isMostBuy=/\b(most|biggest|largest|maximi[sz]e?|how much|afford|budget|stretch|can i (?:get|buy)|what.*\bbuy\b)\b/i.test(t);
-  if(wantsAll && grabTarget(t) && (isBudget||isOptimize||isMostBuy)) return {intent:'budgetAll', gender, age:ages[0], state, target:grabTarget(t), years:(grabBP(t)?parseInt(grabBP(t))/12:3), inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single'), uw:(/\bstandard\b/i.test(t)?'Standard':'Preferred')};
+  if(wantsAll && grabTarget(t) && (isBudget||isOptimize||isMostBuy)) return {intent:'budgetAll', gender, age:ages[0], state, target:grabTarget(t), years:(grabBP(t)?parseInt(grabBP(t))/12:3), inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single'), uw:(/\bpreferred\b/i.test(t)?'Preferred':'Standard')};
   if(isStandard) return {intent:'standard', gender, age:ages[0], state};
   if(isWaiting) return {intent:'waiting', gender, age:ages[0], state, benefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)};
   if(isOptimize && grabTarget(t)) return {intent:'optimize', gender, age:ages[0], state, target:grabTarget(t)};
@@ -3279,7 +3293,7 @@ function dispatch(p){
   if(!p.gender && p.intent!=='couple' && p.intent!=='compare') return setInterp('I need a <b>gender</b> — add “male” or “female”.');
   if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
   if(p.intent==='waiting'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing the <b>cost of waiting</b> for a '+p.age+' '+gL(p.gender)+' — premiums climb with age, and required coverage grows ~3%/yr as care gets pricier.', p.ai); showWaiting(computeWaiting(p.age,p.gender,SNAP(p.benefit),p.benefitPeriod,p.inflation,p.state)); return; }
-  if(p.intent==='budgetAll'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Finding the most a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' — every carrier, side by side.', p.ai); showBudgetAll({budget:p.target, age:p.age, gender:p.gender, years:p.years||3, inflation:p.inflation||0, uw:p.uw||'Preferred', marital:p.marital||'single', state:p.state||null}); return; }
+  if(p.intent==='budgetAll'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Finding the most a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' — every carrier, side by side.', p.ai); showBudgetAll({budget:p.target, age:p.age, gender:p.gender, years:p.years||3, inflation:p.inflation||0, uw:p.uw||'Standard', marital:p.marital||'single', state:p.state||null}); return; }
   if(p.intent==='optimize'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Exploring what a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' across benefit periods and inflation options.', p.ai); const d=computeOptimize(p.target,p.age,p.gender,p.state); renderOptimize(d,''); if(p.ai) recommendAI(p.target,p.age,p.gender,d); return; }
   if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.', p.ai); showStandard(p.age,p.gender,p.state); }
   else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+'.', p.ai); showBudget(p.target,p.age,p.gender,p.opts); }
