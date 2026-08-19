@@ -287,6 +287,7 @@
     <div class="examples" id="examples"></div>
     <div class="quicktools">
       <span class="lbl">Tools:</span>
+      <button class="qtool" onclick="openSweet()">⭐ Sweet spot</button>
       <button class="qtool" onclick="openBudgetAll()">💰 Most I can buy</button>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
       <button class="qtool" onclick="openCare()">🏥 Cost of Care</button>
@@ -439,7 +440,8 @@
     <div class="warn" style="margin-top:2px">Licensed in 43 states; the picker lists the 42 where individual coverage is sold (CO is worksite-only). Not available in CA, FL, MA, ME, MN, NE, NJ, NY.</div>
     <div class="actions">
       <button class="run" onclick="csRunSingle()">Run CareScout quote</button>
-      <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
   </div>
 
@@ -459,6 +461,21 @@
       <div class="field"><label>State</label><select id="ba_state" class="statesel"></select></div>
     </div>
     <div class="actions"><button class="run" onclick="runBudgetAll()">Show the most I can buy</button></div>
+  </div>
+
+  <div class="card" id="sweetCard" hidden>
+    <div class="cs-head">
+      <h2 style="margin:0 0 2px">⭐ Sweet spot <span style="color:var(--muted);font-weight:600;font-size:.9rem">— each carrier's best value</span></h2>
+      <p class="hint" style="margin:0">Each carrier's strongest value-per-dollar lead design for this client, side by side — a clean way to open a comparison. Every carrier you add appears automatically.</p>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Issue age</label><input id="sw_age" type="number" value="60" min="40" max="79"></div>
+      <div class="field"><label>Gender</label><select id="sw_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+      <div class="field"><label>Marital status</label><select id="sw_marital"><option value="single" selected>Single</option><option value="married-both">Married — both applying</option><option value="married-one">Married — one applying</option></select></div>
+      <div class="field"><label>Inflation protection</label><select id="sw_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
+      <div class="field"><label>State</label><select id="sw_state" class="statesel"></select></div>
+    </div>
+    <div class="actions"><button class="run" onclick="runSweetSpot()">Compare best-value designs</button></div>
   </div>
 
   <div class="card" id="resultCard" hidden><div id="result"></div></div>
@@ -2905,8 +2922,14 @@ function csShowSingle(o){
 /* ---------- "most I can buy" — solve a budget across every carrier ---------- */
 function inflToBio(dec){ dec=+dec||0; return dec>=0.05?'5':(dec>=0.03?'3':(dec>=0.01?'1':'none')); }
 function csAvailableState(st){ return !st || CS_IND_STATES.includes(st); }
-// Each carrier exposes solve(p) -> the richest design at or under p.budget. Add a carrier here
-// and it joins every budget comparison automatically. p = {budget,age,gender,years,inflation,uw,marital,state}.
+// Each carrier's best-value "sweet spot" lead design (editable in one place).
+const SWEETSPOT = {
+  ngl:       {monthlyBenefit:4500, benefitPeriod:'48', inflation:0.03},   // $4,500/mo · 4-yr · 3% compound
+  carescout: {dailyBenefit:100, coverageMax:200000, inflation:'3'},        // $100/day · $200k pool · 3% compound
+};
+// Each carrier exposes solve(p) -> the richest design at or under p.budget, and sweetSpot(p) ->
+// its best-value lead design. Add a carrier here and it joins every budget comparison AND the
+// sweet-spot tool automatically. p = {budget,age,gender,years,inflation,uw,marital,state}.
 const CARRIERS = [
   { id:'ngl', label:'NGL — EssentialLTC',
     solve(p){
@@ -2925,6 +2948,13 @@ const CARRIERS = [
         if(qUp.modalPayment>p.budget+0.005 && qUp.modalPayment<=p.budget*1.12) stepUp={design:fmt0(mbUp)+'/mo · '+p.years+'-yr', premium:qUp.modalPayment, trayObj:oUp}; }
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:fmt0(mb)+'/mo · '+p.years+'-yr · '+pctL(p.inflation), sub:'Total pool '+fmt0(mb*parseInt(bp)), trayObj:o, stepUp:stepUp};
+    },
+    sweetSpot(p){
+      const s=SWEETSPOT.ngl, bp=s.benefitPeriod, infl=(p.inflation==null?s.inflation:p.inflation);
+      const o={age:p.age, gender:p.gender, monthlyBenefit:s.monthlyBenefit, benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp, maritalDiscount:p.marital==='married-one'};
+      const q=E.quote(o);
+      return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
+        design:fmt0(s.monthlyBenefit)+'/mo · '+(parseInt(bp)/12)+'-yr · '+pctL(infl), sub:'Total pool '+fmt0(s.monthlyBenefit*parseInt(bp)), trayObj:o};
     } },
   { id:'carescout', label:'CareScout — Care Assurance',
     solve(p){
@@ -2956,8 +2986,24 @@ const CARRIERS = [
       if(!best) return {label:this.label, fits:false, note:'Closest ≈'+p.years+'-yr design is just over: '+stepUp.design+' at '+fmt(stepUp.premium)+'/mo.', stepUp:stepUp};
       return {label:this.label, fits:true, premium:best.premium, annual:best.annual,
         design:'$'+best.daily+'/day · '+fmt0(best.pool)+' pool (≈'+best.ratio.toFixed(1)+' yr) · '+csInflLabel(bio), sub:'Uses '+uw+' class', trayObj:best.o, stepUp:stepUp};
+    },
+    sweetSpot(p){
+      const st=p.state||'';
+      if(!csAvailableState(st)) return {label:this.label, fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
+      if(p.age<40||p.age>70) return {label:this.label, fits:false, note:'CareScout issues ages 40–70.'};
+      const s=SWEETSPOT.carescout;
+      const bio=(p.inflation==null?s.inflation:inflToBio(p.inflation));
+      const marital=p.marital==='married-both'?'Married':(p.marital==='married-one'?'Married1buy':'Single');
+      let daily=s.dailyBenefit, pool=s.coverageMax;               // nudge into what the state allows (rare)
+      if(csDailies(st).indexOf(daily)<0) daily=csDailies(st)[0];
+      if(csPoolsFor(daily,st).indexOf(pool)<0) pool=csPoolsFor(daily,st).slice(-1)[0];
+      const o={carrier:'carescout', age:p.age, gender:p.gender, uwClass:'Standard', marital, dailyBenefit:daily, coverageMax:pool, inflation:bio, deductible:90, mode:'monthly', state:st||null};
+      const q=CS.quote(o), ratio=pool/daily/365.25;
+      return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
+        design:'$'+daily+'/day · '+fmt0(pool)+' pool (≈'+ratio.toFixed(1)+' yr) · '+csInflLabel(bio), sub:'Uses Standard class', trayObj:o};
     } },
 ];
+function sweetSpotAll(p){ return CARRIERS.map(c=>{ if(!c.sweetSpot) return null; try{ return Object.assign({carrier:c.id}, c.sweetSpot(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }).filter(Boolean); }
 function budgetSolveAll(p){ return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
 function showBudgetAll(p){
   const results=budgetSolveAll(p);
@@ -2978,6 +3024,27 @@ function runBudgetAll(){ try{
   if(!p.budget||p.budget<20) return showErr('Enter a monthly budget (e.g. 300).');
   if(!p.age) return showErr('Enter an issue age.');
   showBudgetAll(p);
+}catch(e){ showErr(e.message); } }
+
+/* ---------- sweet spot — each carrier's best-value design, side by side ---------- */
+function showSweetSpot(p){
+  const results=sweetSpotAll(p);
+  const fitList=results.filter(r=>r.fits).map(r=>r.trayObj);
+  const head='<div class="config-line">⭐ <b>Best-value design — each carrier</b> &middot; '+p.age+' '+gL(p.gender)+' &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
+  const rows=results.map(r=>{
+    if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td colspan="2" style="color:var(--muted)">'+(r.note||'No design')+'</td><td></td></tr>';
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.trayObj)+')\'>＋ add</button>';
+    return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>';
+  }).join('');
+  const addAll = fitList.length>1 ? '<button class="run" style="margin-top:12px" onclick=\'addAllToTray('+JSON.stringify(fitList)+')\'>＋ Add all to comparison</button>' : '';
+  show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+'<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Premiums differ — that’s the point of the comparison. Add them to build a side-by-side client sheet.</div><div class="disc">'+DISC+'</div>');
+}
+function openSweet(){ setCarrier('ngl'); $('sweetCard').hidden=false; $('sweetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
+function runSweetSpot(){ try{
+  const p={age:+$('sw_age').value, gender:$('sw_gender').value, state:$('sw_state').value||null,
+    marital:$('sw_marital').value, inflation:parseFloat($('sw_infl').value)||0};
+  if(!p.age) return showErr('Enter an issue age.');
+  showSweetSpot(p);
 }catch(e){ showErr(e.message); } }
 
 /* ---------- tabs ---------- */
@@ -3280,6 +3347,7 @@ function interpret(text){
   const wantsAll=/\b(compan(?:y|ies)|carriers?|insurers?|ngl|carescout)\b/i.test(t) || /\bboth\b/i.test(t);
   const isMostBuy=/\b(most|biggest|largest|maximi[sz]e?|how much|afford|budget|stretch|can i (?:get|buy)|what.*\bbuy\b)\b/i.test(t);
   if(wantsAll && grabTarget(t) && (isBudget||isOptimize||isMostBuy)) return {intent:'budgetAll', gender, age:ages[0], state, target:grabTarget(t), years:(grabBP(t)?parseInt(grabBP(t))/12:3), inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single'), uw:(/\bpreferred\b/i.test(t)?'Preferred':'Standard')};
+  if(/\bsweet[- ]?spot|best[- ]?value\b/i.test(t)) return {intent:'sweet', gender, age:ages[0], state, inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single')};
   if(isStandard) return {intent:'standard', gender, age:ages[0], state};
   if(isWaiting) return {intent:'waiting', gender, age:ages[0], state, benefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)};
   if(isOptimize && grabTarget(t)) return {intent:'optimize', gender, age:ages[0], state, target:grabTarget(t)};
@@ -3294,6 +3362,7 @@ function dispatch(p){
   if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
   if(p.intent==='waiting'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing the <b>cost of waiting</b> for a '+p.age+' '+gL(p.gender)+' — premiums climb with age, and required coverage grows ~3%/yr as care gets pricier.', p.ai); showWaiting(computeWaiting(p.age,p.gender,SNAP(p.benefit),p.benefitPeriod,p.inflation,p.state)); return; }
   if(p.intent==='budgetAll'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Finding the most a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' — every carrier, side by side.', p.ai); showBudgetAll({budget:p.target, age:p.age, gender:p.gender, years:p.years||3, inflation:p.inflation||0, uw:p.uw||'Standard', marital:p.marital||'single', state:p.state||null}); return; }
+  if(p.intent==='sweet'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing each carrier’s <b>best-value design</b> for a '+p.age+' '+gL(p.gender)+', side by side.', p.ai); showSweetSpot({age:p.age, gender:p.gender, state:p.state||null, marital:p.marital||'single', inflation:(p.inflation==null?0.03:p.inflation)}); return; }
   if(p.intent==='optimize'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Exploring what a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' across benefit periods and inflation options.', p.ai); const d=computeOptimize(p.target,p.age,p.gender,p.state); renderOptimize(d,''); if(p.ai) recommendAI(p.target,p.age,p.gender,d); return; }
   if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.', p.ai); showStandard(p.age,p.gender,p.state); }
   else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+'.', p.ai); showBudget(p.target,p.age,p.gender,p.opts); }

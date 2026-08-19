@@ -61,6 +61,22 @@ lasts about the target years and picks the richest that fits, honoring the state
 licensing. Reachable by button (both carrier sides) and by typed command
 (e.g. "62 female, most I can buy for $300, 3% for 3 years, each company").
 
+## "Sweet spot" — each carrier's best-value lead design
+
+A second registry method, `sweetSpot(p)`, returns each carrier's strongest value-per-dollar
+lead design for a client (age/gender/state/marital/inflation), rendered side by side and
+addable to the shared comparison. Defaults live in one `SWEETSPOT` constant:
+
+- **CareScout:** $100/day + $200k pool (≈5.5 yr), 3% compound, 90-day, Standard — CareScout
+  prices off the daily benefit, so a modest daily with a large pool is its best leverage.
+- **NGL:** $4,500/mo, 4-year, 3% compound.
+
+Analysis behind the picks (60F, Standard/Premier, Single, 3%, 90-day): NGL out-buys CareScout
+per premium dollar even at CareScout's own sweet spot — for ~$429/mo NGL gives ~$4,500/mo over
+5 years ($270k) vs CareScout's ~$3,040/mo-equivalent over 5.5 years ($200k). CareScout's edge
+is underwriting/eligibility and its pooled daily design, not price. Reachable by button and by
+typed command ("sweet spot for a 60 year old female in TX").
+
 **Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
 (CareScout's illustration software) quotes through age 70 and the rate workbook carries
 base rates to 70 — so the webpage allows 40–70. Save-age convention (rate one year younger
