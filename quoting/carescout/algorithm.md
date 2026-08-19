@@ -13,8 +13,31 @@ input combinations — 9,526 exact, the other 74 off by a single penny from half
 CareScout is selectable from the header carrier dropdown and its quotes drop into the same
 comparison tray, client records, and printable quote sheet as NGL. Still held out of the
 webpage until confirmed by a real CareScout illustration: the **0-day home-care rider**
-(its own additive table) and the **save-age** convention. State licensing / any state rate
-adjustments load when the state-variations file arrives (state factor is currently 1.0).
+(its own additive table).
+
+## State availability & variations (from CareAssurance_state_variability.xlsx)
+
+The "Care Assurance Individual" state grid is a spec-by-state table, not a rate table — it
+carries **no per-state premium multipliers**, so the nationwide rate workbook applies to
+every licensed state (state factor stays 1.0). What it defines:
+
+- **Licensed in 43 states.** Individual coverage is sold in 42 of them; **CO is worksite-only**.
+  **Not licensed:** CA, FL, MA, ME, MN, NE, NJ, NY. (Not in the file = not licensed.)
+- **2-year minimum coverage — AZ, MD, OR:** only combos with benefit ratio ≥ 2 years
+  (drops $50k+$100/day, $100k+$150/day, $100k+$200/day).
+- **$100 minimum daily benefit — SD, VT, WI:** no $50/day option.
+- **90-day deductible only — CT, KS, SD, VT:** 180-day not permitted.
+- **Waiver-of-HHC-deductible (0-day home care) rider is unavailable with the 180-day
+  deductible** — already enforced by the rater.
+
+These rules are wired into the webpage (state picker limited to the 42 individual states;
+daily/pool/deductible dropdowns filter to what each state allows).
+
+**Open discrepancy to confirm with CareScout:** this spec lists **issue ages 40–65**
+(age last birthday, 30-day save-age), but the rate workbook carries base rates through
+**age 70**. The webpage caps new-issue age at 65 per the spec; confirm whether 66–70 is
+issuable. Save-age convention (rate one year younger within 30 days of the next birthday)
+is confirmed by this file.
 
 ## Inputs (per applicant)
 - **Issue age** from DOB via **Save Age** logic: if birthday within 30 days of current date, rate one year younger. Min age 40, max 70.

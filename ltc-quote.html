@@ -23,6 +23,8 @@
   .carriersel span{text-transform:uppercase;letter-spacing:.04em}
   .carriersel select{border:1px solid var(--border);background:#fff;border-radius:9px;padding:6px 8px;font-size:.85rem;font-weight:700;color:#0f172a;cursor:pointer}
   .cs-head{margin-bottom:12px}
+  .csnote{font-size:.82rem;color:var(--primary-d);background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:8px 11px;margin-top:8px;font-weight:600;display:none}
+  .csnote.show{display:block}
   .gear{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:9px;padding:6px 10px;font-size:1rem}
   .hdrbtn{cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:9px;padding:7px 12px;font-size:.85rem;font-weight:700;color:#334155}
   .hdrbtn:hover{border-color:var(--primary);color:var(--primary)}
@@ -411,10 +413,11 @@
   <div class="card" id="cscard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">CareScout <span style="color:var(--muted);font-weight:600;font-size:.9rem">Policy Form 005</span></h2>
-      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Rated ages 40–70, lifetime pay. Verified against CareScout's own rate workbook.</p>
+      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–65, lifetime pay. Verified against CareScout's own rate workbook.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>Issue age (40–70)</label><input id="cs_age" type="number" value="62" min="40" max="70"></div>
+      <div class="field"><label>State</label><select id="cs_state" onchange="csSyncState()"></select></div>
+      <div class="field"><label>Issue age (40–65)</label><input id="cs_age" type="number" value="62" min="40" max="65"></div>
       <div class="field"><label>Gender</label><select id="cs_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Underwriting class</label><select id="cs_uw"><option value="Standard">Standard</option><option value="Preferred" selected>Preferred</option></select></div>
       <div class="field"><label>Marital status</label><select id="cs_marital">
@@ -422,17 +425,17 @@
         <option value="Married">Married — both applying</option>
         <option value="Married1buy">Married — one applying</option>
       </select></div>
-      <div class="field"><label>Daily benefit</label><select id="cs_daily" onchange="csSyncPool()"><option value="50">$50 / day</option><option value="100" selected>$100 / day</option><option value="150">$150 / day</option><option value="200">$200 / day</option></select></div>
+      <div class="field"><label>Daily benefit</label><select id="cs_daily" onchange="csSyncPool()"></select></div>
       <div class="field"><label>Coverage maximum (pool)</label><select id="cs_pool"></select></div>
       <div class="field"><label>Inflation protection</label><select id="cs_infl"><option value="none">None (level)</option><option value="1">1% compound</option><option value="3" selected>3% compound</option><option value="5">5% compound</option></select></div>
       <div class="field"><label>Deductible (elimination)</label><select id="cs_ded"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
       <div class="field"><label>Premium mode</label><select id="cs_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
-      <div class="field"><label>State</label><select id="cs_state" class="statesel"></select></div>
     </div>
     <div class="riders">
       <label><input type="checkbox" id="cs_nff"> Nonforfeiture benefit (paid-up value if lapsed)</label>
     </div>
-    <div class="warn" style="margin-top:2px">State licensing &amp; any state rate adjustments load once CareScout's state-variations file is in. The 0-day home-care rider is held until a sample illustration confirms it.</div>
+    <div class="csnote" id="cs_statenote"></div>
+    <div class="warn" style="margin-top:2px">Licensed in 43 states; the picker lists the 42 where individual coverage is sold (CO is worksite-only). Not available in CA, FL, MA, ME, MN, NE, NJ, NY. The 0-day home-care rider is held until a sample illustration confirms it.</div>
     <div class="actions"><button class="run" onclick="csRunSingle()">Run CareScout quote</button></div>
   </div>
 
@@ -2787,16 +2790,52 @@ function setCarrier(c){
   $('askCard').style.display = cs ? 'none' : '';
   $('cscard').hidden = !cs;
   $('carrierBadge').textContent = cs ? '✓ CareScout · verified rates' : '✓ NGL · verified rates';
-  if(cs){ $('manual').hidden = true; csSyncPool(); $('cscard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  if(cs){ $('manual').hidden = true; csSyncState(); $('cscard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
   else { setMode(MODE); }
 }
 
-// pool options depend on daily benefit ($50/$100 allow the $50k pool; $150/$200 don't)
+// CareScout state availability (Care Assurance Individual). 42 states sell individual
+// coverage (CO is worksite-only; not listed). Not licensed: CA, FL, MA, ME, MN, NE, NJ, NY.
+const CS_IND_STATES=['AK','AL','AR','AZ','CT','DC','DE','GA','HI','IA','ID','IL','IN','KS','KY','LA','MD','MI','MO','MS','MT','NC','ND','NH','NM','NV','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'];
+const CS_2YR=['AZ','MD','OR'];         // 2-year minimum coverage (benefit ratio >= 2 yrs)
+const CS_MIN100=['SD','VT','WI'];      // minimum $100 daily benefit
+const CS_DED90=['CT','KS','SD','VT'];  // 90-day deductible only
+function csRules(st){ return {twoYear:CS_2YR.includes(st), minDaily100:CS_MIN100.includes(st), ded90only:CS_DED90.includes(st)}; }
+function csDailies(st){ return csRules(st).minDaily100 ? [100,150,200] : [50,100,150,200]; }
+function csPoolsFor(daily,st){
+  let pools = daily<=100 ? [50000,100000,150000,200000,250000] : [100000,150000,200000,250000];
+  if(csRules(st).twoYear) pools = pools.filter(p=>(p/daily/365.25) >= 2 - 1e-6);   // drop combos under 2 years
+  return pools;
+}
+function csStateName(st){ return (US_STATES.find(x=>x[0]===st)||[])[1]||st; }
+function csInitStates(){
+  const sel=$('cs_state');
+  const list=CS_IND_STATES.slice().sort((a,b)=>csStateName(a).localeCompare(csStateName(b)));
+  sel.innerHTML='<option value="">Any licensed state (base rules)</option>'+list.map(c=>'<option value="'+c+'">'+csStateName(c)+'</option>').join('');
+}
+// state can restrict the daily-benefit set, the pool combos, and the deductible
+function csSyncState(){
+  const st=$('cs_state').value, r=csRules(st);
+  const dailies=csDailies(st), curD=+$('cs_daily').value;
+  $('cs_daily').innerHTML=dailies.map(d=>'<option value="'+d+'">$'+d+' / day</option>').join('');
+  $('cs_daily').value=dailies.includes(curD)?curD:(dailies.includes(100)?100:dailies[0]);
+  csSyncPool();
+  const dedSel=$('cs_ded'), curDed=+dedSel.value;
+  dedSel.innerHTML=(r.ded90only?[90]:[90,180]).map(d=>'<option value="'+d+'">'+d+' days</option>').join('');
+  dedSel.value=(!r.ded90only && curDed===180)?180:90;
+  const notes=[];
+  if(r.twoYear) notes.push('2-year minimum coverage — combos under 2 years of benefit aren’t offered.');
+  if(r.minDaily100) notes.push('$100 minimum daily benefit — no $50/day option.');
+  if(r.ded90only) notes.push('90-day deductible only.');
+  const box=$('cs_statenote'); box.classList.toggle('show', notes.length>0);
+  box.innerHTML=(st?csStateName(st)+': ':'')+notes.join(' ');
+}
+// pool options depend on the daily benefit and the state rules
 function csSyncPool(){
-  const daily=+$('cs_daily').value; const sel=$('cs_pool'); const cur=+sel.value;
-  const pools = (daily<=100) ? [50000,100000,150000,200000,250000] : [100000,150000,200000,250000];
-  sel.innerHTML = pools.map(p=>'<option value="'+p+'">'+fmt0(p)+(daily?' ('+(p/daily/365.25).toFixed(1)+' yr)':'')+'</option>').join('');
-  sel.value = pools.indexOf(cur)>=0 ? cur : (pools.indexOf(100000)>=0?100000:pools[0]);
+  const st=$('cs_state').value, daily=+$('cs_daily').value, sel=$('cs_pool'), cur=+sel.value;
+  const pools=csPoolsFor(daily,st);
+  sel.innerHTML=pools.map(p=>'<option value="'+p+'">'+fmt0(p)+(daily?' ('+(p/daily/365.25).toFixed(1)+' yr)':'')+'</option>').join('');
+  sel.value=pools.indexOf(cur)>=0?cur:(pools.indexOf(100000)>=0?100000:pools[0]);
 }
 function csOpts(){
   return {carrier:'carescout', age:+$('cs_age').value, gender:$('cs_gender').value,
@@ -3488,7 +3527,7 @@ fillStates();
 $('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
 renderTray(); renderClients(); renderPatterns();
 setMode('manual');   // start on the click-in form
-csSyncPool();        // populate CareScout pool options
+csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
 setCarrier('ngl');   // start on NGL; switch carriers from the header
 </script>
 </body>
