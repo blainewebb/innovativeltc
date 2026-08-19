@@ -413,11 +413,11 @@
   <div class="card" id="cscard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">CareScout <span style="color:var(--muted);font-weight:600;font-size:.9rem">Policy Form 005</span></h2>
-      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–65, lifetime pay. Verified against CareScout's own rate workbook.</p>
+      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–70, lifetime pay. Verified against CareScout's own rate workbook.</p>
     </div>
     <div class="grid">
       <div class="field"><label>State</label><select id="cs_state" onchange="csSyncState()"></select></div>
-      <div class="field"><label>Issue age (40–65)</label><input id="cs_age" type="number" value="62" min="40" max="65"></div>
+      <div class="field"><label>Issue age (40–70)</label><input id="cs_age" type="number" value="62" min="40" max="70"></div>
       <div class="field"><label>Gender</label><select id="cs_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Underwriting class</label><select id="cs_uw"><option value="Standard">Standard</option><option value="Preferred" selected>Preferred</option></select></div>
       <div class="field"><label>Marital status</label><select id="cs_marital">
@@ -433,7 +433,6 @@
     </div>
     <div class="riders">
       <label id="cs_hc_lbl"><input type="checkbox" id="cs_hc"> 0-day home-care rider (home care pays from day 1 — no elimination wait)</label>
-      <label><input type="checkbox" id="cs_nff"> Nonforfeiture benefit rider (paid-up value if lapsed)</label>
     </div>
     <div class="csnote" id="cs_statenote"></div>
     <div class="warn" style="margin-top:2px">Licensed in 43 states; the picker lists the 42 where individual coverage is sold (CO is worksite-only). Not available in CA, FL, MA, ME, MN, NE, NJ, NY.</div>
@@ -2850,7 +2849,7 @@ function csOpts(){
     dailyBenefit:+$('cs_daily').value, coverageMax:+$('cs_pool').value,
     inflation:$('cs_infl').value, deductible:+$('cs_ded').value,
     zeroDayHc:$('cs_hc').checked && +$('cs_ded').value===90,
-    nonforfeiture:$('cs_nff').checked, mode:$('cs_mode').value, state:$('cs_state').value||null};
+    mode:$('cs_mode').value, state:$('cs_state').value||null};
 }
 function csSyncHc(){
   const d180=+$('cs_ded').value===180, cb=$('cs_hc');

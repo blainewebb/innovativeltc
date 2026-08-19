@@ -27,9 +27,9 @@ $250k pool, 3% compound, 90-day, marital "One Insured", annual), identical excep
 
 Confirms the base calc end-to-end, the additive 0-day HC rider (+$923.60 here), the
 "One Insured" → `Married1buy` cohort mapping, and the age-80 benefit growth
-($12,730/mo · $523,444 pool = daily/pool × 1.03^25). Note: "Contingent" nonforfeiture on
-these illustrations is the standard included benefit, not the optional Nonforfeiture Benefit
-Rider (×1.26) — that optional rider is still awaiting its own sample confirmation.
+($12,730/mo · $523,444 pool = daily/pool × 1.03^25). The optional Nonforfeiture Benefit
+Rider (×1.26) is not something Blaine sells, so it's left out of the webpage UI (the
+`nonforfeiture` flag remains in the rater for completeness).
 
 ## State availability & variations (from CareAssurance_state_variability.xlsx)
 
@@ -49,11 +49,10 @@ every licensed state (state factor stays 1.0). What it defines:
 These rules are wired into the webpage (state picker limited to the 42 individual states;
 daily/pool/deductible dropdowns filter to what each state allows).
 
-**Open discrepancy to confirm with CareScout:** this spec lists **issue ages 40–65**
-(age last birthday, 30-day save-age), but the rate workbook carries base rates through
-**age 70**. The webpage caps new-issue age at 65 per the spec; confirm whether 66–70 is
-issuable. Save-age convention (rate one year younger within 30 days of the next birthday)
-is confirmed by this file.
+**Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
+(CareScout's illustration software) quotes through age 70 and the rate workbook carries
+base rates to 70 — so the webpage allows 40–70. Save-age convention (rate one year younger
+within 30 days of the next birthday) is confirmed.
 
 ## Inputs (per applicant)
 - **Issue age** from DOB via **Save Age** logic: if birthday within 30 days of current date, rate one year younger. Min age 40, max 70.
