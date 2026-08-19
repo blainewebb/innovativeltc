@@ -49,6 +49,18 @@ every licensed state (state factor stays 1.0). What it defines:
 These rules are wired into the webpage (state picker limited to the 42 individual states;
 daily/pool/deductible dropdowns filter to what each state allows).
 
+## "Most I can buy" — budget solve across all carriers
+
+The webpage has a carrier-agnostic budget tool: enter a monthly budget + age + gender +
+target years + inflation + state, and it returns the richest design each carrier offers at
+or under that budget, side by side (each addable to the shared comparison/print sheet).
+Carriers live in a `CARRIERS` registry — each exposes `solve(p)`; adding a carrier makes it
+join every budget comparison automatically. NGL solves linearly (premium ∝ monthly benefit,
+floored to a $300 increment); CareScout enumerates its discrete daily/pool combos whose pool
+lasts about the target years and picks the richest that fits, honoring the state rules and
+licensing. Reachable by button (both carrier sides) and by typed command
+(e.g. "62 female, most I can buy for $300, 3% for 3 years, each company").
+
 **Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
 (CareScout's illustration software) quotes through age 70 and the rate workbook carries
 base rates to 70 — so the webpage allows 40–70. Save-age convention (rate one year younger
