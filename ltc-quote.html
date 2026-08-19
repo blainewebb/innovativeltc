@@ -471,12 +471,16 @@
     <div class="grid">
       <div class="field"><label>Issue age</label><input id="sw_age" type="number" value="60" min="40" max="79"></div>
       <div class="field"><label>Gender</label><select id="sw_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Marital status</label><select id="sw_marital"><option value="single" selected>Single</option><option value="married-both">Married — both applying</option><option value="married-one">Married — one applying</option></select></div>
+      <div class="field"><label>Marital status</label><select id="sw_marital" onchange="swMaritalChange()"><option value="single" selected>Single</option><option value="married-both">Married — both applying (joint)</option><option value="married-one">Married — one applying</option></select></div>
       <div class="field"><label>Inflation protection</label><select id="sw_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
       <div class="field"><label>State</label><select id="sw_state" class="statesel"></select></div>
     </div>
-    <div class="riders">
-      <label><input type="checkbox" id="sw_shared"> Also show a shared-care (couple) version — for carriers that offer it</label>
+    <div class="grid" id="sw_spouse" hidden>
+      <div class="field"><label>Spouse — issue age</label><input id="sw_age2" type="number" value="60" min="40" max="79"></div>
+      <div class="field"><label>Spouse — gender</label><select id="sw_gender2"><option value="male">Male</option><option value="female">Female</option></select></div>
+    </div>
+    <div class="riders" id="sw_sharedwrap" style="display:none">
+      <label><input type="checkbox" id="sw_shared"> Include a shared benefit pool (couples, where the carrier offers it)</label>
     </div>
     <div class="actions"><button class="run" onclick="runSweetSpot()">Compare best-value designs</button></div>
   </div>
@@ -2959,14 +2963,26 @@ const CARRIERS = [
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo · '+(parseInt(bp)/12)+'-yr · '+pctL(infl), sub:'Total pool '+fmt0(s.monthlyBenefit*parseInt(bp)), trayObj:o};
     },
-    // shared-care (couple) version of the sweet spot — only carriers that offer it define this
-    sharedSweet(p){
+    // joint (both applying) household version — a real two-life quote
+    sweetSpotCouple(p){
       const s=SWEETSPOT.ngl, bp=s.benefitPeriod, infl=(p.inflation==null?s.inflation:p.inflation);
-      const o={age:p.age, gender:p.gender, monthlyBenefit:s.monthlyBenefit, benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp, maritalDiscount:p.marital==='married-one', riderSharedAdditional:true};
-      let q; try{ q=E.quote(o); }catch(e){ return null; }
-      const pool=s.monthlyBenefit*parseInt(bp)*3;   // his + hers + shared
-      return {label:this.label+' · shared-care', fits:true, premium:q.modalPayment, annual:q.annualPremium,
-        design:fmt0(s.monthlyBenefit)+'/mo · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · shared-care', sub:'3 shared pools · '+fmt0(pool)+' total', trayObj:o};
+      const opts={benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp};
+      let r; try{ r=E.quoteCouple(p.age,p.gender,p.age2,p.gender2,s.monthlyBenefit,opts); }catch(e){ return {label:this.label+' · joint', fits:false, note:e.message}; }
+      const c=r.combined_joint, older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
+      const trayObj=Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true});
+      return {label:this.label+' · joint', fits:true, premium:c.modalPayment, annual:c.annualPremium,
+        design:fmt0(s.monthlyBenefit)+'/mo each · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · joint', sub:'Combined household (both lives)', trayObjs:[trayObj]};
+    },
+    // joint + shared benefit pool — the shared-care rider on the two-life policy
+    sharedSweetCouple(p){
+      const s=SWEETSPOT.ngl, bp=s.benefitPeriod, infl=(p.inflation==null?s.inflation:p.inflation);
+      const opts={benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp, riderSharedAdditional:true};
+      let r; try{ r=E.quoteCouple(p.age,p.gender,p.age2,p.gender2,s.monthlyBenefit,opts); }catch(e){ return null; }
+      const c=r.combined_joint, older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
+      const trayObj=Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true});
+      const pool=s.monthlyBenefit*parseInt(bp)*3;
+      return {label:this.label+' · joint + shared pool', fits:true, premium:c.modalPayment, annual:c.annualPremium,
+        design:fmt0(s.monthlyBenefit)+'/mo each · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · shared pool', sub:'Shared pool · '+fmt0(pool)+' household total', trayObjs:[trayObj]};
     } },
   { id:'carescout', label:'CareScout — Care Assurance',
     solve(p){
@@ -3013,17 +3029,37 @@ const CARRIERS = [
       const q=CS.quote(o), ratio=pool/daily/365.25;
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:'$'+daily+'/day · '+fmt0(pool)+' pool (≈'+ratio.toFixed(1)+' yr) · '+csInflLabel(bio), sub:'Uses Standard class', trayObj:o};
+    },
+    // couple = two individual policies at the married (both applying) class
+    sweetSpotCouple(p){
+      const st=p.state||'';
+      if(!csAvailableState(st)) return {label:this.label+' · couple', fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
+      if(p.age<40||p.age>70||p.age2<40||p.age2>70) return {label:this.label+' · couple', fits:false, note:'CareScout issues ages 40–70 (both applicants).'};
+      const s=SWEETSPOT.carescout, bio=(p.inflation==null?s.inflation:inflToBio(p.inflation));
+      let daily=s.dailyBenefit, pool=s.coverageMax;
+      if(csDailies(st).indexOf(daily)<0) daily=csDailies(st)[0];
+      if(csPoolsFor(daily,st).indexOf(pool)<0) pool=csPoolsFor(daily,st).slice(-1)[0];
+      const mk=(age,gender)=>({carrier:'carescout', age, gender, uwClass:'Standard', marital:'Married', dailyBenefit:daily, coverageMax:pool, inflation:bio, deductible:90, mode:'monthly', state:st||null});
+      const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=CS.quote(oA), qB=CS.quote(oB), ratio=pool/daily/365.25;
+      return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
+        design:'$'+daily+'/day · '+fmt0(pool)+' pool each (≈'+ratio.toFixed(1)+' yr) · married class', sub:'Two individual policies (combined)', trayObjs:[oA,oB]};
     } },
 ];
 function sweetSpotAll(p, includeShared){
+  const couple = p.age2 && p.marital==='married-both';
   const out=[];
   for(const c of CARRIERS){
-    if(!c.sweetSpot) continue;
-    try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpot(p))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); }
-    if(includeShared && c.sharedSweet){ try{ const s=c.sharedSweet(p); if(s) out.push(Object.assign({carrier:c.id, kind:'shared'}, s)); }catch(e){} }
+    if(couple){
+      if(c.sweetSpotCouple){ try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpotCouple(p))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); } }
+      if(includeShared && c.sharedSweetCouple){ try{ const s=c.sharedSweetCouple(p); if(s) out.push(Object.assign({carrier:c.id, kind:'shared'}, s)); }catch(e){} }
+    } else {
+      if(!c.sweetSpot) continue;
+      try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpot(p))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); }
+    }
   }
   return out;
 }
+function ssObjs(r){ return r.trayObjs || (r.trayObj?[r.trayObj]:[]); }
 function budgetSolveAll(p){ return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
 function showBudgetAll(p){
   const results=budgetSolveAll(p);
@@ -3048,25 +3084,41 @@ function runBudgetAll(){ try{
 
 /* ---------- sweet spot — each carrier's best-value design, side by side ---------- */
 function showSweetSpot(p, includeShared){
+  const couple = p.age2 && p.marital==='married-both';
   const results=sweetSpotAll(p, includeShared);
-  const fitList=results.filter(r=>r.fits).map(r=>r.trayObj);
-  const head='<div class="config-line">⭐ <b>Best-value design — each carrier</b>'+(includeShared?' + shared-care':'')+' &middot; '+p.age+' '+gL(p.gender)+' &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
+  const fitList=results.filter(r=>r.fits).flatMap(ssObjs);
+  const who = couple
+    ? p.age+' '+gL(p.gender)+' + '+p.age2+' '+gL(p.gender2)+' (joint)'
+    : p.age+' '+gL(p.gender);
+  const head='<div class="config-line">⭐ <b>Best-value design — each carrier</b>'+(couple?' · household':'')+' &middot; '+who+' &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
   const rows=results.map(r=>{
     if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td colspan="2" style="color:var(--muted)">'+(r.note||'No design')+'</td><td></td></tr>';
     const shaded=r.kind==='shared'?' style="background:#f0fdf4"':'';
-    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.trayObj)+')\'>＋ add</button>';
-    return '<tr'+shaded+'><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>';
+    const objs=ssObjs(r);
+    const unit = couple ? '/mo household' : '/mo';
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addAllToTray('+JSON.stringify(objs)+')\'>＋ add</button>';
+    return '<tr'+shaded+'><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+unit+'</td><td style="text-align:right">'+add+'</td></tr>';
   }).join('');
   const addAll = fitList.length>1 ? '<button class="run" style="margin-top:12px" onclick=\'addAllToTray('+JSON.stringify(fitList)+')\'>＋ Add all to comparison</button>' : '';
-  const noShared = includeShared ? CARRIERS.filter(c=>c.sweetSpot && !c.sharedSweet).map(c=>c.label.split(' — ')[0]) : [];
-  const sharedNote = noShared.length ? '<div class="warn" style="margin-top:8px">Shared-care isn’t offered by: '+noShared.join(', ')+'. A shared-care row appears only for carriers that offer it.</div>' : '';
-  show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+sharedNote+'<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Shared-care (green) adds a couple’s shared benefit pool. Premiums differ — that’s the point. Add them to build a side-by-side client sheet.</div><div class="disc">'+DISC+'</div>');
+  const noShared = (couple && includeShared) ? CARRIERS.filter(c=>c.sweetSpotCouple && !c.sharedSweetCouple).map(c=>c.label.split(' — ')[0]) : [];
+  const sharedNote = noShared.length ? '<div class="warn" style="margin-top:8px">Shared benefit pool isn’t offered by: '+noShared.join(', ')+' (their couple design is two individual policies). A shared-pool row appears only for carriers that offer it.</div>' : '';
+  const coupleNote = couple ? '<div class="hint" style="margin-top:8px">Household premiums: NGL is one two-life (joint) policy; CareScout is two individual policies at the married class, combined. Add them to build a side-by-side client sheet.</div>' : '<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Premiums differ — that’s the point. Add them to build a side-by-side client sheet.</div>';
+  show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+sharedNote+coupleNote+'<div class="disc">'+DISC+'</div>');
 }
 function openSweet(){ setCarrier('ngl'); $('sweetCard').hidden=false; $('sweetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
+function swMaritalChange(){
+  const couple=$('sw_marital').value==='married-both';
+  $('sw_spouse').hidden=!couple;
+  $('sw_sharedwrap').style.display=couple?'':'none';
+  if(!couple) $('sw_shared').checked=false;
+}
 function runSweetSpot(){ try{
+  const marital=$('sw_marital').value;
   const p={age:+$('sw_age').value, gender:$('sw_gender').value, state:$('sw_state').value||null,
-    marital:$('sw_marital').value, inflation:parseFloat($('sw_infl').value)||0};
+    marital, inflation:parseFloat($('sw_infl').value)||0};
   if(!p.age) return showErr('Enter an issue age.');
+  if(marital==='married-both'){ p.age2=+$('sw_age2').value; p.gender2=$('sw_gender2').value;
+    if(!p.age2) return showErr('Enter the spouse’s age for a joint quote.'); }
   showSweetSpot(p, $('sw_shared').checked);
 }catch(e){ showErr(e.message); } }
 
@@ -3370,7 +3422,8 @@ function interpret(text){
   const wantsAll=/\b(compan(?:y|ies)|carriers?|insurers?|ngl|carescout)\b/i.test(t) || /\bboth\b/i.test(t);
   const isMostBuy=/\b(most|biggest|largest|maximi[sz]e?|how much|afford|budget|stretch|can i (?:get|buy)|what.*\bbuy\b)\b/i.test(t);
   if(wantsAll && grabTarget(t) && (isBudget||isOptimize||isMostBuy)) return {intent:'budgetAll', gender, age:ages[0], state, target:grabTarget(t), years:(grabBP(t)?parseInt(grabBP(t))/12:3), inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single'), uw:(/\bpreferred\b/i.test(t)?'Preferred':'Standard')};
-  if(/\bsweet[- ]?spot|best[- ]?value\b/i.test(t)) return {intent:'sweet', gender, age:ages[0], state, inflation:(grabInfl(t)??0.03), marital:(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single'), shared:/\bshared|couple|both\b/i.test(t)};
+  if(/\bsweet[- ]?spot|best[- ]?value\b/i.test(t)){ const two=ages.length>=2;
+    return {intent:'sweet', gender, age:ages[0], age2:(two?ages[1]:null), gender2:(two?(gender==='female'?'male':'female'):null), state, inflation:(grabInfl(t)??0.03), marital:(two?'married-both':(/\b(married|spouse|spousal|marital)\b/i.test(t)?'married-one':'single')), shared:/\bshared|couple|both|joint\b/i.test(t)}; }
   if(isStandard) return {intent:'standard', gender, age:ages[0], state};
   if(isWaiting) return {intent:'waiting', gender, age:ages[0], state, benefit:grabBenefit(t)||4500, benefitPeriod:grabBP(t)||'36', inflation:(grabInfl(t)??0.03)};
   if(isOptimize && grabTarget(t)) return {intent:'optimize', gender, age:ages[0], state, target:grabTarget(t)};
@@ -3385,7 +3438,7 @@ function dispatch(p){
   if((p.intent==='standard'||p.intent==='single'||p.intent==='budget') && !p.age) return setInterp('I need an <b>age</b> — e.g. “a 62 year old”.');
   if(p.intent==='waiting'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing the <b>cost of waiting</b> for a '+p.age+' '+gL(p.gender)+' — premiums climb with age, and required coverage grows ~3%/yr as care gets pricier.', p.ai); showWaiting(computeWaiting(p.age,p.gender,SNAP(p.benefit),p.benefitPeriod,p.inflation,p.state)); return; }
   if(p.intent==='budgetAll'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Finding the most a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' — every carrier, side by side.', p.ai); showBudgetAll({budget:p.target, age:p.age, gender:p.gender, years:p.years||3, inflation:p.inflation||0, uw:p.uw||'Standard', marital:p.marital||'single', state:p.state||null}); return; }
-  if(p.intent==='sweet'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing each carrier’s <b>best-value design</b>'+(p.shared?' + shared-care':'')+' for a '+p.age+' '+gL(p.gender)+', side by side.', p.ai); showSweetSpot({age:p.age, gender:p.gender, state:p.state||null, marital:p.marital||'single', inflation:(p.inflation==null?0.03:p.inflation)}, !!p.shared); return; }
+  if(p.intent==='sweet'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); setInterp('Showing each carrier’s <b>best-value design</b>'+(p.age2?' — household':'')+' for '+p.age+' '+gL(p.gender)+(p.age2?' + '+p.age2+' '+gL(p.gender2):'')+', side by side.', p.ai); showSweetSpot({age:p.age, gender:p.gender, age2:p.age2||null, gender2:p.gender2||null, state:p.state||null, marital:p.marital||'single', inflation:(p.inflation==null?0.03:p.inflation)}, !!p.shared); return; }
   if(p.intent==='optimize'){ if(!p.gender) return setInterp('I need a <b>gender</b> — add “male” or “female”.'); if(!p.age) return setInterp('I need an <b>age</b>.'); if(!p.target) return setInterp('Tell me the <b>monthly budget</b> — e.g. “$300 a month”.'); setInterp('Exploring what a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+' across benefit periods and inflation options.', p.ai); const d=computeOptimize(p.target,p.age,p.gender,p.state); renderOptimize(d,''); if(p.ai) recommendAI(p.target,p.age,p.gender,d); return; }
   if(p.intent==='standard'){ setInterp('Running your <b>standard 3-option ladder</b> for a '+p.age+' '+gL(p.gender)+'.', p.ai); showStandard(p.age,p.gender,p.state); }
   else if(p.intent==='budget'){ if(!p.target) return setInterp('For a budget quote, tell me the <b>monthly amount</b> — e.g. “for $300 a month”.'); setInterp('Solving how much a <b>'+fmt0(p.target)+'/mo</b> budget buys for a '+p.age+' '+gL(p.gender)+'.', p.ai); showBudget(p.target,p.age,p.gender,p.opts); }

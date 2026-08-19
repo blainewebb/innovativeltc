@@ -81,9 +81,17 @@ typed command ("sweet spot for a 60 year old female in TX").
 `sharedSweet(p)` method; the sweet-spot tool then shows an extra shared-care row for it when
 "Also show a shared-care version" is checked. NGL has it (its Shared Additional Policy Limit
 rider — 3 shared pools). CareScout's Care Assurance has **no** shared-care option (confirmed:
-no "shared" anywhere in the state file, and the Survivorship Benefit is "Not offered"), so it
-simply shows no shared row and a note says so. Any future carrier that adds `sharedSweet`
-appears automatically.
+no "shared" anywhere in the state file, and the Survivorship Benefit is "Not offered").
+
+**Couples are real joint quotes.** Choosing "Married — both applying (joint)" reveals spouse
+age/gender fields and switches each carrier to a `sweetSpotCouple(p)` (and optional
+`sharedSweetCouple(p)`) that returns a true household quote:
+- **NGL:** one two-life joint policy (`quoteCouple`, rated on the older insured), optionally
+  with the shared benefit pool. Combined household premium.
+- **CareScout:** two individual policies at the married (both applying) class, combined —
+  CareScout is individual-only, so there's no shared pool for it.
+
+Any future carrier that adds these methods joins the couple comparison automatically.
 
 **Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
 (CareScout's illustration software) quotes through age 70 and the rate workbook carries
