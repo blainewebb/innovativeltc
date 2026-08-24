@@ -3707,9 +3707,29 @@ function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add a
   QSHEET={client:{name:'', items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
-function printSheet(){ window.print(); }
+// Open the content in a real browser tab and print there. window.print() is silently
+// ignored inside claude.ai's sandboxed artifact frame, so we escape the frame first.
+// Falls back to in-place print (works in the downloaded file / non-sandboxed views).
+function printDoc(innerHTML, title, bodyClass){
+  let css=''; document.querySelectorAll('style').forEach(s=>{ css+=s.textContent+'\n'; });
+  let w=null; try{ w=window.open('', '_blank'); }catch(e){ w=null; }
+  if(!w){
+    // popup blocked or sandbox disallows it — try in-place, then guide to the file
+    try{ if(bodyClass){ document.body.classList.add(bodyClass); const done=()=>{document.body.classList.remove(bodyClass);window.removeEventListener('afterprint',done);}; window.addEventListener('afterprint',done);} window.print(); }catch(e){}
+    setTimeout(()=>alert('Your browser blocked the print window in this embedded view. Open the quote-tool file (the ltc-quote.html I sent) and print from there — the downloaded file prints reliably.'), 50);
+    return;
+  }
+  const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
+  w.document.open();
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+'</head><body class="'+(bodyClass||'')+'">'+innerHTML+'</body></html>');
+  w.document.close();
+  const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
+  try{ w.onload=()=>setTimeout(go,250); }catch(e){}
+  setTimeout(go, 600);   // belt-and-suspenders in case onload already fired
+}
+function printSheet(){ printDoc('<div class="qsheet">'+$('sheet').outerHTML+'</div>', 'Quote — Innovative LTC', ''); }
 // Print just the current result card (Inflation Growth / Cost of Waiting / comparison)
-function printResult(){ const done=()=>{ document.body.classList.remove('print-result'); window.removeEventListener('afterprint',done); }; window.addEventListener('afterprint',done); document.body.classList.add('print-result'); window.print(); }
+function printResult(){ printDoc('<div class="wrap"><div class="card" id="resultCard">'+$('result').innerHTML+'</div></div>', 'Quote — Innovative LTC', 'print-result'); }
 function resultBrand(title){ return '<div class="printonly res-brand">Innovative <span>LTC</span> — '+title+'<small>Blaine Webb · Innovative LTC · blaine@innovativeltc.com</small></div>'; }
 function printBtn(){ return '<button class="resprint noprint" onclick="printResult()">⎙ Print / Save PDF</button>'; }
 /* customize: toggle/reorder line items, move option columns */
