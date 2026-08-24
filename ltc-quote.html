@@ -3219,9 +3219,13 @@ function showCouple(a1,g1,a2,g2,opts){
   const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
   const surv=Object.keys(r).filter(k=>k.startsWith('survivor_'));
   const rows=surv.map(k=>'<tr><td>If only the '+k.replace('survivor_','')+' remains</td><td class="p">'+fmt(r[k].modalPayment)+'/mo</td></tr>').join('');
+  // joint household policy as a tray object (rated on the older insured) so it can be added/saved/printed
+  const older = (+a1>=+a2) ? {age:+a1,gender:g1} : {age:+a2,gender:g2};
+  const trayObj = Object.assign({}, opts, older, {joint:true, monthlyBenefit:opts.monthlyBenefit});
   show('<div class="res-head">'+priceHead(c)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
     '<div class="config-line">'+fmt0(opts.monthlyBenefit)+'/mo each &middot; '+bpL(opts.benefitPeriod)+' &middot; '+opts.elimination+'-day &middot; '+pctL(opts.inflation)+(opts.riderSharedAdditional?' &middot; shared-care':'')+'</div>'+
-    '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+stepsBlock(c.steps)+'<div class="disc">'+DISC+'</div>');
+    '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+
+    '<div class="resbtns">'+addBtn(trayObj)+'</div>'+stepsBlock(c.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showBudget(target,age,gender,opts){
   const raw=E.benefitForPremium(target,age,gender,opts).solvedMonthlyBenefit;
