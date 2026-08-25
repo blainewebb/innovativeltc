@@ -3707,26 +3707,37 @@ function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add a
   QSHEET={client:{name:'', items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
-// Open the content in a real browser tab and print there. window.print() is silently
-// ignored inside claude.ai's sandboxed artifact frame, so we escape the frame first.
-// Falls back to in-place print (works in the downloaded file / non-sandboxed views).
-function printDoc(innerHTML, title, bodyClass){
+// Build a self-contained, print-ready HTML document from the given content.
+function buildPrintDoc(innerHTML, title, bodyClass, autoprint){
   let css=''; document.querySelectorAll('style').forEach(s=>{ css+=s.textContent+'\n'; });
+  const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
+  const onload = autoprint ? ' onload="setTimeout(function(){try{window.print()}catch(e){}},350)"' : '';
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+'</head><body class="'+(bodyClass||'')+'"'+onload+'>'+innerHTML+'</body></html>';
+}
+// window.print() is silently ignored inside claude.ai's sandboxed artifact frame, so:
+// 1) open a real browser tab and print there (works in the downloaded file / non-sandboxed views);
+// 2) if popups are blocked, hand the viewer a print-ready file via the downloads capability;
+// 3) if that's unavailable too, show an in-page help panel.
+async function printDoc(innerHTML, title, bodyClass){
   let w=null; try{ w=window.open('', '_blank'); }catch(e){ w=null; }
-  if(!w){
-    // popups + print + alert are all blocked inside the sandboxed artifact frame —
-    // try native print once (works in the downloaded file), then show an in-page panel.
-    try{ if(bodyClass){ document.body.classList.add(bodyClass); const done=()=>{document.body.classList.remove(bodyClass);window.removeEventListener('afterprint',done);}; window.addEventListener('afterprint',done);} window.print(); }catch(e){}
-    showPrintHelp();
+  if(w){
+    w.document.open();
+    w.document.write(buildPrintDoc(innerHTML, title, bodyClass, false));
+    w.document.close();
+    const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
+    try{ w.onload=()=>setTimeout(go,250); }catch(e){}
+    setTimeout(go, 600);
     return;
   }
-  const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
-  w.document.open();
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+'</head><body class="'+(bodyClass||'')+'">'+innerHTML+'</body></html>');
-  w.document.close();
-  const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
-  try{ w.onload=()=>setTimeout(go,250); }catch(e){}
-  setTimeout(go, 600);   // belt-and-suspenders in case onload already fired
+  // sandboxed frame — offer the quote as a print-ready file (auto-opens the print dialog when opened)
+  try{
+    const dl = (window.claude && claude.use) ? await claude.use('downloads') : null;
+    if(dl){
+      try{ await dl.save({filename:'LTC-quote.html', data: buildPrintDoc(innerHTML, title, bodyClass, true)}); return; }
+      catch(e){ if(e && e.code==='declined') return; }   // viewer said no — don't nag
+    }
+  }catch(e){}
+  showPrintHelp();
 }
 function showPrintHelp(){
   let el=$('printHelp');
