@@ -3714,9 +3714,10 @@ function printDoc(innerHTML, title, bodyClass){
   let css=''; document.querySelectorAll('style').forEach(s=>{ css+=s.textContent+'\n'; });
   let w=null; try{ w=window.open('', '_blank'); }catch(e){ w=null; }
   if(!w){
-    // popup blocked or sandbox disallows it — try in-place, then guide to the file
+    // popups + print + alert are all blocked inside the sandboxed artifact frame —
+    // try native print once (works in the downloaded file), then show an in-page panel.
     try{ if(bodyClass){ document.body.classList.add(bodyClass); const done=()=>{document.body.classList.remove(bodyClass);window.removeEventListener('afterprint',done);}; window.addEventListener('afterprint',done);} window.print(); }catch(e){}
-    setTimeout(()=>alert('Your browser blocked the print window in this embedded view. Open the quote-tool file (the ltc-quote.html I sent) and print from there — the downloaded file prints reliably.'), 50);
+    showPrintHelp();
     return;
   }
   const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
@@ -3726,6 +3727,21 @@ function printDoc(innerHTML, title, bodyClass){
   const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
   try{ w.onload=()=>setTimeout(go,250); }catch(e){}
   setTimeout(go, 600);   // belt-and-suspenders in case onload already fired
+}
+function showPrintHelp(){
+  let el=$('printHelp');
+  if(!el){ el=document.createElement('div'); el.id='printHelp'; el.className='modal';
+    el.innerHTML='<div class="box"><h3>Save this quote as a PDF</h3>'+
+      '<p>You’re on the shared app <b>link</b>, which runs in a secure frame that blocks the browser’s print dialog — so the button can’t open it here.</p>'+
+      '<p><b>Reliable ways to get the PDF:</b></p>'+
+      '<ul style="line-height:1.7;margin:2px 0 12px 18px">'+
+      '<li><b>Open the saved file</b> — double-click the <b>ltc-quote.html</b> file on your computer; it opens in your browser and prints / saves to PDF normally.</li>'+
+      '<li><b>Ask Blaine to host it at a real web link</b> — then Print / Save PDF works right from the web (and on your phone).</li>'+
+      '</ul>'+
+      '<div class="row"><button class="run" onclick="$(\'printHelp\').classList.remove(\'show\')">Got it</button></div></div>';
+    document.body.appendChild(el);
+  }
+  el.classList.add('show');
 }
 function printSheet(){ printDoc('<div class="qsheet">'+$('sheet').outerHTML+'</div>', 'Quote — Innovative LTC', ''); }
 // Print just the current result card (Inflation Growth / Cost of Waiting / comparison)
