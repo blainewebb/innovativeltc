@@ -1359,7 +1359,7 @@ async function onBarcode(code){
   hint.innerHTML=`<div class="spinner"></div>Looking up ${esc(code)}…`;
   try{
     const url=`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`+
-      `?fields=code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,ingredients_analysis_tags`;
+      `?fields=${OFF_FIELDS}`;
     const res=await fetch(url); const data=await res.json();
     if(data.status===1&&data.product&&data.product.product_name){ foodFromProduct(data.product); hint.textContent='Found it!'; }
     else hint.innerHTML=`Barcode <b>${esc(code)}</b> isn't in the database. Add it via the Manual tab.`;
