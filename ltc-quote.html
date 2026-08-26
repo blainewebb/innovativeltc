@@ -3595,7 +3595,35 @@ function saveClientForm(){ const name=$('cf_name').value.trim(); if(!name){ aler
   if(EDIT_CLIENT>=0){ Object.assign(c[EDIT_CLIENT], fields); c[EDIT_CLIENT].updatedAt=Date.now(); delete c[EDIT_CLIENT].contact; }
   else { const rec=Object.assign({}, fields, {items:(PENDING_ITEMS||LS.tray()).slice(), savedAt:new Date().toLocaleDateString(), ts:Date.now()}); rec.updatedAt=rec.ts; c.push(rec); }
   LS.setClients(c); $('clientModal').classList.remove('show'); renderClients(); openClients(); }
-function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); renderTray(); closeClients(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); renderTray(); hydrateFormsFrom(c.items); closeClients(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+// Loading a client puts their applicant details back into the entry form (ages, gender, plan)
+function hydrateFormsFrom(items){
+  if(!items||!items.length) return;
+  const ngl1=items.find(o=>!isCS(o)&&!o.joint), nglJ=items.find(o=>!isCS(o)&&o.joint), cs1=items.find(o=>isCS(o));
+  if(ngl1) fillSingleForm(ngl1); else if(nglJ) fillCoupleForm(nglJ); else if(cs1) fillCsForm(cs1);
+}
+function fillSingleForm(o){
+  setCarrier('ngl'); setMode('manual'); activateTab('single');
+  $('s_age').value=o.age; $('s_gender').value=o.gender||'female'; $('s_benefit').value=o.monthlyBenefit;
+  $('s_bp').value=o.benefitPeriod||'36'; $('s_ep').value=o.elimination||'90'; $('s_infl').value=String(o.inflation||0);
+  $('s_pay').value=o.pay||'level'; $('s_mode').value=o.mode||'monthly'; $('s_state').value=o.state||'';
+  $('s_sba').checked=!!o.riderSharedAdditional; $('s_fdc').checked=!!o.riderFirstDayHccs;
+  $('s_sbn').checked=!!o.riderShortenedBenefit; $('s_marital').checked=!!o.maritalDiscount;
+}
+function fillCoupleForm(o){
+  setCarrier('ngl'); setMode('manual'); activateTab('couple');
+  $('c_age1').value=o.age; $('c_g1').value=o.gender||'male';   // only the older insured is stored on a joint quote
+  $('c_benefit').value=o.monthlyBenefit; $('c_bp').value=o.benefitPeriod||'36'; $('c_ep').value=o.elimination||'90';
+  $('c_infl').value=String(o.inflation||0); $('c_sba').checked=!!o.riderSharedAdditional;
+}
+function fillCsForm(o){
+  setCarrier('carescout');
+  $('cs_state').value=o.state||''; csSyncState();
+  $('cs_gender').value=o.gender||'female'; $('cs_uw').value=o.uwClass||'Standard'; $('cs_marital').value=o.marital||'Single';
+  $('cs_daily').value=o.dailyBenefit; csSyncPool(); $('cs_pool').value=o.coverageMax;
+  $('cs_infl').value=o.inflation||'none'; $('cs_ded').value=o.deductible||90; csSyncHc(); $('cs_hc').checked=!!o.zeroDayHc;
+  $('cs_mode').value=o.mode||'monthly'; $('cs_age').value=o.age;
+}
 function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+'”?')) return; c.splice(i,1); LS.setClients(c); renderClients(); }
 function openClients(){ renderClientsList(); $('clientsModal').classList.add('show'); }
 function closeClients(){ $('clientsModal').classList.remove('show'); }
