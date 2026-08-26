@@ -415,11 +415,11 @@
   <div class="card" id="cscard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">CareScout</h2>
-      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–70, lifetime pay. Verified against CareScout's own rate workbook.</p>
+      <p class="hint" style="margin:0">Daily-benefit design with a coverage-maximum pool. Issue ages 40–65, lifetime pay. Verified against CareScout's own rate workbook.</p>
     </div>
     <div class="grid">
       <div class="field"><label>State</label><select id="cs_state" onchange="csSyncState()"></select></div>
-      <div class="field"><label>Issue age (40–70)</label><input id="cs_age" type="number" value="62" min="40" max="70"></div>
+      <div class="field"><label>Issue age (40–65)</label><input id="cs_age" type="number" value="62" min="40" max="65"></div>
       <div class="field"><label>Gender</label><select id="cs_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Underwriting class</label><select id="cs_uw"><option value="Standard" selected>Standard</option><option value="Preferred">Preferred</option></select></div>
       <div class="field"><label>Marital status</label><select id="cs_marital">
@@ -2903,7 +2903,7 @@ function csSyncHc(){
   $('cs_hc_lbl').style.opacity=d180?'.5':'1';
   $('cs_hc_lbl').title=d180?'Not available with the 180-day deductible':'';
 }
-function csRunSingle(){ try{ csShowSingle(csOpts()); }catch(e){ showErr(e.message); } }
+function csRunSingle(){ try{ const o=csOpts(); if(o.age<40||o.age>65) return showErr('CareScout issues ages 40–65.'); csShowSingle(o); }catch(e){ showErr(e.message); } }
 function csPriceHead(q){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode];
   return '<div class="price">'+fmt(q.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(q.annualPremium)+' / yr</div>'; }
 function csValueMetrics(o,q){
@@ -2988,7 +2988,7 @@ const CARRIERS = [
     solve(p){
       const st=p.state||'';
       if(!csAvailableState(st)) return {label:this.label, fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
-      if(p.age<40||p.age>70) return {label:this.label, fits:false, note:'CareScout issues ages 40–70.'};
+      if(p.age<40||p.age>65) return {label:this.label, fits:false, note:'CareScout issues ages 40–65.'};
       const bio=inflToBio(p.inflation);
       const marital=p.marital==='married-both'?'Married':(p.marital==='married-one'?'Married1buy':'Single');
       const uw=p.uw||'Standard';
@@ -3018,7 +3018,7 @@ const CARRIERS = [
     sweetSpot(p){
       const st=p.state||'';
       if(!csAvailableState(st)) return {label:this.label, fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
-      if(p.age<40||p.age>70) return {label:this.label, fits:false, note:'CareScout issues ages 40–70.'};
+      if(p.age<40||p.age>65) return {label:this.label, fits:false, note:'CareScout issues ages 40–65.'};
       const s=SWEETSPOT.carescout;
       const bio=(p.inflation==null?s.inflation:inflToBio(p.inflation));
       const marital=p.marital==='married-both'?'Married':(p.marital==='married-one'?'Married1buy':'Single');
@@ -3034,7 +3034,7 @@ const CARRIERS = [
     sweetSpotCouple(p){
       const st=p.state||'';
       if(!csAvailableState(st)) return {label:this.label+' · couple', fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
-      if(p.age<40||p.age>70||p.age2<40||p.age2>70) return {label:this.label+' · couple', fits:false, note:'CareScout issues ages 40–70 (both applicants).'};
+      if(p.age<40||p.age>65||p.age2<40||p.age2>65) return {label:this.label+' · couple', fits:false, note:'CareScout issues ages 40–65 (both applicants).'};
       const s=SWEETSPOT.carescout, bio=(p.inflation==null?s.inflation:inflToBio(p.inflation));
       let daily=s.dailyBenefit, pool=s.coverageMax;
       if(csDailies(st).indexOf(daily)<0) daily=csDailies(st)[0];

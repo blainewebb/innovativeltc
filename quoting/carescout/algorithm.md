@@ -93,10 +93,11 @@ age/gender fields and switches each carrier to a `sweetSpotCouple(p)` (and optio
 
 Any future carrier that adds these methods joins the couple comparison automatically.
 
-**Issue ages 40–70.** The state spec's "Issue Ages" field reads 40–65, but StrateCision
-(CareScout's illustration software) quotes through age 70 and the rate workbook carries
-base rates to 70 — so the webpage allows 40–70. Save-age convention (rate one year younger
-within 30 days of the next birthday) is confirmed.
+**Issue ages 40–65.** Confirmed by Blaine against CareScout — the product issues 40–65
+(the state spec's "Issue Ages" field was right; StrateCision showing 70 was wrong). The rate
+workbook carries base rates through 70, but new business caps at 65, so the webpage enforces
+40–65. Save-age convention (rate one year younger within 30 days of the next birthday) is
+confirmed.
 
 ## Inputs (per applicant)
 - **Issue age** from DOB via **Save Age** logic: if birthday within 30 days of current date, rate one year younger. Min age 40, max 70.
