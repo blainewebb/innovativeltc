@@ -224,6 +224,7 @@
   .cz-item input{width:auto}
   .cz-item .cz-lbl{font-weight:600;color:#334155}
   .cz-item.off .cz-lbl{color:var(--muted);text-decoration:line-through}
+  table.qtab th .col-carrier{margin-top:3px;font-size:.72rem;font-weight:800;color:#fff;background:var(--primary-d);border-radius:999px;padding:2px 8px;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.qtab th .colmove{display:inline-flex;gap:3px;justify-content:center;margin-top:5px}
   table.qtab th .colmove button{border:1px solid var(--border);background:#fff;color:var(--primary-d);border-radius:6px;width:22px;height:20px;line-height:1;font-size:.7rem;font-weight:800;cursor:pointer;padding:0}
   table.qtab th .colmove button:disabled{opacity:.3;cursor:default}
@@ -3840,8 +3841,7 @@ function renderSheet(){
     rows = QLAYOUTS[QSHEET.layout].slice();
     if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
     else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
-    const spanCarriers = items.some(isCS) && items.some(o=>!isCS(o));
-    if(spanCarriers && !rows.includes('carrier')) rows.unshift('carrier'); // NGL vs CareScout on one sheet → name the carrier
+    if(rows.includes('carrier')) rows = rows.filter(k=>k!=='carrier'); // carrier now shown in each column header
     if(items.every(o=>isCS(o)||!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
     if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   }
@@ -3850,7 +3850,7 @@ function renderSheet(){
   // option column order (view-only; reset each time the sheet is opened)
   if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
   const order = QSHEET.colOrder;
-  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
