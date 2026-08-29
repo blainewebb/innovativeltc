@@ -3415,7 +3415,7 @@ function showStandardJoint(age1,g1,age2,g2,state){
 function stdTypeChange(){ $('t_couple').hidden = $('t_type').value!=='joint'; }
 function showCompare(items, opts){
   opts=opts||{};
-  const rows=items.map(o=>{ let prem='—'; try{ const q=E.quote(o); prem=fmt(q.modalPayment)+'/mo'; }catch(e){} return '<tr><td class="b">'+cfgText(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){} return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
   const addAll = items.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+JSON.stringify(items)+')\'>＋ Add all '+items.length+' to comparison</button>' : '';
   show('<div class="config-line">'+(opts.title||'Comparison')+'</div>'+addAll+'<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
@@ -3669,9 +3669,8 @@ function fillQuickPicker(){
 }
 // --- save the current comparison as a reusable quick command (no typing amounts) ---
 let PENDING_PATTERN_OPTS=null;
-function optDesignText(o){ return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
+function optDesignText(o){ if(isCS(o)||isOmni(o)) return cfgTextAny(o); return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
 function saveTrayAsPattern(){ let a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
-  if(a.some(o=>isCS(o)||isOmni(o))){ if(!a.some(o=>!isCS(o)&&!isOmni(o))){ alert('Quick commands re-run NGL designs by typing an age + gender. CareScout and Omniflex quotes use their own forms, so they can’t be saved as a quick command yet.'); return; } alert('Quick commands only capture the NGL options — the CareScout / Omniflex options in this comparison will be skipped.'); a=a.filter(o=>!isCS(o)&&!isOmni(o)); }
   PENDING_PATTERN_OPTS=a.map(o=>Object.assign({},o));
   $('sp_trigger').value=''; $('sp_name').value='';
   $('sp_preview').innerHTML='<div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:5px">Captures '+a.length+' option'+(a.length>1?'s':'')+' (age &amp; gender become variable):</div><div style="font-size:.85rem;color:#334155;line-height:1.7">'+a.map(o=>'&bull; '+optDesignText(o)).join('<br>')+'</div>';
@@ -3855,7 +3854,9 @@ function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$(
 let EDIT_PAT = -1;
 function patternSummary(p){
   if(p.options && p.options.length){
-    return p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(o=>fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr/'+(o.inflation?(o.inflation*100)+'%':'level')).join(', ');
+    const carriers=[...new Set(p.options.map(o=>isOmni(o)?'Omniflex':isCS(o)?'CareScout':'NGL'))].join('/');
+    const optStr=o=> isOmni(o)?('$'+o.facilityDaily+'/day STC') : isCS(o)?('$'+o.dailyBenefit+'/day') : (fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr'+(o.inflation?'/'+(o.inflation*100)+'%':''));
+    return carriers+' · '+p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(optStr).join(', ');
   }
   const bits=[bpL(p.benefitPeriod), (p.elimination||'90')+'-day', pctL(p.inflation??null)];
   if(p.pay&&p.pay!=='level') bits.push(p.pay==='10pay'?'10-Pay':'Single-Pay');
