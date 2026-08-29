@@ -304,7 +304,7 @@
       <div class="tab active" data-mode="single">Single</div>
       <div class="tab" data-mode="couple">Couple</div>
       <div class="tab" data-mode="budget">Budget</div>
-      <div class="tab" data-mode="standard">My Standard</div>
+      <div class="tab" data-mode="standard">Quick Commands</div>
       <div class="tab" data-mode="waiting">Cost of Waiting</div>
       <div class="tab" data-mode="growth">Inflation Growth</div>
       <div class="tab" data-mode="care">Cost of Care</div>
@@ -357,8 +357,9 @@
       <div class="actions"><button class="run" onclick="runBudget()">Solve coverage</button></div>
     </div>
     <div class="pane" data-pane="standard" hidden>
-      <p class="hint" style="margin-top:0" id="std_desc"></p>
+      <p class="hint" style="margin-top:0">Pick a commonly-run quote and run it for this applicant. Build more with “＋ Save as quick command” under a comparison.</p>
       <div class="grid">
+        <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
         <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
           <option value="single-female">Single female</option>
           <option value="single-male">Single male</option>
@@ -374,7 +375,7 @@
         <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
       </div>
-      <div class="actions"><button class="run" onclick="runStandard()">Run my standard</button></div>
+      <div class="actions"><button class="run" onclick="runQuickCommand()">Run</button></div>
     </div>
     <div class="pane" data-pane="waiting" hidden>
       <p class="hint" style="margin-top:0">What does delaying cost? Premiums rise because they’re older, and care costs grow ~3%/yr — so they’ll need a bigger monthly benefit to keep pace.</p>
@@ -2916,7 +2917,10 @@ function csInflRate(v){ return (!v||v==='none')?0:(+v/100); }
 function csInflLabel(v){ return (!v||v==='none')?'level (no inflation)':(v+'% compound'); }
 function csMaritalLabel(m){ return m==='Married'?'married (both applying)':(m==='Married1buy'?'married (one applying)':'single'); }
 function csRatioYrs(o){ return o.coverageMax/o.dailyBenefit/365.25; }
-function cfgTextAny(o){ return isOmni(o)?omniConfigText(o):isCS(o)?csConfigText(o):cfgText(o); }
+function cfgTextAny(o){ return isOmni(o)?omniConfigText(o):isCS(o)?csConfigShort(o):cfgText(o); }
+// condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
+function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
+  return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
 function omMonths(days){ return Math.round(days/30); }
 // condensed one-liner for the comparison tray
 function omniConfigText(o){ return o.age+' · Omniflex '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+(o.facilityEP?' · '+o.facilityEP+'d elim':'')+(o.inflation?' · 5% Simple*':''); }
@@ -3637,6 +3641,32 @@ function runPattern(p, raw){
   showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+bpL(p.benefitPeriod)+' · '+pctL(p.inflation??null)+(p.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')});
 }
 function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of items){ if(a.length>=6){ break; } a.push(o); added++; } LS.setTray(a); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); if(added<items.length) alert('Comparison holds up to 6 — added '+added+' of '+items.length+'.'); }
+// Run a saved quick command for an explicit applicant (used by the Quick Commands tab)
+function execPattern(p, age, gender){
+  age=+age;
+  if(p.options && p.options.length){
+    const items=p.options.map(op=> op.joint ? Object.assign({},op) : Object.assign({}, op, {age, gender}));
+    showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
+    return;
+  }
+  const list=(p.benefits||[]).map(SNAP).slice(0,6);
+  if(!list.length) return showErr('This quick command has no default benefit amounts — edit it to add some (e.g. 7000, 5000, 4000).');
+  const items=list.map(mb=>({age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod}));
+  showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
+}
+function runQuickCommand(){ try{
+  const v=$('qc_pick').value;
+  if(v==='__standard') return runStandard();
+  const p=LS.patterns()[+v]; if(!p) return runStandard();
+  const gender = $('t_type').value.indexOf('female')>=0 ? 'female' : 'male';
+  execPattern(p, +$('t_age').value, gender);
+}catch(e){ showErr(e.message); } }
+function fillQuickPicker(){
+  const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
+  const ps=LS.patterns();
+  sel.innerHTML='<option value="__standard">My Standard — 3-option ladder</option>'+ps.map((p,i)=>'<option value="'+i+'">'+esc(p.trigger)+(p.name?' · '+esc(p.name):'')+'</option>').join('');
+  if(cur==='__standard' || (cur!==''&&+cur<ps.length)) sel.value=cur;
+}
 // --- save the current comparison as a reusable quick command (no typing amounts) ---
 let PENDING_PATTERN_OPTS=null;
 function optDesignText(o){ return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
@@ -3842,6 +3872,7 @@ function renderPatterns(){
   if(!ps.length){ box.innerHTML='<p class="empty">No quick commands yet. Create one to run your go-to plan design with a single code.</p>'; }
   else box.innerHTML=ps.map((p,i)=>'<div class="client"><div><div class="nm">'+esc(p.trigger)+(p.name?' <span style="color:var(--muted);font-weight:600">'+esc(p.name)+'</span>':'')+'</div><div class="cfg">'+patternSummary(p)+'</div></div><div class="sp"><button class="view" onclick="usePattern('+i+')">Use</button><button class="go" style="background:#64748b" onclick="editPattern('+i+')">Edit</button><button class="del" onclick="delPattern('+i+')">Delete</button></div></div>').join('');
   renderQuickChips();
+  fillQuickPicker();
 }
 // Saved quick commands shown as one-tap chips under the command bar
 function renderQuickChips(){
@@ -4047,7 +4078,6 @@ function fillStates(){
 
 /* ---------- init ---------- */
 fillStates();
-$('std_desc').textContent = E.STANDARD_SCENARIO.options.map(o=>o.name).join('  ·  ') + '  (shown high to low)';
 renderTray(); renderClients(); renderPatterns();
 setMode('manual');   // start on the click-in form
 csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
