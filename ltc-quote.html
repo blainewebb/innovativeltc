@@ -478,7 +478,11 @@
       <label><input type="checkbox" id="om_spousal"> Spousal discount (−10%)</label>
     </div>
     <div class="warn" style="margin-top:2px">Filed in Michigan and Texas only. A $25 one-time policy fee applies. The facility &amp; home-care cash benefits equal 50% of the daily benefit (included). Verified to the penny against an Omniflex illustration.</div>
-    <div class="actions"><button class="run" onclick="omniRunSingle()">Run Omniflex quote</button></div>
+    <div class="actions">
+      <button class="run" onclick="omniRunSingle()">Run Omniflex quote</button>
+      <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
+    </div>
   </div>
 
   <div class="card" id="budgetCard" hidden>
@@ -2832,6 +2836,8 @@ const MAX_BENEFIT = 12000;   // NGL sells a monthly benefit up to $12,000 — ne
 const SNAP  = b => Math.min(MAX_BENEFIT, Math.max(300, Math.round((+b||0)/300)*300));   // nearest quotable $300 increment, capped
 const FLOOR3= b => Math.min(MAX_BENEFIT, Math.max(300, Math.floor((+b||0)/300)*300));   // largest increment within budget, capped
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
+const OMNI_INFL_NOTE = '*Omniflex 5% simple inflation: the benefit begins growing in year 6, then increases 5% (simple) of the original benefit each year for 20 years, then stops.';
+function omniInflNote(items){ return (items||[]).some(o=>isOmni(o)&&o.inflation) ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+OMNI_INFL_NOTE+'</div>' : ''; }
 let MODE = 'manual';
 
 /* ---------- storage ---------- */
@@ -2913,7 +2919,7 @@ function csRatioYrs(o){ return o.coverageMax/o.dailyBenefit/365.25; }
 function cfgTextAny(o){ return isOmni(o)?omniConfigText(o):isCS(o)?csConfigText(o):cfgText(o); }
 function omMonths(days){ return Math.round(days/30); }
 // condensed one-liner for the comparison tray
-function omniConfigText(o){ return o.age+' · Omniflex '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+(o.facilityEP?' · '+o.facilityEP+'d elim':'')+(o.inflation?' · 5%':''); }
+function omniConfigText(o){ return o.age+' · Omniflex '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+(o.facilityEP?' · '+o.facilityEP+'d elim':'')+(o.inflation?' · 5% Simple*':''); }
 function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr) · '+o.deductible+'-day · '+csInflLabel(o.inflation)+' · '+o.uwClass+' · '+csMaritalLabel(o.marital)+(o.zeroDayHc?' · 0-day HC':'')+(o.nonforfeiture?' · nonforfeiture':'')+(o.state?' · '+o.state:''); }
 
@@ -3040,7 +3046,7 @@ function omniValueMetrics(o,q){
 }
 function omniShowSingle(o){
   const q=OMNI.quote(o);
-  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. A $25 one-time policy fee applies. '+DISC+'</div>');
+  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+(o.inflation?'<div class="disc" style="border-top:none;padding-top:2px">'+OMNI_INFL_NOTE+'</div>':'')+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. A $25 one-time policy fee applies. '+DISC+'</div>');
 }
 
 /* ---------- "most I can buy" — solve a budget across every carrier ---------- */
@@ -3179,13 +3185,13 @@ const CARRIERS = [
         if(q.modalPayment<=p.budget+0.005){ best={d, hd:o.hcDaily, premium:q.modalPayment, annual:q.annualPremium, o}; break; } }
       if(!best) return {label:this.label, fits:false, note:'Even $50/day is above this budget.'};
       return {label:this.label, fits:true, premium:best.premium, annual:best.annual,
-        design:'$'+best.d+'/day facility + $'+best.hd+'/day home · 12-mo', sub:'Short-term care · '+(infl?'5% inflation':'level')+' · Rx $300', trayObj:best.o};
+        design:'$'+best.d+'/day facility + $'+best.hd+'/day home · 12-mo', sub:'Short-term care · '+(infl?'5% Simple*':'level')+' · Rx $300', trayObj:best.o};
     },
     sweetSpot(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const infl=(+p.inflation||0)>0; const o=this._design(p,400); const q=OMNI.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
-        design:'$400/day facility + $300/day home · 12-mo', sub:'Short-term care · '+(infl?'5% inflation':'level')+' · Rx $300', trayObj:o};
+        design:'$400/day facility + $300/day home · 12-mo', sub:'Short-term care · '+(infl?'5% Simple*':'level')+' · Rx $300', trayObj:o};
     } },
 ];
 function sweetSpotAll(p, includeShared){
@@ -3213,7 +3219,8 @@ function showBudgetAll(p){
     const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.trayObj)+')\'>＋ add</button>';
     return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>'+stepRow(r);
   }).join('');
-  show(resultBrand('Most I Can Buy')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Most coverage that fits</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="hint" style="margin-top:8px">Each carrier shows the richest design at or under your budget for about '+p.years+' year'+(p.years===1?'':'s')+' of coverage. Tap ＋ to drop any into the comparison, then print a side-by-side sheet.</div><div class="disc">'+DISC+'</div>');
+  const omniNote=omniInflNote(results.filter(r=>r.fits).map(r=>r.trayObj));
+  show(resultBrand('Most I Can Buy')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Most coverage that fits</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="hint" style="margin-top:8px">Each carrier shows the richest design at or under your budget for about '+p.years+' year'+(p.years===1?'':'s')+' of coverage. Tap ＋ to drop any into the comparison, then print a side-by-side sheet.</div>'+omniNote+'<div class="disc">'+DISC+'</div>');
 }
 function openBudgetAll(){ setCarrier('ngl'); $('budgetCard').hidden=false; $('budgetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
 function runBudgetAll(){ try{
@@ -3246,7 +3253,7 @@ function showSweetSpot(p, includeShared){
   const noShared = (couple && includeShared) ? CARRIERS.filter(c=>c.sweetSpotCouple && !c.sharedSweetCouple).map(c=>c.label.split(' — ')[0]) : [];
   const sharedNote = noShared.length ? '<div class="warn" style="margin-top:8px">Shared benefit pool isn’t offered by: '+noShared.join(', ')+' (their couple design is two individual policies). A shared-pool row appears only for carriers that offer it.</div>' : '';
   const coupleNote = couple ? '<div class="hint" style="margin-top:8px">Household premiums: NGL is one two-life (joint) policy; CareScout is two individual policies at the married class, combined. Add them to build a side-by-side client sheet.</div>' : '<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Premiums differ — that’s the point. Add them to build a side-by-side client sheet.</div>';
-  show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+sharedNote+coupleNote+'<div class="disc">'+DISC+'</div>');
+  show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+sharedNote+coupleNote+omniInflNote(fitList)+'<div class="disc">'+DISC+'</div>');
 }
 function openSweet(){ setCarrier('ngl'); $('sweetCard').hidden=false; $('sweetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
 function swMaritalChange(){
@@ -3877,7 +3884,7 @@ const QCATS = {
   projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day' : isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'},
   projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0)); if(isCS(o)) return fmt0(csProjPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? o.facilityEP+'-day wait' : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
-  inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'Included':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
+  inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
   shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'Included':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
   marital:  {label:'Marital',              v:(o)=> isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
@@ -4025,7 +4032,7 @@ function renderSheet(){
     + nameHtml
     + '<div class="sh-sub">'+sub+'</div>'
     + (items.length
-        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote
+        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote+omniInflNote(items)
         : '<p class="empty">No options saved for this client.</p>')
     + '<div class="qs-cta">Ready to talk it through? <a href="'+LEVITATE+'">Book a Benefits &amp; Pricing Zoom &rarr;</a></div>'
     + '<div class="disc">'+DISC+'</div>';
