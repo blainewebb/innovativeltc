@@ -2911,7 +2911,9 @@ function csInflLabel(v){ return (!v||v==='none')?'level (no inflation)':(v+'% co
 function csMaritalLabel(m){ return m==='Married'?'married (both applying)':(m==='Married1buy'?'married (one applying)':'single'); }
 function csRatioYrs(o){ return o.coverageMax/o.dailyBenefit/365.25; }
 function cfgTextAny(o){ return isOmni(o)?omniConfigText(o):isCS(o)?csConfigText(o):cfgText(o); }
-function omniConfigText(o){ return o.age+' · Omniflex '+o.state+' · facility $'+o.facilityDaily+'/day '+o.facilityBP+'-day ('+o.facilityEP+'-day wait)'+(o.homeCare?' · home care $'+o.hcDaily+'/day '+o.hcBP+'-day ('+o.hcEP+'-day wait)':'')+(o.rxMax?' · Rx $'+o.rxMax+'/yr':'')+(o.inflation?' · 5% inflation':'')+(o.smoker?' · smoker':'')+(o.spousal?' · spousal −10%':''); }
+function omMonths(days){ return Math.round(days/30); }
+// condensed one-liner for the comparison tray
+function omniConfigText(o){ return o.age+' · Omniflex '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+(o.facilityEP?' · '+o.facilityEP+'d elim':'')+(o.inflation?' · 5%':''); }
 function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr) · '+o.deductible+'-day · '+csInflLabel(o.inflation)+' · '+o.uwClass+' · '+csMaritalLabel(o.marital)+(o.zeroDayHc?' · 0-day HC':'')+(o.nonforfeiture?' · nonforfeiture':'')+(o.state?' · '+o.state:''); }
 
@@ -3843,9 +3845,9 @@ const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
-  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day'+(o.homeCare?' + $'+o.hcDaily+' HC':'') : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
-  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? o.facilityBP+'-day benefit ('+(o.facilityBP/30).toFixed(0)+' mo)' : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
-  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0))+' max'; if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
+  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day facility'+(o.homeCare?'<br>$'+o.hcDaily+'/day home care':'') : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
+  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omMonths(o.facilityBP)+'-month'+(o.homeCare&&o.hcBP!==o.facilityBP?' fac<br>'+omMonths(o.hcBP)+'-month home':'') : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
+  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP)+' facility'+(o.homeCare?'<br>'+fmt0(o.hcDaily*o.hcBP)+' home care':''); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
   projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day' : isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'},
   projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0)); if(isCS(o)) return fmt0(csProjPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? o.facilityEP+'-day wait' : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
