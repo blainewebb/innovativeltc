@@ -3161,6 +3161,32 @@ const CARRIERS = [
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
         design:'$'+daily+'/day · '+fmt0(pool)+' pool each (≈'+ratio.toFixed(1)+' yr) · married class', sub:'Two individual policies (combined)', trayObjs:[oA,oB]};
     } },
+  { id:'omniflex', label:'Manhattan Life — Omniflex STC',
+    _design(p, daily){   // one Omniflex design at a given facility daily benefit (home care matched, capped $300)
+      const st=(p.state||'').toUpperCase(); const infl=(+p.inflation||0)>0; const hd=Math.min(daily,300);
+      return {carrier:'omniflex', state:st, age:p.age, facilityDaily:daily, facilityBP:360, facilityEP:0,
+        homeCare:true, hcDaily:hd, hcBP:360, hcEP:0, inflation:infl, rxMax:300,
+        smoker:false, spousal:(p.marital&&p.marital!=='single'), mode:'monthly'};
+    },
+    _avail(p){ const st=(p.state||'').toUpperCase();
+      if(st!=='MI'&&st!=='TX') return 'Filed only in MI &amp; TX — pick a state.';
+      if(p.age<45||p.age>89) return 'Omniflex issues ages 45–89.';
+      return null; },
+    solve(p){
+      const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
+      const infl=(+p.inflation||0)>0; let best=null;
+      for(let d=400; d>=50; d-=10){ const o=this._design(p,d); let q; try{ q=OMNI.quote(o); }catch(e){ continue; }
+        if(q.modalPayment<=p.budget+0.005){ best={d, hd:o.hcDaily, premium:q.modalPayment, annual:q.annualPremium, o}; break; } }
+      if(!best) return {label:this.label, fits:false, note:'Even $50/day is above this budget.'};
+      return {label:this.label, fits:true, premium:best.premium, annual:best.annual,
+        design:'$'+best.d+'/day facility + $'+best.hd+'/day home · 12-mo', sub:'Short-term care · '+(infl?'5% inflation':'level')+' · Rx $300', trayObj:best.o};
+    },
+    sweetSpot(p){
+      const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
+      const infl=(+p.inflation||0)>0; const o=this._design(p,400); const q=OMNI.quote(o);
+      return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
+        design:'$400/day facility + $300/day home · 12-mo', sub:'Short-term care · '+(infl?'5% inflation':'level')+' · Rx $300', trayObj:o};
+    } },
 ];
 function sweetSpotAll(p, includeShared){
   const couple = p.age2 && p.marital==='married-both';
