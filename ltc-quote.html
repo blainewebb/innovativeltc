@@ -3910,15 +3910,15 @@ const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
-  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day facility'+(o.homeCare?'<br>$'+o.hcDaily+'/day home care':'') : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
+  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day facility' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
   period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omMonths(o.facilityBP)+'-month'+(o.homeCare&&o.hcBP!==o.facilityBP?' fac<br>'+omMonths(o.hcBP)+'-month home':'') : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
-  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP)+' facility'+(o.homeCare?'<br>'+fmt0(o.hcDaily*o.hcBP)+' home care':''); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
-  projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day' : isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'},
-  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0)); if(isCS(o)) return fmt0(csProjPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
+  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
+  projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> isOmni(o) ? '$'+omProjFac(o)+'/day'+(o.homeCare?'<br>$'+Math.round(o.hcDaily*omInflFactor(o,QSHEET.projAge))+'/day home':'') : isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'},
+  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(omProjPool(o)); if(isCS(o)) return fmt0(csProjPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? o.facilityEP+'-day wait' : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
-  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'Included':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
+  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
   marital:  {label:'Marital',              v:(o)=> isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
@@ -3943,6 +3943,11 @@ function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age));
   return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 // CareScout compound inflation grows the coverage-maximum pool too.
 function csProjPool(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round(o.coverageMax*Math.pow(1+csInflRate(o.inflation),yrs)); }
+// Omniflex 5% SIMPLE inflation: begins in year 6, +5% of the original each year for 20 years, then stops.
+function omInflFactor(o, projAge){ if(!o.inflation) return 1; const y=Math.max(0,(+projAge||80)-(+o.age)); const inc=Math.max(0,Math.min(20,y-5)); return 1+0.05*inc; }
+function omProjFac(o){ return Math.round(o.facilityDaily*omInflFactor(o,QSHEET.projAge)); }
+function omPool(o){ return o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0); }
+function omProjPool(o){ return Math.round(omPool(o)*omInflFactor(o,QSHEET.projAge)); }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
@@ -4036,6 +4041,8 @@ function renderSheet(){
     else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
     if(rows.includes('carrier')) rows = rows.filter(k=>k!=='carrier'); // carrier now shown in each column header
     if(items.every(o=>isOmni(o)?!o.homeCare:isCS(o)?true:!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
+    // Omniflex with home care → show the Home care line right under Facility (Benefit amount), in any layout
+    if(items.some(o=>isOmni(o)&&o.homeCare)){ rows = rows.filter(k=>k!=='shared'); const bi=rows.indexOf('benefit'); rows.splice(bi<0?0:bi+1, 0, 'shared'); }
     if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   }
   const showProj = rows.includes('projMonthly') || rows.includes('projPool');
