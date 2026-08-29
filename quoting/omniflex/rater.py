@@ -42,15 +42,15 @@ def quote(state, age, facility_daily, facility_bp=360, facility_ep=0,
         if hcd<=0 or hcd%10: raise ValueError("Home-care daily benefit must be a multiple of $10.")
         hc=_rate(state,'homecare_infl' if inflation else 'homecare_none',hc_ep,age,hc_bp)*(hcd/10.0)
         steps.append((f"home care {hcd}/day, {hc_bp}-day, {hc_ep}-day EP", round(hc,2)))
-    base=fac+hc
-    if smoker: base*=F['smoker']; steps.append((f"x {F['smoker']} smoker", round(base,2)))
-    if spousal: base*=F['spousal']; steps.append((f"x {F['spousal']} spousal", round(base,2)))
     rx=0.0
     if rx_max:
         if rx_max not in RXM: raise ValueError(f"Rx max must be one of {RXM}.")
         rx=R['rates'][state]['rx'][a][RXM.index(rx_max)]
-        steps.append((f"+ {rx} Rx benefit (${rx_max}/yr)", round(base+rx,2)))
-    annual=round(base+rx,2)
+        steps.append((f"+ {rx} Rx benefit (${rx_max}/yr)", round(fac+hc+rx,2)))
+    sub=fac+hc+rx
+    if smoker: sub*=F['smoker']; steps.append((f"x {F['smoker']} smoker", round(sub,2)))
+    if spousal: sub*=F['spousal']; steps.append((f"x {F['spousal']} spousal", round(sub,2)))
+    annual=round(sub,2)
     mf=F[mode]
     return {'carrier':'omniflex','state':state,'company':R['states'][state]['company'],
             'issue_age':age,'facility_daily':facility_daily,'facility_bp':facility_bp,'facility_ep':facility_ep,

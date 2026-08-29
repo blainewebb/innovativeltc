@@ -20,8 +20,9 @@ Rates are an **annual premium per $10 of daily benefit**, indexed by:
 facility = facility_rate(age, fac_bp, fac_ep) × (fac_daily ÷ 10)
 home_care= home_care_rate(age, hc_bp, hc_ep) × (hc_daily ÷ 10)   # optional rider
 base     = facility + home_care
-base    *= 1.10 (smoker)  *= 0.90 (spousal)
-annual   = round(base + rx_annual, 2)      # + prescription-drug benefit ($300/500/700/yr max)
+subtotal = base + rx_annual                # + prescription-drug benefit ($300/500/700/yr max)
+subtotal*= 1.10 (smoker)  *= 0.90 (spousal) # applied to the WHOLE premium, Rx included
+annual   = round(subtotal, 2)
 modal    = round(annual × modal factor)    # monthly ×0.0833, semi-annual ×0.52, annual ×1.0
                                            # + a $25 one-time policy fee
 ```
@@ -48,19 +49,21 @@ modal    = round(annual × modal factor)    # monthly ×0.0833, semi-annual ×0.
 
 ## Verification status: VERIFIED against a real illustration
 
-Reproduced a StrateCision Omniflex illustration (TX, male 61, three designs) **to
-the penny**:
+Reproduced two StrateCision Omniflex illustrations **to the penny** — a Texas
+single (M61) and a Michigan couple (M61 + F58, with the spousal discount):
 
-| Design | Illustration | Rater |
-|---|---|---|
-| Fac $400/0-day + HC $300/0-day, 5% infl, Rx $300 | $271.37/mo | $271.37 |
-| Fac $300/90-day + HC $300/0-day, 5% infl, Rx $300 | $183.07/mo | $183.07 |
-| Fac $100/0-day + HC $100/0-day, no infl, Rx $300 | $44.28/mo | $44.28 |
+| State | Design | Illustration | Rater |
+|---|---|---|---|
+| TX | Fac $400/0-day + HC $300/0-day, 5% infl, Rx $300 | $271.37/mo | $271.37 |
+| TX | Fac $300/90-day + HC $300/0-day, 5% infl, Rx $300 | $183.07/mo | $183.07 |
+| TX | Fac $100/0-day + HC $100/0-day, no infl, Rx $300 | $44.28/mo | $44.28 |
+| MI | Fac $400/0-day + HC $300/0-day, no infl, Rx $300, spousal | $134.15 / $106.08 | exact |
+| MI | Fac $400/90-day + HC $300/0-day, 5% infl, Rx $300, spousal | $190.72 / $154.91 | exact |
 
-That confirms the whole assembly: independent facility/home-care daily+EP, the
-5%-simple inflation tables, and the Rx add-on (Rx(TX, age 61, $300) = $37.40/yr,
-the exact residual). Python rater and browser engine also agree over 2,304
-combinations (all within a rounding penny).
+Confirms: independent facility/home-care daily+EP, the 5%-simple inflation tables,
+the Rx add-on, unisex rates (M61 vs F58 differ only by age), and that
+smoker/spousal apply to the **whole** premium (Rx included). Python rater and
+browser engine agree over 2,304 combinations (all within a rounding penny).
 
 **Not yet modeled** (weren't in this illustration's premium): the **HR** short-duration
 rider and any hospital-care rider. The facility/home-care cash benefits and restoration
