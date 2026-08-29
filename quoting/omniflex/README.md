@@ -17,16 +17,23 @@ Rates are an **annual premium per $10 of daily benefit**, indexed by:
 - **Elimination period** — 0 / 20 / 30 / 60 / 90 / 100 days (the waiting period).
 
 ```
-annual = ( facility_rate + home_care_rate? ) × (daily_benefit ÷ 10)
-       × smoker_load?      # ×1.10 if smoker
-       × spousal_discount? # ×0.90 if spousal
-then × modal factor        # monthly ×0.0833, semi-annual ×0.52, annual ×1.0
+facility = facility_rate(age, fac_bp, fac_ep) × (fac_daily ÷ 10)
+home_care= home_care_rate(age, hc_bp, hc_ep) × (hc_daily ÷ 10)   # optional rider
+base     = facility + home_care
+base    *= 1.10 (smoker)  *= 0.90 (spousal)
+annual   = round(base + rx_annual, 2)      # + prescription-drug benefit ($300/500/700/yr max)
+modal    = round(annual × modal factor)    # monthly ×0.0833, semi-annual ×0.52, annual ×1.0
+                                           # + a $25 one-time policy fee
 ```
 
-- **Home care** is an additive rider at the **same daily benefit / benefit period /
-  elimination period** (its own per-$10 rate table).
-- **Inflation** switches both the facility and home-care tables to their inflation
-  variant (forms `...I` / `...IH`).
+- **Facility** and the **home-care rider** carry INDEPENDENT daily benefit, benefit
+  period, and elimination period.
+- **Inflation (5% simple)** switches the facility and home-care tables to their
+  inflation variant (forms `...I` / `...IH`).
+- **Prescription-drug benefit** is a flat annual premium by age × annual max
+  (the "Annual Max" / Rx exhibit), not adjusted by smoker/spousal.
+- The **facility & home-care cash benefits** equal 50% of the daily benefit — an
+  included feature, no separate premium.
 
 ## Forms in the exhibits
 
@@ -39,13 +46,22 @@ then × modal factor        # monthly ×0.0833, semi-annual ×0.52, annual ×1.0
 | AT7002HR / AL7060HR | A short-duration (3/6/10/20-day) rider | not yet modeled |
 | (base pg. 7) | "Annual Max / Rx" cash-and-pharmacy option | not yet modeled |
 
-## Verification status
+## Verification status: VERIFIED against a real illustration
 
-Facility + home-care assembly reproduces the carrier's rate exhibits and was
-cross-checked between the Python rater and the browser engine over 9,216
-combinations (both states, all ages/periods/EPs, smoker/spousal/inflation/home
-care, all modes) — 9,036 exact, the rest within a single rounding penny.
+Reproduced a StrateCision Omniflex illustration (TX, male 61, three designs) **to
+the penny**:
 
-**Pending:** confirm the additive facility + home-care assembly against a real
-Omniflex illustration, and decide whether to model the HR rider and the Annual-Max /
-Rx cash option. Filed only in **MI and TX** here.
+| Design | Illustration | Rater |
+|---|---|---|
+| Fac $400/0-day + HC $300/0-day, 5% infl, Rx $300 | $271.37/mo | $271.37 |
+| Fac $300/90-day + HC $300/0-day, 5% infl, Rx $300 | $183.07/mo | $183.07 |
+| Fac $100/0-day + HC $100/0-day, no infl, Rx $300 | $44.28/mo | $44.28 |
+
+That confirms the whole assembly: independent facility/home-care daily+EP, the
+5%-simple inflation tables, and the Rx add-on (Rx(TX, age 61, $300) = $37.40/yr,
+the exact residual). Python rater and browser engine also agree over 2,304
+combinations (all within a rounding penny).
+
+**Not yet modeled** (weren't in this illustration's premium): the **HR** short-duration
+rider and any hospital-care rider. The facility/home-care cash benefits and restoration
+of benefits appear included at no separate charge. Filed only in **MI and TX** here.
