@@ -14,7 +14,8 @@ Files:
 Rates are an **annual premium per $10 of daily benefit**, indexed by:
 - **Issue age** 45–89 (ages 45–50 share one rate), **unisex**.
 - **Benefit period** — 90 / 180 / 270 / 360 days (how long the daily benefit pays).
-- **Elimination period** — 0 / 20 / 30 / 60 / 90 / 100 days (the waiting period).
+- **Elimination period** — the rate tables carry 0 / 20 / 30 / 60 / 90 / 100 days,
+  but Manhattan Life only **sells 0 / 20 / 60 / 90 days**, so the webpage offers only those.
 
 ```
 facility = facility_rate(age, fac_bp, fac_ep) × (fac_daily ÷ 10)
