@@ -309,11 +309,14 @@
       <div class="tab" data-mode="growth">Inflation Growth</div>
       <div class="tab" data-mode="care">Cost of Care</div>
     </div>
+    <datalist id="dl_monthly"><option value="1500"><option value="3000"><option value="4500"><option value="6000"><option value="7500"><option value="9000"><option value="10500"><option value="12000"></datalist>
+    <datalist id="dl_omfac"><option value="100"><option value="150"><option value="200"><option value="250"><option value="300"><option value="350"><option value="400"></datalist>
+    <datalist id="dl_omhc"><option value="100"><option value="150"><option value="200"><option value="250"><option value="300"></datalist>
     <div class="pane" data-pane="single">
       <div class="grid">
         <div class="field"><label>Issue age (18–79)</label><input id="s_age" type="number" value="62" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="s_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="s_benefit" list="dl_monthly" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Benefit period</label><select id="s_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Elimination period</label><select id="s_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="s_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
@@ -336,7 +339,7 @@
         <div class="field"><label>Client 1 — gender</label><select id="c_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
         <div class="field"><label>Client 2 — age</label><input id="c_age2" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Client 2 — gender</label><select id="c_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
+        <div class="field"><label>Monthly benefit ($, each)</label><input id="c_benefit" list="dl_monthly" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Benefit period</label><select id="c_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Elimination period</label><select id="c_ep"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="c_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
@@ -382,7 +385,7 @@
       <div class="grid">
         <div class="field"><label>Issue age (today)</label><input id="w_age" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="w_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-        <div class="field"><label>Monthly benefit today ($)</label><input id="w_benefit" type="number" value="4500" step="300"></div>
+        <div class="field"><label>Monthly benefit today ($)</label><input id="w_benefit" list="dl_monthly" type="number" value="4500" step="300"></div>
         <div class="field"><label>Benefit period</label><select id="w_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="w_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>State</label><select id="w_state" class="statesel"></select></div>
@@ -394,7 +397,7 @@
       <p class="hint" style="margin-top:0">See year by year how a compound-inflation benefit grows over time — the monthly benefit and the total benefit pool at each age.</p>
       <div class="grid">
         <div class="field"><label>Issue age (start)</label><input id="g_age" type="number" value="60" min="18" max="90"></div>
-        <div class="field"><label>Monthly benefit ($)</label><input id="g_benefit" type="number" value="4500" step="300" min="300" max="12000"></div>
+        <div class="field"><label>Monthly benefit ($)</label><input id="g_benefit" list="dl_monthly" type="number" value="4500" step="300" min="300" max="12000"></div>
         <div class="field"><label>Inflation protection</label><select id="g_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>Benefit period</label><select id="g_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Grow to age</label><input id="g_endage" type="number" value="90" min="70" max="100" step="1"></div>
@@ -460,13 +463,13 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Facility benefit</div>
     <div class="grid">
-      <div class="field"><label>Facility daily benefit ($10–$400)</label><input id="om_daily" type="number" value="400" step="10" min="10" max="400"></div>
+      <div class="field"><label>Facility daily benefit ($10–$400)</label><input id="om_daily" list="dl_omfac" type="number" value="400" step="10" min="10" max="400"></div>
       <div class="field"><label>Facility benefit period</label><select id="om_bp"><option value="90">90 days</option><option value="180">180 days</option><option value="270">270 days</option><option value="360" selected>360 days</option></select></div>
       <div class="field"><label>Facility elimination period</label><select id="om_ep"><option value="0" selected>0 days</option><option value="20">20 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
     </div>
     <div class="riders" style="margin-top:8px"><label><input type="checkbox" id="om_hc" checked onchange="omniSyncHc()"> Home-care benefit rider</label></div>
     <div class="grid" id="om_hcbox">
-      <div class="field"><label>Home-care daily benefit ($10–$300)</label><input id="om_hcdaily" type="number" value="300" step="10" min="10" max="300"></div>
+      <div class="field"><label>Home-care daily benefit ($10–$300)</label><input id="om_hcdaily" list="dl_omhc" type="number" value="300" step="10" min="10" max="300"></div>
       <div class="field"><label>Home-care benefit period</label><select id="om_hcbp"><option value="90">90 days</option><option value="180">180 days</option><option value="270">270 days</option><option value="360" selected>360 days</option></select></div>
       <div class="field"><label>Home-care elimination period</label><select id="om_hcep"><option value="0" selected>0 days</option><option value="20">20 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
     </div>
@@ -3910,15 +3913,15 @@ const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
-  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day facility' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
-  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omMonths(o.facilityBP)+'-month'+(o.homeCare&&o.hcBP!==o.facilityBP?' fac<br>'+omMonths(o.hcBP)+'-month home':'') : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
+  benefit:  {label:'Benefit amount',       v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo) facility benefit' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
+  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
   pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
-  projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> isOmni(o) ? '$'+omProjFac(o)+'/day'+(o.homeCare?'<br>$'+Math.round(o.hcDaily*omInflFactor(o,QSHEET.projAge))+'/day home':'') : isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'},
+  projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)){ const fac=omProjFac(o); let s='$'+fac+'/day ('+fmt0(fac*30)+'/mo)'; if(o.homeCare){ const h=Math.round(o.hcDaily*omInflFactor(o,QSHEET.projAge)); s+='<br>$'+h+'/day ('+fmt0(h*30)+'/mo) home'; } return s; } return isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'; }},
   projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(omProjPool(o)); if(isCS(o)) return fmt0(csProjPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? o.facilityEP+'-day wait' : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
-  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
+  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day ('+fmt0(o.hcDaily*30)+'/mo)':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
   marital:  {label:'Marital',              v:(o)=> isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
@@ -3948,6 +3951,8 @@ function omInflFactor(o, projAge){ if(!o.inflation) return 1; const y=Math.max(0
 function omProjFac(o){ return Math.round(o.facilityDaily*omInflFactor(o,QSHEET.projAge)); }
 function omPool(o){ return o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0); }
 function omProjPool(o){ return Math.round(omPool(o)*omInflFactor(o,QSHEET.projAge)); }
+// Omniflex coverage text: e.g. facility 360-day + home care 360-day => "12-month each (2-year total)".
+function omCoverageText(o){ const facMo=omMonths(o.facilityBP); if(!o.homeCare) return facMo+'-month'; const hcMo=omMonths(o.hcBP); const totMo=facMo+hcMo; const tot=(totMo%12===0)?(totMo/12)+'-year':totMo+'-month'; return (facMo===hcMo?facMo+'-month each':facMo+'-mo fac / '+hcMo+'-mo home')+' ('+tot+' total)'; }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
