@@ -39,14 +39,10 @@
   .cm-list{max-height:min(60vh,520px);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:8px}
   .cm-empty{color:var(--muted);font-size:.85rem;font-style:italic;padding:14px 2px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
-  /* Quick Commands hero — the fast path, pinned to the top */
-  .qc-hero{background:linear-gradient(135deg,#eef2ff 0%,#faf5ff 100%);border:2px solid var(--violet);box-shadow:0 4px 16px rgba(124,58,237,.14)}
-  .qc-hero .qc-title{display:flex;align-items:center;gap:9px;font-size:1.15rem;font-weight:800;letter-spacing:-.01em;color:#4c1d95;margin:0}
-  .qc-hero .qc-title .qc-pill{background:var(--violet);color:#fff;font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
-  .qc-hero .qc-sub{color:#6d28d9;font-size:.82rem;font-weight:600;margin:4px 0 0}
-  .qc-hero .run{background:var(--violet)}
-  .qc-hero.collapsed .qc-body{display:none}
-  .qc-toggle{margin-left:auto;background:#fff;border:1px solid var(--violet);color:var(--violet);border-radius:9px;padding:6px 12px;font-weight:800;font-size:.8rem;cursor:pointer}
+  /* Top-level view switcher — clean segmented tabs */
+  .viewtabs{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;margin-bottom:18px}
+  .vtab{border:none;background:transparent;padding:9px 18px;border-radius:9px;font-weight:800;font-size:.92rem;cursor:pointer;color:var(--muted)}
+  .vtab.on{background:#fff;color:var(--primary-d);box-shadow:0 1px 3px rgba(0,0,0,.08)}
   /* mode toggle */
   .modes{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px}
   .modebtn{border:none;background:transparent;padding:8px 16px;border-radius:8px;font-weight:800;font-size:.9rem;cursor:pointer;color:var(--muted)}
@@ -272,7 +268,7 @@
     </div>
     <div class="topright">
       <label class="carriersel" title="Carrier"><span>Carrier</span>
-        <select id="carrier" onchange="setCarrier(this.value)">
+        <select id="carrier" onchange="setCarrier(this.value); setView('quote')">
           <option value="ngl">NGL — HonestLTC</option>
           <option value="carescout">CareScout</option>
           <option value="omniflex">Manhattan Life — Omniflex STC</option>
@@ -284,34 +280,34 @@
     </div>
   </header>
 
-  <div class="card qc-hero" id="qccard">
-    <div style="display:flex;align-items:flex-start;gap:12px">
-      <div>
-        <h2 class="qc-title">⚡ Quick Commands <span class="qc-pill">Fast path</span></h2>
-        <p class="qc-sub">Your saved plans — run any one for this client in two clicks. Works on every carrier.</p>
-      </div>
-      <button class="qc-toggle" id="qcToggle" onclick="toggleQc()">Hide</button>
+  <div class="viewtabs" id="viewTabs">
+    <button class="vtab on" data-view="quote" onclick="setView('quote')">🧮 New Quote</button>
+    <button class="vtab" data-view="qc" onclick="setView('qc')">⚡ Quick Commands</button>
+  </div>
+
+  <div class="card" id="qccard" hidden>
+    <div class="cs-head">
+      <h2 style="margin:0 0 2px">⚡ Quick Commands</h2>
+      <p class="hint" style="margin:0">Pick a saved plan and run it for this client. Each runs on the carrier it was saved with — NGL, CareScout, or Manhattan Life. Choose <b>Joint (couple)</b> to run a couple plan for two applicants. Build more with “＋ Save as quick command” under any comparison.</p>
     </div>
-    <div class="qc-body">
-      <div class="grid" style="margin-top:12px">
-        <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
-        <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
-          <option value="single-female">Single female</option>
-          <option value="single-male">Single male</option>
-          <option value="married-female">Female (married)</option>
-          <option value="married-male">Male (married)</option>
-          <option value="joint">Joint (couple, shared rider)</option>
-        </select></div>
-        <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
-        <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
-      </div>
-      <div class="grid" id="t_couple" hidden>
-        <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
-        <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
-        <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-      </div>
-      <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
+    <div class="grid">
+      <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
+      <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
+        <option value="single-female">Single female</option>
+        <option value="single-male">Single male</option>
+        <option value="married-female">Female (married)</option>
+        <option value="married-male">Male (married)</option>
+        <option value="joint">Joint (couple)</option>
+      </select></div>
+      <div class="field"><label id="t_agelbl">Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
+      <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
     </div>
+    <div class="grid" id="t_couple" hidden>
+      <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
+      <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
+      <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
+    </div>
+    <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
   </div>
 
   <div class="card ask" id="askCard">
@@ -2949,10 +2945,27 @@ function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith(
 
 // Companion dropdown → writes the picked amount into its number input, then resets to "Pick…".
 function pickInto(sel, targetId){ const t=$(targetId); if(!t) return; if(sel.value!==''){ t.value=sel.value; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } sel.selectedIndex=0; }
-// Collapse/expand the pinned Quick Commands hero (remembered per browser).
-function setQcCollapsed(on){ const c=$('qccard'), b=$('qcToggle'); if(!c) return; c.classList.toggle('collapsed', on); if(b) b.textContent = on ? 'Show' : 'Hide'; try{ localStorage.setItem('qcCollapsed', on?'1':'0'); }catch(e){} }
-function toggleQc(){ setQcCollapsed(!$('qccard').classList.contains('collapsed')); }
-try{ if(localStorage.getItem('qcCollapsed')==='1'){ document.addEventListener('DOMContentLoaded',()=>setQcCollapsed(true)); } }catch(e){}
+// Top-level view switcher: "New Quote" (carrier forms) vs "Quick Commands".
+let VIEW='quote';
+const QUOTE_CARDS=['manual','cscard','omnicard','budgetCard','sweetCard'];
+function setView(v){
+  VIEW = v==='qc' ? 'qc' : 'quote';
+  const qc = VIEW==='qc';
+  document.querySelectorAll('#viewTabs .vtab').forEach(t=>t.classList.toggle('on', t.dataset.view===VIEW));
+  if($('qccard')) $('qccard').hidden = !qc;
+  if(qc){
+    if($('askCard')) $('askCard').style.display='none';
+    QUOTE_CARDS.forEach(id=>{ const e=$(id); if(e) e.hidden=true; });
+    if($('qccard')) $('qccard').scrollIntoView({behavior:'smooth',block:'nearest'});
+  } else {
+    // restore the carrier's entry form (no scroll)
+    const cs=CARRIER==='carescout', om=CARRIER==='omniflex', ngl=CARRIER==='ngl';
+    if($('askCard')) $('askCard').style.display = ngl ? '' : 'none';
+    if($('cscard')) $('cscard').hidden = !cs;
+    if($('omnicard')) $('omnicard').hidden = !om;
+    if(ngl) setMode(MODE); else if($('manual')) $('manual').hidden=true;
+  }
+}
 function setCarrier(c){
   CARRIER = (c==='carescout'||c==='omniflex') ? c : 'ngl';
   const cs=CARRIER==='carescout', om=CARRIER==='omniflex', ngl=CARRIER==='ngl';
@@ -3438,7 +3451,7 @@ function showStandardJoint(age1,g1,age2,g2,state){
     return '<tr><td><b>'+op.name.replace(/\/\s*4-yr/,'/ 3-yr')+'</b>'+(fdc?'<div style="font-size:.72rem;color:#15803d;font-weight:700">+ zero-day home care</div>':'')+'</td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(BP)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
-function stdTypeChange(){ $('t_couple').hidden = $('t_type').value!=='joint'; }
+function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; }
 function showCompare(items, opts){
   opts=opts||{};
   const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){} return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
@@ -3668,24 +3681,39 @@ function runPattern(p, raw){
 }
 function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of items){ if(a.length>=6){ break; } a.push(o); added++; } LS.setTray(a); renderTray(); $('trayCard').scrollIntoView({behavior:'smooth',block:'nearest'}); if(added<items.length) alert('Comparison holds up to 6 — added '+added+' of '+items.length+'.'); }
 // Run a saved quick command for an explicit applicant (used by the Quick Commands tab)
-function execPattern(p, age, gender){
+// couple: {age1,g1,age2,g2}. Joint options re-rate to the new couple (NGL joint is
+// rated on the older insured); individual options are quoted for BOTH spouses.
+function execPattern(p, age, gender, couple){
   age=+age;
+  const older = couple ? (((+couple.age1)>=(+couple.age2)) ? {age:+couple.age1,g:couple.g1} : {age:+couple.age2,g:couple.g2}) : null;
+  const who = couple ? (couple.age1+' '+gL(couple.g1)+' + '+couple.age2+' '+gL(couple.g2)) : (age+' '+gL(gender));
+  const title = 'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+who;
   if(p.options && p.options.length){
-    const items=p.options.map(op=> op.joint ? Object.assign({},op) : Object.assign({}, op, {age, gender}));
-    showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
+    let items=[];
+    for(const op of p.options){
+      if(op.joint){ items.push(couple ? Object.assign({},op,{age:older.age,gender:older.g}) : Object.assign({},op)); }
+      else if(couple){ items.push(Object.assign({},op,{age:+couple.age1,gender:couple.g1})); items.push(Object.assign({},op,{age:+couple.age2,gender:couple.g2})); }
+      else { items.push(Object.assign({},op,{age,gender})); }
+    }
+    if(items.length>6) items=items.slice(0,6);
+    showCompare(items, {title});
     return;
   }
   const list=(p.benefits||[]).map(SNAP).slice(0,6);
   if(!list.length) return showErr('This quick command has no default benefit amounts — edit it to add some (e.g. 7000, 5000, 4000).');
-  const items=list.map(mb=>({age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod}));
-  showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
+  const mk=(mb,a,g)=>({age:+a, gender:g, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
+  let items = couple ? list.flatMap(mb=>[mk(mb,couple.age1,couple.g1), mk(mb,couple.age2,couple.g2)]) : list.map(mb=>mk(mb,age,gender));
+  if(items.length>6) items=items.slice(0,6);
+  showCompare(items, {title});
 }
 function runQuickCommand(){ try{
   const v=$('qc_pick').value;
-  if(v==='__standard') return runStandard();
+  if(v==='__standard') return runStandard();          // runStandard() already handles the joint case
   const p=LS.patterns()[+v]; if(!p) return runStandard();
+  const joint = $('t_type').value==='joint';
+  const couple = joint ? {age1:+$('t_age').value, g1:$('t_g1').value, age2:+$('t_age2').value, g2:$('t_g2').value} : null;
   const gender = $('t_type').value.indexOf('female')>=0 ? 'female' : 'male';
-  execPattern(p, +$('t_age').value, gender);
+  execPattern(p, +$('t_age').value, gender, couple);
 }catch(e){ showErr(e.message); } }
 function fillQuickPicker(){
   const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
