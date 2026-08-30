@@ -3235,6 +3235,17 @@ const CARRIERS = [
       const infl=(+p.inflation||0)>0; const o=this._design(p,400); const q=OMNI.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:'$400/day facility + $300/day home · 12-mo', sub:'Short-term care · '+(infl?'5% Simple*':'level')+' · Rx $300', trayObj:o};
+    },
+    // couple = two individual STC policies, each with the spousal discount; premiums combined
+    sweetSpotCouple(p){
+      const a=this._avail({age:p.age, state:p.state}); if(a) return {label:this.label+' · couple', fits:false, note:a};
+      const b=this._avail({age:p.age2, state:p.state}); if(b) return {label:this.label+' · couple', fits:false, note:b};
+      const infl=(+p.inflation||0)>0;
+      const oA=this._design(Object.assign({}, p, {marital:'married-both'}), 400);
+      const oB=this._design(Object.assign({}, p, {age:p.age2, marital:'married-both'}), 400);
+      const qA=OMNI.quote(oA), qB=OMNI.quote(oB);
+      return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
+        design:'$400/day fac + $300/day home · 12-mo each', sub:'Two STC policies (combined) · spousal −10%', trayObjs:[oA,oB]};
     } },
 ];
 function sweetSpotAll(p, includeShared){
@@ -3295,7 +3306,7 @@ function showSweetSpot(p, includeShared){
   const addAll = fitList.length>1 ? '<button class="run" style="margin-top:12px" onclick=\'addAllToTray('+JSON.stringify(fitList)+')\'>＋ Add all to comparison</button>' : '';
   const noShared = (couple && includeShared) ? CARRIERS.filter(c=>c.sweetSpotCouple && !c.sharedSweetCouple).map(c=>c.label.split(' — ')[0]) : [];
   const sharedNote = noShared.length ? '<div class="warn" style="margin-top:8px">Shared benefit pool isn’t offered by: '+noShared.join(', ')+' (their couple design is two individual policies). A shared-pool row appears only for carriers that offer it.</div>' : '';
-  const coupleNote = couple ? '<div class="hint" style="margin-top:8px">Household premiums: NGL is one two-life (joint) policy; CareScout is two individual policies at the married class, combined. Add them to build a side-by-side client sheet.</div>' : '<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Premiums differ — that’s the point. Add them to build a side-by-side client sheet.</div>';
+  const coupleNote = couple ? '<div class="hint" style="margin-top:8px">Household premiums: NGL is one two-life (joint) policy; CareScout and Manhattan Life are two individual policies (each with the couple/spousal discount), combined. Add them to build a side-by-side client sheet.</div>' : '<div class="hint" style="margin-top:8px">Each carrier’s strongest value-per-dollar lead design for this client. Premiums differ — that’s the point. Add them to build a side-by-side client sheet.</div>';
   show(resultBrand('Sweet Spot — Best Value')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Best-value design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+sharedNote+coupleNote+omniInflNote(fitList)+'<div class="disc">'+DISC+'</div>');
 }
 function openSweet(){ setCarrier('ngl'); $('sweetCard').hidden=false; $('sweetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
@@ -3452,10 +3463,29 @@ function showStandardJoint(age1,g1,age2,g2,state){
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
 function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; }
+// Build a combined-household entry for a couple from one individual option: two spouse
+// policies, each with its carrier's couple discount; premiums are summed in showCompare.
+function coupleHousehold(op, couple){
+  const mkPart=(a,g)=>{ const it=Object.assign({}, op, {age:+a, gender:g});
+    if(isOmni(it)) it.spousal=true;             // both applying → Omniflex spousal −10%
+    else if(isCS(it)) it.marital='Married';     // CareScout both-applying class
+    return it; };
+  return {__couple:true, carrier:op.carrier, parts:[mkPart(couple.age1,couple.g1), mkPart(couple.age2,couple.g2)]};
+}
+function modePer(mode){ return {monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[mode]||'/mo'; }
 function showCompare(items, opts){
   opts=opts||{};
-  const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){} return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
-  const addAll = items.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+JSON.stringify(items)+')\'>＋ Add all '+items.length+' to comparison</button>' : '';
+  const flat = items.flatMap(o=> o.__couple ? o.parts : [o]);   // spouse policies drop into the tray individually
+  const rows=items.map(o=>{
+    if(o.__couple){
+      let sum=0, ok=true; for(const part of o.parts){ try{ sum += anyQuote(part).modalPayment; }catch(e){ ok=false; } }
+      const prem = ok ? fmt(sum)+modePer(o.parts[0].mode)+' <span style="font-weight:600;color:var(--muted)">household</span>' : '—';
+      const label = cfgTextAny(o.parts[0]) + ' <span style="color:var(--muted)">+ spouse (two policies)</span>';
+      return '<tr><td class="b">'+label+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addAllToTray('+esc(JSON.stringify(o.parts))+')\'>＋</button></td></tr>';
+    }
+    let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){}
+    return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  const addAll = flat.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+esc(JSON.stringify(flat))+')\'>＋ Add all to comparison</button>' : '';
   show('<div class="config-line">'+(opts.title||'Comparison')+'</div>'+addAll+'<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
 
@@ -3692,7 +3722,7 @@ function execPattern(p, age, gender, couple){
     let items=[];
     for(const op of p.options){
       if(op.joint){ items.push(couple ? Object.assign({},op,{age:older.age,gender:older.g}) : Object.assign({},op)); }
-      else if(couple){ items.push(Object.assign({},op,{age:+couple.age1,gender:couple.g1})); items.push(Object.assign({},op,{age:+couple.age2,gender:couple.g2})); }
+      else if(couple){ items.push(coupleHousehold(op, couple)); }
       else { items.push(Object.assign({},op,{age,gender})); }
     }
     if(items.length>6) items=items.slice(0,6);
@@ -3701,8 +3731,8 @@ function execPattern(p, age, gender, couple){
   }
   const list=(p.benefits||[]).map(SNAP).slice(0,6);
   if(!list.length) return showErr('This quick command has no default benefit amounts — edit it to add some (e.g. 7000, 5000, 4000).');
-  const mk=(mb,a,g)=>({age:+a, gender:g, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
-  let items = couple ? list.flatMap(mb=>[mk(mb,couple.age1,couple.g1), mk(mb,couple.age2,couple.g2)]) : list.map(mb=>mk(mb,age,gender));
+  const mk=(mb,a,g)=>({carrier:'ngl', age:+a, gender:g, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
+  let items = couple ? list.map(mb=>coupleHousehold(mk(mb), couple)) : list.map(mb=>mk(mb,age,gender));
   if(items.length>6) items=items.slice(0,6);
   showCompare(items, {title});
 }
