@@ -39,6 +39,14 @@
   .cm-list{max-height:min(60vh,520px);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:8px}
   .cm-empty{color:var(--muted);font-size:.85rem;font-style:italic;padding:14px 2px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
+  /* Quick Commands hero — the fast path, pinned to the top */
+  .qc-hero{background:linear-gradient(135deg,#eef2ff 0%,#faf5ff 100%);border:2px solid var(--violet);box-shadow:0 4px 16px rgba(124,58,237,.14)}
+  .qc-hero .qc-title{display:flex;align-items:center;gap:9px;font-size:1.15rem;font-weight:800;letter-spacing:-.01em;color:#4c1d95;margin:0}
+  .qc-hero .qc-title .qc-pill{background:var(--violet);color:#fff;font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+  .qc-hero .qc-sub{color:#6d28d9;font-size:.82rem;font-weight:600;margin:4px 0 0}
+  .qc-hero .run{background:var(--violet)}
+  .qc-hero.collapsed .qc-body{display:none}
+  .qc-toggle{margin-left:auto;background:#fff;border:1px solid var(--violet);color:var(--violet);border-radius:9px;padding:6px 12px;font-weight:800;font-size:.8rem;cursor:pointer}
   /* mode toggle */
   .modes{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px}
   .modebtn{border:none;background:transparent;padding:8px 16px;border-radius:8px;font-weight:800;font-size:.9rem;cursor:pointer;color:var(--muted)}
@@ -74,6 +82,7 @@
   .tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
   h2{font-size:1.05rem;margin:0 0 14px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  [hidden]{display:none!important}
   @media(max-width:560px){
     .grid{grid-template-columns:1fr}
     body,html{overflow-x:hidden}
@@ -275,6 +284,36 @@
     </div>
   </header>
 
+  <div class="card qc-hero" id="qccard">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div>
+        <h2 class="qc-title">⚡ Quick Commands <span class="qc-pill">Fast path</span></h2>
+        <p class="qc-sub">Your saved plans — run any one for this client in two clicks. Works on every carrier.</p>
+      </div>
+      <button class="qc-toggle" id="qcToggle" onclick="toggleQc()">Hide</button>
+    </div>
+    <div class="qc-body">
+      <div class="grid" style="margin-top:12px">
+        <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
+        <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
+          <option value="single-female">Single female</option>
+          <option value="single-male">Single male</option>
+          <option value="married-female">Female (married)</option>
+          <option value="married-male">Male (married)</option>
+          <option value="joint">Joint (couple, shared rider)</option>
+        </select></div>
+        <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
+        <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
+      </div>
+      <div class="grid" id="t_couple" hidden>
+        <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
+        <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
+      </div>
+      <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
+    </div>
+  </div>
+
   <div class="card ask" id="askCard">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <div class="modes" id="modes">
@@ -465,31 +504,6 @@
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
-  </div>
-
-  <div class="card" id="qccard">
-    <div class="cs-head">
-      <h2 style="margin:0 0 2px">⚡ Quick Commands <span style="color:var(--muted);font-weight:600;font-size:.9rem">— saved plans, any carrier</span></h2>
-      <p class="hint" style="margin:0">Pick a saved quick command and run it for this applicant. Each one runs on the carrier it was saved with — NGL, CareScout, or Manhattan Life. Build more with “＋ Save as quick command” under a comparison.</p>
-    </div>
-    <div class="grid">
-      <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
-      <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
-        <option value="single-female">Single female</option>
-        <option value="single-male">Single male</option>
-        <option value="married-female">Female (married)</option>
-        <option value="married-male">Male (married)</option>
-        <option value="joint">Joint (couple, shared rider)</option>
-      </select></div>
-      <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
-      <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
-    </div>
-    <div class="grid" id="t_couple" hidden>
-      <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
-      <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
-      <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-    </div>
-    <div class="actions"><button class="run" onclick="runQuickCommand()">Run</button></div>
   </div>
 
   <div class="card" id="budgetCard" hidden>
@@ -2935,6 +2949,10 @@ function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith(
 
 // Companion dropdown → writes the picked amount into its number input, then resets to "Pick…".
 function pickInto(sel, targetId){ const t=$(targetId); if(!t) return; if(sel.value!==''){ t.value=sel.value; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } sel.selectedIndex=0; }
+// Collapse/expand the pinned Quick Commands hero (remembered per browser).
+function setQcCollapsed(on){ const c=$('qccard'), b=$('qcToggle'); if(!c) return; c.classList.toggle('collapsed', on); if(b) b.textContent = on ? 'Show' : 'Hide'; try{ localStorage.setItem('qcCollapsed', on?'1':'0'); }catch(e){} }
+function toggleQc(){ setQcCollapsed(!$('qccard').classList.contains('collapsed')); }
+try{ if(localStorage.getItem('qcCollapsed')==='1'){ document.addEventListener('DOMContentLoaded',()=>setQcCollapsed(true)); } }catch(e){}
 function setCarrier(c){
   CARRIER = (c==='carescout'||c==='omniflex') ? c : 'ngl';
   const cs=CARRIER==='carescout', om=CARRIER==='omniflex', ngl=CARRIER==='ngl';
