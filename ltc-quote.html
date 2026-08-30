@@ -307,7 +307,6 @@
       <div class="tab active" data-mode="single">Single</div>
       <div class="tab" data-mode="couple">Couple</div>
       <div class="tab" data-mode="budget">Budget</div>
-      <div class="tab" data-mode="standard">Quick Commands</div>
       <div class="tab" data-mode="waiting">Cost of Waiting</div>
       <div class="tab" data-mode="growth">Inflation Growth</div>
       <div class="tab" data-mode="care">Cost of Care</div>
@@ -358,27 +357,6 @@
         <div class="field"><label>State</label><select id="b_state" class="statesel"></select></div>
       </div>
       <div class="actions"><button class="run" onclick="runBudget()">Solve coverage</button></div>
-    </div>
-    <div class="pane" data-pane="standard" hidden>
-      <p class="hint" style="margin-top:0">Pick a commonly-run quote and run it for this applicant. Build more with “＋ Save as quick command” under a comparison.</p>
-      <div class="grid">
-        <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
-        <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
-          <option value="single-female">Single female</option>
-          <option value="single-male">Single male</option>
-          <option value="married-female">Female (married)</option>
-          <option value="married-male">Male (married)</option>
-          <option value="joint">Joint (couple, shared rider)</option>
-        </select></div>
-        <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
-        <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
-      </div>
-      <div class="grid" id="t_couple" hidden>
-        <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
-        <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
-        <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-      </div>
-      <div class="actions"><button class="run" onclick="runQuickCommand()">Run</button></div>
     </div>
     <div class="pane" data-pane="waiting" hidden>
       <p class="hint" style="margin-top:0">What does delaying cost? Premiums rise because they’re older, and care costs grow ~3%/yr — so they’ll need a bigger monthly benefit to keep pace.</p>
@@ -487,6 +465,31 @@
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
+  </div>
+
+  <div class="card" id="qccard">
+    <div class="cs-head">
+      <h2 style="margin:0 0 2px">⚡ Quick Commands <span style="color:var(--muted);font-weight:600;font-size:.9rem">— saved plans, any carrier</span></h2>
+      <p class="hint" style="margin:0">Pick a saved quick command and run it for this applicant. Each one runs on the carrier it was saved with — NGL, CareScout, or Manhattan Life. Build more with “＋ Save as quick command” under a comparison.</p>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
+      <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
+        <option value="single-female">Single female</option>
+        <option value="single-male">Single male</option>
+        <option value="married-female">Female (married)</option>
+        <option value="married-male">Male (married)</option>
+        <option value="joint">Joint (couple, shared rider)</option>
+      </select></div>
+      <div class="field"><label>Issue age</label><input id="t_age" type="number" value="62" min="18" max="79"></div>
+      <div class="field"><label>State</label><select id="t_state" class="statesel"></select></div>
+    </div>
+    <div class="grid" id="t_couple" hidden>
+      <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
+      <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
+      <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
+    </div>
+    <div class="actions"><button class="run" onclick="runQuickCommand()">Run</button></div>
   </div>
 
   <div class="card" id="budgetCard" hidden>
