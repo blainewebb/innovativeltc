@@ -2927,13 +2927,21 @@ function toggle(id){ $(id).hidden=!$(id).hidden; }
 let CARRIER='ngl';
 function isCS(o){ return !!o && o.carrier==='carescout'; }
 function isOmni(o){ return !!o && o.carrier==='omniflex'; }
-function anyQuote(o){ return isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : E.quote(o); }
-function premText(o,q){ if(isCS(o)||isOmni(o)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
+function oneQuote(o){ return isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : E.quote(o); }
+// A couple/household item (__couple) quotes each spouse and returns the summed premium.
+function anyQuote(o){ if(o && o.__couple){ let mp=0, ap=0; const mode=(o.parts[0]||{}).mode||'monthly';
+    for(const part of o.parts){ const q=oneQuote(part); mp+=(q.modalPayment!=null?q.modalPayment:(q.singlePremium||0)); ap+=(q.annualPremium!=null?q.annualPremium:(q.singlePremium||0)); }
+    return {modalPayment:Math.round(mp*100)/100, annualPremium:Math.round(ap*100)/100, mode, pay:'Level', __couple:true}; }
+  return oneQuote(o); }
+function premText(o,q){ if(isCS(o)||isOmni(o)||(o&&o.__couple)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
+// Combine spouse policies (same design, different age/gender) into one household item.
+function coupleCombine(parts){ const older=parts.reduce((a,b)=> (+b.age>+a.age)?b:a, parts[0]);
+  return Object.assign({}, older, {__couple:true, parts:parts.map(x=>Object.assign({},x)), _ages:parts.map(x=>+x.age), _genders:parts.map(x=>x.gender)}); }
 function csInflRate(v){ return (!v||v==='none')?0:(+v/100); }
 function csInflLabel(v){ return (!v||v==='none')?'level (no inflation)':(v+'% compound'); }
 function csMaritalLabel(m){ return m==='Married'?'married (both applying)':(m==='Married1buy'?'married (one applying)':'single'); }
 function csRatioYrs(o){ return o.coverageMax/o.dailyBenefit/365.25; }
-function cfgTextAny(o){ return isOmni(o)?omniConfigText(o):isCS(o)?csConfigShort(o):cfgText(o); }
+function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delete base.__couple; const who=o._ages.map((a,i)=>a+(String(o._genders[i]).toLowerCase().startsWith('f')?'F':'M')).join(' + '); return 'Couple '+who+' · '+cfgTextAny(base)+' (each)'; } return isOmni(o)?omniConfigText(o):isCS(o)?csConfigShort(o):cfgText(o); }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3208,7 +3216,7 @@ const CARRIERS = [
       const mk=(age,gender)=>({carrier:'carescout', age, gender, uwClass:'Standard', marital:'Married', dailyBenefit:daily, coverageMax:pool, inflation:bio, deductible:90, mode:'monthly', state:st||null});
       const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=CS.quote(oA), qB=CS.quote(oB), ratio=pool/daily/365.25;
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
-        design:'$'+daily+'/day · '+fmt0(pool)+' pool each (≈'+ratio.toFixed(1)+' yr) · married class', sub:'Two individual policies (combined)', trayObjs:[oA,oB]};
+        design:'$'+daily+'/day · '+fmt0(pool)+' pool each (≈'+ratio.toFixed(1)+' yr) · married class', sub:'Two individual policies (combined)', trayObj:coupleCombine([oA,oB])};
     } },
   { id:'omniflex', label:'Manhattan Life — Omniflex STC',
     _design(p, daily){   // one Omniflex design at a given facility daily benefit (home care matched, capped $300)
@@ -3245,7 +3253,7 @@ const CARRIERS = [
       const oB=this._design(Object.assign({}, p, {age:p.age2, marital:'married-both'}), 400);
       const qA=OMNI.quote(oA), qB=OMNI.quote(oB);
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
-        design:'$400/day fac + $300/day home · 12-mo each', sub:'Two STC policies (combined) · spousal −10%', trayObjs:[oA,oB]};
+        design:'$400/day fac + $300/day home · 12-mo each', sub:'Two STC policies (combined) · spousal −10%', trayObj:coupleCombine([oA,oB])};
     } },
 ];
 function sweetSpotAll(p, includeShared){
@@ -3463,29 +3471,19 @@ function showStandardJoint(age1,g1,age2,g2,state){
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
 function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; }
-// Build a combined-household entry for a couple from one individual option: two spouse
-// policies, each with its carrier's couple discount; premiums are summed in showCompare.
+// Build a combined-household item for a couple from one individual option: two spouse
+// policies (each with its carrier's couple discount) summed into a single household item.
 function coupleHousehold(op, couple){
   const mkPart=(a,g)=>{ const it=Object.assign({}, op, {age:+a, gender:g});
     if(isOmni(it)) it.spousal=true;             // both applying → Omniflex spousal −10%
     else if(isCS(it)) it.marital='Married';     // CareScout both-applying class
     return it; };
-  return {__couple:true, carrier:op.carrier, parts:[mkPart(couple.age1,couple.g1), mkPart(couple.age2,couple.g2)]};
+  return coupleCombine([mkPart(couple.age1,couple.g1), mkPart(couple.age2,couple.g2)]);
 }
-function modePer(mode){ return {monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[mode]||'/mo'; }
 function showCompare(items, opts){
   opts=opts||{};
-  const flat = items.flatMap(o=> o.__couple ? o.parts : [o]);   // spouse policies drop into the tray individually
-  const rows=items.map(o=>{
-    if(o.__couple){
-      let sum=0, ok=true; for(const part of o.parts){ try{ sum += anyQuote(part).modalPayment; }catch(e){ ok=false; } }
-      const prem = ok ? fmt(sum)+modePer(o.parts[0].mode)+' <span style="font-weight:600;color:var(--muted)">household</span>' : '—';
-      const label = cfgTextAny(o.parts[0]) + ' <span style="color:var(--muted)">+ spouse (two policies)</span>';
-      return '<tr><td class="b">'+label+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addAllToTray('+esc(JSON.stringify(o.parts))+')\'>＋</button></td></tr>';
-    }
-    let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){}
-    return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
-  const addAll = flat.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+esc(JSON.stringify(flat))+')\'>＋ Add all to comparison</button>' : '';
+  const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){} return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  const addAll = items.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+JSON.stringify(items)+')\'>＋ Add all '+items.length+' to comparison</button>' : '';
   show('<div class="config-line">'+(opts.title||'Comparison')+'</div>'+addAll+'<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
 
@@ -3993,7 +3991,7 @@ function savePattern(){
 const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-Meeting';
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const QCATS = {
-  applicant:{label:'Applicant',            v:(o)=> isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
+  applicant:{label:'Applicant',            v:(o)=> o.__couple ? o._ages.map((a,i)=>a+' '+gL(o._genders[i])).join(' + ')+(isOmni(o)?' · '+o.state:'') : isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
   benefit:  {label:()=>{ const it=(QSHEET.client&&QSHEET.client.items)||[]; return (it.length && it.every(o=>isOmni(o))) ? 'Facility benefit' : 'Benefit amount'; }, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo)' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
   period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
   pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
@@ -4003,7 +4001,7 @@ const QCATS = {
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
   shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day ('+fmt0(o.hcDaily*30)+'/mo)':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
-  marital:  {label:'Marital',              v:(o)=> isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
+  marital:  {label:'Marital',              v:(o)=> o.__couple ? 'Couple — combined household'+(isOmni(o)||o.parts.some(x=>isOmni(x))?' (spousal −10%)':'') : isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
   carrier:  {label:'Carrier',              v:(o)=> isOmni(o) ? 'Manhattan Life' : isCS(o) ? 'CareScout' : 'NGL'},
@@ -4141,7 +4139,7 @@ function renderSheet(){
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
   const projNote = showProj ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Values <b>at age '+QSHEET.projAge+'</b> assume each option’s compound inflation grows the benefit every year to that age (level options stay flat). Illustrative — the actual benefit at claim follows the issued policy.</div>' : '';
-  const applicant = (uniform && items.length) ? items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'') : '';
+  const applicant = (uniform && items.length) ? (items[0].__couple ? items[0]._ages.map((a,i)=>a+' '+gL(items[0]._genders[i])).join(' + ')+' (couple)'+(items[0].state?' &middot; '+items[0].state:'') : items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')) : '';
   const sub = QSHEET.adhoc
     ? (applicant?applicant+' &middot; ':'')+(cl.savedAt||'')
     : ((uniform && items.length ? 'Prepared for '+esc(cl.name)+' &middot; '+applicant : 'Prepared for '+esc(cl.name))
