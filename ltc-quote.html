@@ -39,6 +39,10 @@
   .cm-list{max-height:min(60vh,520px);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:8px}
   .cm-empty{color:var(--muted);font-size:.85rem;font-style:italic;padding:14px 2px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:20px;margin-bottom:18px}
+  /* Manhattan "Limited Benefit" toggle */
+  .om-limited{display:flex;align-items:flex-start;gap:9px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:11px 13px;margin:12px 0 4px;font-size:.86rem;color:#78350f;cursor:pointer;line-height:1.45}
+  .om-limited input{width:auto;margin-top:2px;flex:0 0 auto}
+  .om-limited span{font-weight:600;color:#92400e}
   /* Top-level view switcher — clean segmented tabs */
   .viewtabs{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;margin-bottom:18px}
   .vtab{border:none;background:transparent;padding:9px 18px;border-radius:9px;font-weight:800;font-size:.92rem;cursor:pointer;color:var(--muted)}
@@ -474,15 +478,16 @@
       <div class="field"><label>Issue age (45–89)</label><input id="om_age" type="number" value="62" min="45" max="89"></div>
       <div class="field"><label>Premium mode</label><select id="om_mode"><option value="monthly" selected>Monthly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
+    <label class="om-limited"><input type="checkbox" id="om_limited" onchange="omniLimitedToggle()"> <b>Limited Benefit</b> <span>— caps facility &amp; home care at $100/day, 0-day wait each, no inflation (maxes out at what a limited-benefit case can buy; you can still choose less)</span></label>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Facility benefit</div>
     <div class="grid">
-      <div class="field"><label>Facility daily benefit ($10–$400)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'om_daily')"><option value="">Pick…</option><option value="100">$100</option><option value="150">$150</option><option value="200">$200</option><option value="250">$250</option><option value="300">$300</option><option value="350">$350</option><option value="400">$400</option></select><input id="om_daily" type="number" value="400" step="10" min="10" max="400"></div></div>
+      <div class="field"><label id="om_dailylbl">Facility daily benefit ($10–$400)</label><div class="pickrow"><select class="picksel" id="om_facpick" onchange="pickInto(this,'om_daily')"><option value="">Pick…</option><option value="100">$100</option><option value="150">$150</option><option value="200">$200</option><option value="250">$250</option><option value="300">$300</option><option value="350">$350</option><option value="400">$400</option></select><input id="om_daily" type="number" value="400" step="10" min="10" max="400"></div></div>
       <div class="field"><label>Facility benefit period</label><select id="om_bp"><option value="90">90 days</option><option value="180">180 days</option><option value="270">270 days</option><option value="360" selected>360 days</option></select></div>
       <div class="field"><label>Facility elimination period</label><select id="om_ep"><option value="0" selected>0 days</option><option value="20">20 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
     </div>
     <div class="riders" style="margin-top:8px"><label><input type="checkbox" id="om_hc" checked onchange="omniSyncHc()"> Home-care benefit rider</label></div>
     <div class="grid" id="om_hcbox">
-      <div class="field"><label>Home-care daily benefit ($10–$300)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'om_hcdaily')"><option value="">Pick…</option><option value="100">$100</option><option value="150">$150</option><option value="200">$200</option><option value="250">$250</option><option value="300">$300</option></select><input id="om_hcdaily" type="number" value="300" step="10" min="10" max="300"></div></div>
+      <div class="field"><label id="om_hcdailylbl">Home-care daily benefit ($10–$300)</label><div class="pickrow"><select class="picksel" id="om_hcpick" onchange="pickInto(this,'om_hcdaily')"><option value="">Pick…</option><option value="100">$100</option><option value="150">$150</option><option value="200">$200</option><option value="250">$250</option><option value="300">$300</option></select><input id="om_hcdaily" type="number" value="300" step="10" min="10" max="300"></div></div>
       <div class="field"><label>Home-care benefit period</label><select id="om_hcbp"><option value="90">90 days</option><option value="180">180 days</option><option value="270">270 days</option><option value="360" selected>360 days</option></select></div>
       <div class="field"><label>Home-care elimination period</label><select id="om_hcep"><option value="0" selected>0 days</option><option value="20">20 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
     </div>
@@ -3077,6 +3082,30 @@ function csShowSingle(o){
 
 /* ---------- Manhattan Life Omniflex (Short-Term Care) ---------- */
 function omniSyncHc(){ $('om_hcbox').hidden = !$('om_hc').checked; }
+// "Limited Benefit": some health answers cap Omniflex at $100/day facility + $100/day home,
+// 0-day wait on each, and no inflation. Check the box to snap to that max; you can still pick less.
+function omniLimitedToggle(){
+  const on = $('om_limited').checked;
+  const capPick=(sel,cap)=>{ if(!sel) return; [...sel.options].forEach(o=>{ if(o.value) o.disabled = on && (+o.value>cap); }); };
+  // facility + home daily: cap at $100 when limited, restore $400/$300 when not
+  $('om_daily').max = on ? 100 : 400;
+  if(on && +$('om_daily').value>100) $('om_daily').value=100;
+  if($('om_dailylbl')) $('om_dailylbl').textContent = on ? 'Facility daily benefit ($10–$100)' : 'Facility daily benefit ($10–$400)';
+  capPick($('om_facpick'),100);
+  $('om_hc').checked = on ? true : $('om_hc').checked;   // limited case includes the home-care benefit
+  omniSyncHc();
+  $('om_hcdaily').max = on ? 100 : 300;
+  if(on && +$('om_hcdaily').value>100) $('om_hcdaily').value=100;
+  if($('om_hcdailylbl')) $('om_hcdailylbl').textContent = on ? 'Home-care daily benefit ($10–$100)' : 'Home-care daily benefit ($10–$300)';
+  capPick($('om_hcpick'),100);
+  // elimination: force 0-day on both and lock
+  if(on){ $('om_ep').value='0'; $('om_hcep').value='0'; }
+  $('om_ep').disabled = on; $('om_hcep').disabled = on;
+  // inflation: not available on limited benefit
+  if(on) $('om_infl').checked=false;
+  $('om_infl').disabled = on;
+  $('om_infl').closest('label').style.opacity = on ? .45 : '';
+}
 function omniOpts(){
   return {carrier:'omniflex', state:$('om_state').value, age:+$('om_age').value, mode:$('om_mode').value,
     facilityDaily:+$('om_daily').value, facilityBP:+$('om_bp').value, facilityEP:+$('om_ep').value,
@@ -3910,6 +3939,7 @@ function fillCsForm(o){
 }
 function fillOmniForm(o){
   setCarrier('omniflex');
+  if($('om_limited')){ $('om_limited').checked=false; omniLimitedToggle(); }   // clear any Limited-Benefit lock before loading
   if(o.state==='MI'||o.state==='TX') $('om_state').value=o.state;
   $('om_age').value=o.age; $('om_mode').value=o.mode||'monthly';
   $('om_daily').value=o.facilityDaily; $('om_bp').value=o.facilityBP; $('om_ep').value=o.facilityEP;
