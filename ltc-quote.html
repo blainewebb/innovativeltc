@@ -2937,6 +2937,10 @@ function premText(o,q){ if(isCS(o)||isOmni(o)||(o&&o.__couple)){ const per={mont
 // Combine spouse policies (same design, different age/gender) into one household item.
 function coupleCombine(parts){ const older=parts.reduce((a,b)=> (+b.age>+a.age)?b:a, parts[0]);
   return Object.assign({}, older, {__couple:true, parts:parts.map(x=>Object.assign({},x)), _ages:parts.map(x=>+x.age), _genders:parts.map(x=>x.gender)}); }
+// Tag a joint (two-life) item with both applicants so the sheet header can name both.
+function withCoupleAges(o, a1,g1,a2,g2){ return Object.assign({}, o, {_ages:[+a1,+a2], _genders:[g1,g2]}); }
+// Is this item a couple/household (combined item or a joint two-life policy)?
+function isCoupleItem(o){ return !!(o && (o.__couple || (o._ages && o._ages.length>1))); }
 function csInflRate(v){ return (!v||v==='none')?0:(+v/100); }
 function csInflLabel(v){ return (!v||v==='none')?'level (no inflation)':(v+'% compound'); }
 function csMaritalLabel(m){ return m==='Married'?'married (both applying)':(m==='Married1buy'?'married (one applying)':'single'); }
@@ -3143,7 +3147,7 @@ const CARRIERS = [
       const opts={benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp};
       let r; try{ r=E.quoteCouple(p.age,p.gender,p.age2,p.gender2,s.monthlyBenefit,opts); }catch(e){ return {label:this.label+' · joint', fits:false, note:e.message}; }
       const c=r.combined_joint, older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
-      const trayObj=Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true});
+      const trayObj=withCoupleAges(Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true}), p.age,p.gender,p.age2,p.gender2);
       return {label:this.label+' · joint', fits:true, premium:c.modalPayment, annual:c.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo each · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · joint', sub:'Combined household (both lives)', trayObjs:[trayObj]};
     },
@@ -3153,7 +3157,7 @@ const CARRIERS = [
       const opts={benefitPeriod:bp, elimination:'90', inflation:infl, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp, riderSharedAdditional:true};
       let r; try{ r=E.quoteCouple(p.age,p.gender,p.age2,p.gender2,s.monthlyBenefit,opts); }catch(e){ return null; }
       const c=r.combined_joint, older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
-      const trayObj=Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true});
+      const trayObj=withCoupleAges(Object.assign({}, opts, older, {monthlyBenefit:s.monthlyBenefit, joint:true}), p.age,p.gender,p.age2,p.gender2);
       const pool=s.monthlyBenefit*parseInt(bp)*3;
       return {label:this.label+' · joint + shared pool', fits:true, premium:c.modalPayment, annual:c.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo each · '+(parseInt(bp)/12)+'-yr · '+pctL(infl)+' · shared pool', sub:'Shared pool · '+fmt0(pool)+' household total', trayObjs:[trayObj]};
@@ -3433,7 +3437,7 @@ function showCouple(a1,g1,a2,g2,opts){
   const rows=surv.map(k=>'<tr><td>If only the '+k.replace('survivor_','')+' remains</td><td class="p">'+fmt(r[k].modalPayment)+'/mo</td></tr>').join('');
   // joint household policy as a tray object (rated on the older insured) so it can be added/saved/printed
   const older = (+a1>=+a2) ? {age:+a1,gender:g1} : {age:+a2,gender:g2};
-  const trayObj = Object.assign({}, opts, older, {joint:true, monthlyBenefit:opts.monthlyBenefit});
+  const trayObj = withCoupleAges(Object.assign({}, opts, older, {joint:true, monthlyBenefit:opts.monthlyBenefit}), a1,g1,a2,g2);
   show('<div class="res-head">'+priceHead(c)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
     '<div class="config-line">'+fmt0(opts.monthlyBenefit)+'/mo each &middot; '+bpL(opts.benefitPeriod)+' &middot; '+opts.elimination+'-day &middot; '+pctL(opts.inflation)+(opts.riderSharedAdditional?' &middot; shared-care':'')+'</div>'+
     '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+
@@ -3466,7 +3470,7 @@ function showStandardJoint(age1,g1,age2,g2,state){
     const kw={benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP,riderFirstDayHccs:fdc};
     let prem; try{ prem=fmt(E.quoteCouple(+age1,g1,+age2,g2,op.monthly_benefit,kw).combined_joint.modalPayment)+'/mo'; }catch(e){ prem='—'; }
     // joint opts for the tray — the combined premium is the joint rate at the older insured's age
-    const jointCfg={age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP,riderFirstDayHccs:fdc};
+    const jointCfg=withCoupleAges({age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP,riderFirstDayHccs:fdc}, age1,g1,age2,g2);
     return '<tr><td><b>'+op.name.replace(/\/\s*4-yr/,'/ 3-yr')+'</b>'+(fdc?'<div style="font-size:.72rem;color:#15803d;font-weight:700">+ zero-day home care</div>':'')+'</td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(BP)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
@@ -3719,7 +3723,7 @@ function execPattern(p, age, gender, couple){
   if(p.options && p.options.length){
     let items=[];
     for(const op of p.options){
-      if(op.joint){ items.push(couple ? Object.assign({},op,{age:older.age,gender:older.g}) : Object.assign({},op)); }
+      if(op.joint){ items.push(couple ? withCoupleAges(Object.assign({},op,{age:older.age,gender:older.g}), couple.age1,couple.g1,couple.age2,couple.g2) : Object.assign({},op)); }
       else if(couple){ items.push(coupleHousehold(op, couple)); }
       else { items.push(Object.assign({},op,{age,gender})); }
     }
@@ -3991,7 +3995,7 @@ function savePattern(){
 const LEVITATE = 'https://m.levitate.ai/033751-3s8s2j/Benefits-and-Pricing-Zoom-Meeting';
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const QCATS = {
-  applicant:{label:'Applicant',            v:(o)=> o.__couple ? o._ages.map((a,i)=>a+' '+gL(o._genders[i])).join(' + ')+(isOmni(o)?' · '+o.state:'') : isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
+  applicant:{label:'Applicant',            v:(o)=> isCoupleItem(o) ? o._ages.map((a,i)=>a+' '+gL(o._genders[i])).join(' + ')+(isOmni(o)?' · '+o.state:'') : isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
   benefit:  {label:()=>{ const it=(QSHEET.client&&QSHEET.client.items)||[]; return (it.length && it.every(o=>isOmni(o))) ? 'Facility benefit' : 'Benefit amount'; }, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo)' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
   period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : poolYearsLabel(o)},
   pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
@@ -4000,8 +4004,9 @@ const QCATS = {
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? (o.homeCare && o.hcEP!==o.facilityEP ? o.facilityEP+' / '+o.hcEP+'-day (facility / home)' : o.facilityEP+'-day wait') : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
-  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day ('+fmt0(o.hcDaily*30)+'/mo)':'—') : isCS(o) ? '—' : (o.riderSharedAdditional?'Shared-care':'—')},
-  marital:  {label:'Marital',              v:(o)=> o.__couple ? 'Couple — combined household'+(isOmni(o)||o.parts.some(x=>isOmni(x))?' (spousal −10%)':'') : isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
+  shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day ('+fmt0(o.hcDaily*30)+'/mo)':'—') : '—'},
+  sharedcare:{label:'Shared care',         v:(o)=> (o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional))) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span> Yes' : '—'},
+  marital:  {label:'Marital',              v:(o)=> o.__couple ? 'Couple — combined household'+(isOmni(o)||o.parts.some(x=>isOmni(x))?' (spousal −10%)':'') : (o._ages&&o._ages.length>1) ? 'Joint — both insured' : isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
   carrier:  {label:'Carrier',              v:(o)=> isOmni(o) ? 'Manhattan Life' : isCS(o) ? 'CareScout' : 'NGL'},
@@ -4012,8 +4017,8 @@ const QLAYOUTS = {
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
 // Customize mode: every available line item, and which are on by default.
-const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','marital','annual','premium'];
-const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,marital:false,annual:true,premium:true};
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','marital','annual','premium'];
+const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,marital:false,annual:true,premium:true};
 function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
   let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
 function catLabelPlain(key){ const c=QCATS[key]; if(!c) return key; return (typeof c.label==='function')?c.label():c.label; }
@@ -4124,9 +4129,14 @@ function renderSheet(){
     if(uniform) rows = rows.filter(k=>k!=='applicant');            // uniform → shown in the subtitle instead
     else if(!rows.includes('applicant')) rows.unshift('applicant'); // mixed applicants → label every column
     if(rows.includes('carrier')) rows = rows.filter(k=>k!=='carrier'); // carrier now shown in each column header
-    if(items.every(o=>isOmni(o)?!o.homeCare:isCS(o)?true:!o.riderSharedAdditional)) rows = rows.filter(k=>k!=='shared');
+    // "Home care" row is Omniflex-only now — keep it only when an Omniflex option carries the rider
+    if(!items.some(o=>isOmni(o)&&o.homeCare)) rows = rows.filter(k=>k!=='shared');
     // Omniflex with home care → show the Home care line right under Facility (Benefit amount), in any layout
     if(items.some(o=>isOmni(o)&&o.homeCare)){ rows = rows.filter(k=>k!=='shared'); const bi=rows.indexOf('benefit'); rows.splice(bi<0?0:bi+1, 0, 'shared'); }
+    // Shared-care row appears whenever any option carries the shared-care rider
+    const anyShared = items.some(o=>o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional)));
+    if(anyShared && !rows.includes('sharedcare')){ const ii=rows.indexOf('inflation'); rows.splice(ii<0?rows.indexOf('premium'):ii+1, 0, 'sharedcare'); }
+    else if(!anyShared) rows = rows.filter(k=>k!=='sharedcare');
     if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   }
   const showProj = rows.includes('projMonthly') || rows.includes('projPool');
@@ -4139,7 +4149,7 @@ function renderSheet(){
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
   const projNote = showProj ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Values <b>at age '+QSHEET.projAge+'</b> assume each option’s compound inflation grows the benefit every year to that age (level options stay flat). Illustrative — the actual benefit at claim follows the issued policy.</div>' : '';
-  const applicant = (uniform && items.length) ? (items[0].__couple ? items[0]._ages.map((a,i)=>a+' '+gL(items[0]._genders[i])).join(' + ')+' (couple)'+(items[0].state?' &middot; '+items[0].state:'') : items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')) : '';
+  const applicant = (uniform && items.length) ? (isCoupleItem(items[0]) ? items[0]._ages.map((a,i)=>a+' '+gL(items[0]._genders[i])).join(' + ')+' (couple)'+(items[0].state?' &middot; '+items[0].state:'') : items[0].age+' '+gL(items[0].gender)+(items[0].state?' &middot; '+items[0].state:'')) : '';
   const sub = QSHEET.adhoc
     ? (applicant?applicant+' &middot; ':'')+(cl.savedAt||'')
     : ((uniform && items.length ? 'Prepared for '+esc(cl.name)+' &middot; '+applicant : 'Prepared for '+esc(cl.name))
