@@ -493,7 +493,7 @@
       <label><input type="checkbox" id="om_infl"> Inflation protection (5% simple)</label>
       <label><input type="checkbox" id="om_smoker"> Smoker (+10%)</label>
       <label><input type="checkbox" id="om_spousal"> Spousal discount (−10%)</label>
-      <label title="Caps facility &amp; home care at $100/day, 0-day wait each, no inflation — the max a limited-benefit case can buy. You can still choose less."><input type="checkbox" id="om_limited" onchange="omniLimitedToggle()"> Limited Benefit ($100 max)</label>
+      <label title="Caps facility &amp; home care at $100/day and turns off inflation — the max a limited-benefit case can buy. Elimination period is still your choice, and you can choose lower daily amounts."><input type="checkbox" id="om_limited" onchange="omniLimitedToggle()"> Limited Benefit ($100 max)</label>
     </div>
     <div class="warn" style="margin-top:2px">Filed in Michigan and Texas only. A $25 one-time policy fee applies. The facility &amp; home-care cash benefits equal 50% of the daily benefit (included). Verified to the penny against an Omniflex illustration.</div>
     <div class="actions">
@@ -3094,9 +3094,7 @@ function omniLimitedToggle(){
   if(on && +$('om_hcdaily').value>100) $('om_hcdaily').value=100;
   if($('om_hcdailylbl')) $('om_hcdailylbl').textContent = on ? 'Home-care daily benefit ($10–$100)' : 'Home-care daily benefit ($10–$300)';
   capPick($('om_hcpick'),100);
-  // elimination: force 0-day on both and lock
-  if(on){ $('om_ep').value='0'; $('om_hcep').value='0'; }
-  $('om_ep').disabled = on; $('om_hcep').disabled = on;
+  // elimination period stays fully selectable (0/20/60/90) on limited benefit
   // inflation: not available on limited benefit
   if(on) $('om_infl').checked=false;
   $('om_infl').disabled = on;
