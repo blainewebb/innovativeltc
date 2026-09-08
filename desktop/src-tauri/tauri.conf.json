@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Innovative LTC",
+  "version": "1.0.0",
+  "identifier": "com.innovativeltc.quote",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "node prepare.mjs"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Innovative LTC — Instant Quote",
+        "width": 1200,
+        "height": 860,
+        "minWidth": 380,
+        "minHeight": 520,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Business",
+    "shortDescription": "LTC/STC instant quoting",
+    "longDescription": "Instant long-term and short-term care insurance quoting for NGL HonestLTC, CareScout, and Manhattan Life Omniflex — verified rates, works offline."
+  }
+}
