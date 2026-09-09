@@ -103,6 +103,7 @@
   .pickrow{display:flex;gap:6px}
   .pickrow input{flex:1;min-width:0}
   .pickrow .picksel{flex:0 0 96px;width:96px;padding:11px 6px;color:#475569;font-weight:600}
+  .pickrow input.dobpick{flex:0 0 150px;width:150px;padding:11px 8px;color:#475569}
   input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
   .riders{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}
   .riders label{display:flex;align-items:center;gap:7px;font-weight:600;font-size:.85rem;color:#334155}
@@ -3900,6 +3901,22 @@ function renderTray(){
 /* ---------- saved clients ---------- */
 let EDIT_CLIENT=-1, PENDING_ITEMS=null, CLIENT_SORT='az';
 function ageFromDob(dob){ if(!dob) return null; const d=new Date(dob+'T00:00:00'); if(isNaN(d)) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
+// Birthday → age: enter either an age OR pick a birthday, and the birthday fills in the age.
+const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','g_age','coc_age','cs_age','om_age','om_age2','sw_age','sw_age2'];
+function dobToAge(dobEl, ageId){ const a=ageFromDob(dobEl.value); if(a==null) return; const t=$(ageId); if(!t) return; t.value=a; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+function attachBirthdayPickers(){
+  const today=new Date().toISOString().slice(0,10);
+  AGE_FIELDS.forEach(id=>{ const inp=document.getElementById(id); if(!inp || inp.closest('.pickrow')) return;
+    const field=inp.closest('.field')||inp.parentNode;
+    const row=document.createElement('div'); row.className='pickrow';
+    inp.parentNode.insertBefore(row, inp); row.appendChild(inp);
+    const dob=document.createElement('input'); dob.type='date'; dob.className='dobpick'; dob.max=today;
+    dob.title='Pick a birthday to fill in the age'; dob.setAttribute('aria-label','Birthday');
+    dob.addEventListener('change', ()=>dobToAge(dob, id));
+    row.appendChild(dob);
+    const lbl=field.querySelector('label'); if(lbl && !lbl.dataset.dob){ lbl.insertAdjacentHTML('beforeend', ' <span style="color:var(--muted);font-weight:500">· or 🎂 birthday</span>'); lbl.dataset.dob='1'; }
+  });
+}
 function clientContact(x){ const parts=[x.email,x.phone].filter(Boolean); return parts.length?parts.join(' · '):(x.contact||''); }
 function clientTs(x){ return x.updatedAt||x.ts||0; }
 // Save-to-client (new) opens the editor pre-filled from the current comparison
@@ -4246,6 +4263,7 @@ fillStates();
 renderTray(); renderClients(); renderPatterns();
 setMode('manual');   // start on the click-in form
 csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
+attachBirthdayPickers();   // add a birthday date-picker beside every age field (either/or entry)
 setCarrier('ngl');   // start on NGL; switch carriers from the header
 </script>
 </body>
