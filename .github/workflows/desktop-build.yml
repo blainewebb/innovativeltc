@@ -1,0 +1,76 @@
+name: Build desktop app
+
+# How to get installers:
+#   1. Bump the version, then create & push a tag that starts with "v"
+#      (e.g. git tag v1.0.0 && git push origin v1.0.0), OR
+#   2. Run this workflow by hand from the Actions tab ("Run workflow").
+# A tag push publishes a GitHub Release with the Windows and macOS installers
+# attached. Either way, the installers are also uploaded as workflow artifacts
+# you can download from the run's summary page.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Allow the workflow's token to attach the built installers to the GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest          # builds a universal .dmg (Apple Silicon + Intel)
+            args: "--target universal-apple-darwin"
+          - platform: windows-latest         # builds .msi and .exe (NSIS) installers
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Build the app (and publish a Release on tag pushes)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: "Innovative LTC ${{ github.ref_name }}"
+          releaseBody: "Desktop installers for the Innovative LTC instant-quote tool. Windows: run the .msi or .exe. macOS: open the .dmg and drag the app to Applications."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      - name: Upload installers as workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            desktop/src-tauri/target/**/release/bundle/**/*.dmg
+            desktop/src-tauri/target/**/release/bundle/**/*.app/**
+            desktop/src-tauri/target/**/release/bundle/**/*.msi
+            desktop/src-tauri/target/**/release/bundle/**/*.exe
+          if-no-files-found: warn
