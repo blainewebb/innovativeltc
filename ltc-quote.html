@@ -588,7 +588,7 @@
     <label id="keylabel">Anthropic API key</label>
     <input id="apikey" type="password" placeholder="sk-ant-...">
     <label>Model</label>
-    <select id="model"></select>
+    <input id="model" list="modellist" autocomplete="off" spellcheck="false" placeholder="model name"><datalist id="modellist"></datalist>
     <div class="warn" id="keyhelp"></div>
     <div class="row">
       <button class="ghost" onclick="clearKey()">Clear key</button>
@@ -2874,9 +2874,9 @@ const PROVIDERS = {
   },
   gemini: {
     label:'Google Gemini', keyLabel:'Google Gemini API key', placeholder:'AIza...',
-    keyStore:'ltcGeminiKey', modelStore:'ltcGeminiModel', defaultModel:'gemini-2.5-flash',
-    models:[['gemini-2.5-flash','Gemini 2.5 Flash — cheapest, plenty for this'],['gemini-2.5-pro','Gemini 2.5 Pro — most capable'],['gemini-2.0-flash','Gemini 2.0 Flash — fast']],
-    help:'Get a free key at aistudio.google.com/apikey. It’s stored only in this browser (local storage) and sent directly to Google. Don’t use this on a shared/public computer. Clear it anytime here.',
+    keyStore:'ltcGeminiKey', modelStore:'ltcGeminiModel', defaultModel:'gemini-3.6-flash',
+    models:[['gemini-3.6-flash','Gemini 3.6 Flash — cheapest, recommended'],['gemini-flash-latest','Gemini Flash (latest — always current)'],['gemini-pro-latest','Gemini Pro (latest) — most capable']],
+    help:'Get a free key at aistudio.google.com/apikey. You can pick a model or type any current model name (Google renames these from time to time). Your key is stored only on this device and sent directly to Google. Don’t use it on a shared computer; clear it anytime here.',
   },
 };
 const LS = {
@@ -2921,7 +2921,7 @@ function syncProviderUI(){
   $('keylabel').textContent=P.keyLabel;
   $('apikey').placeholder=P.placeholder;
   $('apikey').value=localStorage.getItem(P.keyStore)||'';
-  $('model').innerHTML=P.models.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
+  $('modellist').innerHTML=P.models.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
   $('model').value=localStorage.getItem(P.modelStore)||P.defaultModel;
   $('keyhelp').textContent=P.help;
 }
