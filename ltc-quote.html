@@ -4151,7 +4151,7 @@ function benefitGrowthSection(items, order){
   if(!items.length) return '';
   const uniform = items.every(o=>(+o.age)===(+items[0].age));
   const issueAge = uniform ? +items[0].age : null;
-  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'ManhattanLife':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
+  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
   const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
     return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
   return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
@@ -4272,7 +4272,7 @@ function renderSheet(){
   // option column order (view-only; reset each time the sheet is opened)
   if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
   const order = QSHEET.colOrder;
-  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'ManhattanLife':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
