@@ -234,6 +234,12 @@
   .cz-item .cz-lbl{font-weight:600;color:#334155}
   .cz-item.off .cz-lbl{color:var(--muted);text-decoration:line-through}
   table.qtab th .col-carrier{margin-top:3px;font-size:.72rem;font-weight:800;color:#fff;background:var(--primary-d);border-radius:999px;padding:2px 8px;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .growth-page{margin-top:24px}
+  .growth-h{margin:0 0 4px;font-size:1.1rem;font-weight:800;color:var(--text)}
+  table.growth-tab td,table.growth-tab th{text-align:center;font-size:.85rem}
+  table.growth-tab tbody td:first-child,table.growth-tab tbody td:nth-child(2){color:var(--muted);font-weight:700}
+  .growth-tab .gc-sub{font-size:.7rem;color:var(--muted);font-weight:600}
+  @media print{ .growth-page{page-break-before:always} }
   table.qtab th .colmove{display:inline-flex;gap:3px;justify-content:center;margin-top:5px}
   table.qtab th .colmove button{border:1px solid var(--border);background:#fff;color:var(--primary-d);border-radius:6px;width:22px;height:20px;line-height:1;font-size:.7rem;font-weight:800;cursor:pointer;padding:0}
   table.qtab th .colmove button:disabled{opacity:.3;cursor:default}
@@ -610,6 +616,7 @@
     <label class="qs-proj" id="qsProj">Project benefit to age
       <input id="qsProjAge" type="number" min="70" max="100" step="1" value="80" onchange="setProjAge(this.value)">
     </label>
+    <label class="qs-proj" id="qsGrowthToggle" title="Add a year-by-year benefit-growth page to the printout"><input type="checkbox" id="qsGrowth" onchange="toggleGrowth(this.checked)" style="width:auto;margin-right:6px"> Benefit-growth page</label>
     <div class="sp">
       <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
       <button class="tb close" onclick="closeSheet()">Close</button>
@@ -2861,7 +2868,7 @@ const MAX_BENEFIT = 12000;   // NGL sells a monthly benefit up to $12,000 — ne
 const SNAP  = b => Math.min(MAX_BENEFIT, Math.max(300, Math.round((+b||0)/300)*300));   // nearest quotable $300 increment, capped
 const FLOOR3= b => Math.min(MAX_BENEFIT, Math.max(300, Math.floor((+b||0)/300)*300));   // largest increment within budget, capped
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
-const OMNI_INFL_NOTE = '*Omniflex 5% simple inflation: the benefit begins growing in year 6, then increases 5% (simple) of the original benefit each year for 20 years, then stops.';
+const OMNI_INFL_NOTE = '*Omniflex inflation rider: the benefit starts at 50% of the selected amount and builds 10% of the original each year to 100% by year 6 (a 5-year ramp-up), then grows 5% simple of the original each year for 20 years (years 6–26), then stays level.';
 function omniInflNote(items){ return (items||[]).some(o=>isOmni(o)&&o.inflation) ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+OMNI_INFL_NOTE+'</div>' : ''; }
 let MODE = 'manual';
 
@@ -4110,13 +4117,42 @@ function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age));
   return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 // CareScout compound inflation grows the coverage-maximum pool too.
 function csProjPool(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round(o.coverageMax*Math.pow(1+csInflRate(o.inflation),yrs)); }
-// Omniflex 5% SIMPLE inflation: begins in year 6, +5% of the original each year for 20 years, then stops.
-function omInflFactor(o, projAge){ if(!o.inflation) return 1; const y=Math.max(0,(+projAge||80)-(+o.age)); const inc=Math.max(0,Math.min(20,y-5)); return 1+0.05*inc; }
+// Omniflex inflation rider (graded ramp): with the rider the benefit starts at 50% of the
+// selected daily and builds +10% of the original each year — 50/60/70/80/90/100% over years
+// 1–6 — then grows 5% SIMPLE of the original each year for 20 years (years 6–26), then stops.
+// Without the rider the benefit is the flat selected amount. `e` = years elapsed since issue.
+function omFactorAtElapsed(o, e){ if(!o.inflation) return 1; e=Math.max(0, e);
+  if(e < 5) return 0.5 + 0.10*e;                 // years 1–5: 50% → 90%
+  return 1 + 0.05*Math.min(20, e-5); }           // year 6 = 100%, then +5% simple/yr for 20 yrs
+function omInflFactor(o, projAge){ return omFactorAtElapsed(o, Math.max(0,(+projAge||80)-(+o.age))); }
 function omProjFac(o){ return Math.round(o.facilityDaily*omInflFactor(o,QSHEET.projAge)); }
 function omPool(o){ return o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0); }
 function omProjPool(o){ return Math.round(omPool(o)*omInflFactor(o,QSHEET.projAge)); }
 // Omniflex coverage text: e.g. facility 360-day + home care 360-day => "12-month each (2-year total)".
 function omCoverageText(o){ const facMo=omMonths(o.facilityBP); if(!o.homeCare) return facMo+'-month'; const hcMo=omMonths(o.hcBP); const totMo=facMo+hcMo; const tot=(totMo%12===0)?(totMo/12)+'-year':totMo+'-month'; return (facMo===hcMo?facMo+'-month each':facMo+'-mo fac / '+hcMo+'-mo home')+' ('+tot+' total)'; }
+/* ---------- benefit-growth (inflation) page for the printout ---------- */
+function toggleGrowth(on){ QSHEET.growth=!!on; renderSheet(); }
+const GROWTH_YEARS=[1,2,3,4,5,6,7,8,9,10,15,20,25,30];
+// each option's benefit at `e` years after issue (e=0 at year 1), per its carrier's growth model
+function growthCell(o,e){
+  if(isOmni(o)){ const f=omFactorAtElapsed(o,e); let s='$'+Math.round(o.facilityDaily*f)+'/day'; if(o.homeCare) s+='<div class="gc-sub">+$'+Math.round(o.hcDaily*f)+' home</div>'; return s; }
+  if(isCS(o)){ const r=csInflRate(o.inflation); return '$'+Math.round(o.dailyBenefit*Math.pow(1+r,e))+'/day'; }
+  return fmt0(Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,e):1)))+'/mo';
+}
+function benefitGrowthSection(items, order){
+  if(!items.length) return '';
+  const uniform = items.every(o=>(+o.age)===(+items[0].age));
+  const issueAge = uniform ? +items[0].age : null;
+  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'Manhattan Life':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
+  const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
+    return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
+  const anyOmniInfl = items.some(o=>isOmni(o)&&o.inflation);
+  return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
+    + '<div class="hint" style="margin:0 0 8px">How each option’s benefit changes year by year (Year 1 = policy issue). Level options stay flat; inflation options grow as shown. Illustrative — the actual benefit at claim follows the issued policy.</div>'
+    + '<div style="overflow-x:auto"><table class="qtab growth-tab"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    + (anyOmniInfl ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+OMNI_INFL_NOTE+'</div>' : '')
+    + '</div>';
+}
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
@@ -4199,6 +4235,8 @@ function renderSheet(){
   const custom = QSHEET.layout==='custom';
   document.querySelectorAll('#qsSeg button').forEach(b=>b.classList.toggle('on', b.dataset.l===QSHEET.layout));
   $('qsProjAge').value = QSHEET.projAge||80;
+  if($('qsGrowth')) $('qsGrowth').checked = !!QSHEET.growth;
+  if($('qsGrowthToggle')) $('qsGrowthToggle').classList.toggle('show', (cl.items||[]).length>0);
   const quotes = items.map(o=>{ try{ return anyQuote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
   let rows;
@@ -4245,7 +4283,7 @@ function renderSheet(){
     + nameHtml
     + '<div class="sh-sub">'+sub+'</div>'
     + (items.length
-        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote+omniInflNote(items)
+        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote+omniInflNote(items)+(QSHEET.growth?benefitGrowthSection(items, order):'')
         : '<p class="empty">No options saved for this client.</p>')
     + '<div class="qs-cta">Ready to talk it through? <a href="'+LEVITATE+'">Book a Benefits &amp; Pricing Zoom &rarr;</a></div>'
     + '<div class="disc">'+DISC+'</div>';
