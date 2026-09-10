@@ -4099,6 +4099,7 @@ const QCATS = {
   sharedcare:{label:'Shared care',         v:(o)=> (o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional))) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span> Yes' : '—'},
   rxbenefit:{label:'Prescription Drug Benefit', v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
   fast50:   {label:'Fast-50',               v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
+  restoration:{label:'Restoration of Benefits', v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
   marital:  {label:'Marital',              v:(o)=> o.__couple ? 'Couple — combined household'+(isOmni(o)||o.parts.some(x=>isOmni(x))?' (spousal −10%)':'') : (o._ages&&o._ages.length>1) ? 'Joint — both insured' : isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
@@ -4110,8 +4111,8 @@ const QLAYOUTS = {
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
 // Customize mode: every available line item, and which are on by default.
-const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','rxbenefit','fast50','marital','annual','premium'];
-const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,rxbenefit:false,fast50:false,marital:false,annual:true,premium:true};
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','rxbenefit','fast50','restoration','marital','annual','premium'];
+const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,rxbenefit:false,fast50:false,restoration:false,marital:false,annual:true,premium:true};
 function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
   let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
 function catLabelPlain(key){ const c=QCATS[key]; if(!c) return key; return (typeof c.label==='function')?c.label():c.label; }
@@ -4262,9 +4263,10 @@ function renderSheet(){
     const anyShared = items.some(o=>o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional)));
     if(anyShared && !rows.includes('sharedcare')){ const ii=rows.indexOf('inflation'); rows.splice(ii<0?rows.indexOf('premium'):ii+1, 0, 'sharedcare'); }
     else if(!anyShared) rows = rows.filter(k=>k!=='sharedcare');
-    // OmniFlex-only sheet → show its built-in benefit lines (Rx + Fast-50); kept out of
-    // cross-carrier comparisons so those stay clean. In Customize mode the user's choice governs.
-    if(items.length && items.every(o=>isOmni(o)) && !rows.includes('rxbenefit')){ const pi=rows.indexOf('annual'); const at=pi<0?rows.indexOf('premium'):pi; rows.splice(at<0?rows.length:at, 0, 'rxbenefit','fast50'); }
+    // OmniFlex-only sheet → show its built-in benefit lines (Rx, Fast-50, Restoration of
+    // Benefits); kept out of cross-carrier comparisons so those stay clean, and off the
+    // minimal Essentials view. In Customize mode the user's choice governs.
+    if(QSHEET.layout!=='essentials' && items.length && items.every(o=>isOmni(o)) && !rows.includes('rxbenefit')){ const pi=rows.indexOf('annual'); const at=pi<0?rows.indexOf('premium'):pi; rows.splice(at<0?rows.length:at, 0, 'rxbenefit','fast50','restoration'); }
     if(items.some(o=>o.maritalDiscount) && !rows.includes('marital')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'marital'); }
   }
   const showProj = rows.includes('projMonthly') || rows.includes('projPool');
