@@ -2868,8 +2868,11 @@ const MAX_BENEFIT = 12000;   // NGL sells a monthly benefit up to $12,000 — ne
 const SNAP  = b => Math.min(MAX_BENEFIT, Math.max(300, Math.round((+b||0)/300)*300));   // nearest quotable $300 increment, capped
 const FLOOR3= b => Math.min(MAX_BENEFIT, Math.max(300, Math.floor((+b||0)/300)*300));   // largest increment within budget, capped
 const DISC = 'This is an independent illustration not provided or approved by the issuers of the policies shown. Use the Insurer’s forms and software for Insurer-approved quotes and applications.';
-const OMNI_INFL_NOTE = '*Omniflex inflation rider: the benefit starts at 50% of the selected amount and builds 10% of the original each year to 100% by year 6 (a 5-year ramp-up), then grows 5% simple of the original each year for 20 years (years 6–26), then stays level.';
-function omniInflNote(items){ return (items||[]).some(o=>isOmni(o)&&o.inflation) ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+OMNI_INFL_NOTE+'</div>' : ''; }
+// Ramp applies to every Manhattan plan; the 5% simple growth is added only with the rider.
+const OMNI_RAMP_NOTE = '*Manhattan Life benefits start at 50% of the selected amount and build 10% of the original each year to 100% by year 6 (a 5-year ramp-up).';
+const OMNI_INFL_ADD = ' With the inflation rider, the benefit then grows 5% simple of the original each year for 20 years (years 6–26), then stays level.';
+function omniNoteText(items){ items=items||[]; if(!items.some(o=>isOmni(o))) return ''; return OMNI_RAMP_NOTE + (items.some(o=>isOmni(o)&&o.inflation)?OMNI_INFL_ADD:''); }
+function omniInflNote(items){ const t=omniNoteText(items); return t ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+t+'</div>' : ''; }
 let MODE = 'manual';
 
 /* ---------- storage ---------- */
@@ -3152,7 +3155,7 @@ function omniShowCouple(item){
   const q=anyQuote(item); const per={monthly:'/mo',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo';
   const head='<div class="price">'+fmt(q.modalPayment)+' <small>'+per+' household</small></div><div class="price2">'+fmt(q.annualPremium)+' / yr <small>combined · both policies</small></div>';
   const who=item._ages.map((a,i)=>a+' '+gL(item._genders[i])).join(' + ');
-  const infl=item.parts[0].inflation?'<div class="disc" style="border-top:none;padding-top:2px">'+OMNI_INFL_NOTE+'</div>':'';
+  const infl=omniInflNote(item.parts);
   show('<div class="res-head">'+head+'<div style="color:var(--muted);font-weight:600">Manhattan Life · joint household</div></div>'
     +'<div class="config-line">'+who+' (couple) &middot; '+omniConfigText(item.parts[0]).replace(/·/g,'&middot;')+' each &middot; spousal &minus;10%</div>'
     +'<div class="resbtns">'+addBtn(item)+'</div>'+infl
@@ -3170,7 +3173,7 @@ function omniValueMetrics(o,q){
 }
 function omniShowSingle(o){
   const q=OMNI.quote(o);
-  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+(o.inflation?'<div class="disc" style="border-top:none;padding-top:2px">'+OMNI_INFL_NOTE+'</div>':'')+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. A $25 one-time policy fee applies. '+DISC+'</div>');
+  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+omniInflNote([o])+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. A $25 one-time policy fee applies. '+DISC+'</div>');
 }
 
 /* ---------- "most I can buy" — solve a budget across every carrier ---------- */
@@ -4117,13 +4120,15 @@ function projBenefitAt(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age));
   return Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,yrs):1)); }
 // CareScout compound inflation grows the coverage-maximum pool too.
 function csProjPool(o){ const yrs=Math.max(0,(+QSHEET.projAge||80)-(+o.age)); return Math.round(o.coverageMax*Math.pow(1+csInflRate(o.inflation),yrs)); }
-// Omniflex inflation rider (graded ramp): with the rider the benefit starts at 50% of the
-// selected daily and builds +10% of the original each year — 50/60/70/80/90/100% over years
-// 1–6 — then grows 5% SIMPLE of the original each year for 20 years (years 6–26), then stops.
-// Without the rider the benefit is the flat selected amount. `e` = years elapsed since issue.
-function omFactorAtElapsed(o, e){ if(!o.inflation) return 1; e=Math.max(0, e);
-  if(e < 5) return 0.5 + 0.10*e;                 // years 1–5: 50% → 90%
-  return 1 + 0.05*Math.min(20, e-5); }           // year 6 = 100%, then +5% simple/yr for 20 yrs
+// Omniflex benefit schedule. A 5-year graded ramp applies to EVERY Manhattan plan: the
+// benefit starts at 50% of the selected daily and builds +10% of the original each year —
+// 50/60/70/80/90/100% over years 1–6 — then stays at 100%. The inflation rider adds 5%
+// SIMPLE of the original each year for 20 years on top (years 6–26), then stops. `e` = years
+// elapsed since issue (e=0 at year 1).
+function omFactorAtElapsed(o, e){ e=Math.max(0, e);
+  const ramp = (e < 5) ? (0.5 + 0.10*e) : 1;                              // ramp on all plans
+  const growth = o.inflation ? 0.05*Math.min(20, Math.max(0, e-5)) : 0;   // 5% simple, rider only
+  return ramp + growth; }
 function omInflFactor(o, projAge){ return omFactorAtElapsed(o, Math.max(0,(+projAge||80)-(+o.age))); }
 function omProjFac(o){ return Math.round(o.facilityDaily*omInflFactor(o,QSHEET.projAge)); }
 function omPool(o){ return o.facilityDaily*o.facilityBP+(o.homeCare?o.hcDaily*o.hcBP:0); }
@@ -4146,11 +4151,10 @@ function benefitGrowthSection(items, order){
   const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'Manhattan Life':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
   const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
     return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
-  const anyOmniInfl = items.some(o=>isOmni(o)&&o.inflation);
   return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
     + '<div class="hint" style="margin:0 0 8px">How each option’s benefit changes year by year (Year 1 = policy issue). Level options stay flat; inflation options grow as shown. Illustrative — the actual benefit at claim follows the issued policy.</div>'
     + '<div style="overflow-x:auto"><table class="qtab growth-tab"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-    + (anyOmniInfl ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+OMNI_INFL_NOTE+'</div>' : '')
+    + omniInflNote(items)
     + '</div>';
 }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
