@@ -4141,7 +4141,9 @@ function omProjPool(o){ return Math.round(omPool(o)*omInflFactor(o,QSHEET.projAg
 function omCoverageText(o){ const facMo=omMonths(o.facilityBP); if(!o.homeCare) return facMo+'-month'; const hcMo=omMonths(o.hcBP); const totMo=facMo+hcMo; const tot=(totMo%12===0)?(totMo/12)+'-year':totMo+'-month'; return (facMo===hcMo?facMo+'-month each':facMo+'-mo fac / '+hcMo+'-mo home')+' ('+tot+' total)'; }
 /* ---------- benefit-growth (inflation) page for the printout ---------- */
 function toggleGrowth(on){ QSHEET.growth=!!on; renderSheet(); }
-const GROWTH_YEARS=[1,2,3,4,5,6,7,8,9,10,15,20,25,30];
+// Includes year 26 — where OmniFlex's 5%-simple growth stops — so the table shows it leveling
+// off (26 and 30 read the same) rather than appearing to keep growing.
+const GROWTH_YEARS=[1,2,3,4,5,6,7,8,9,10,15,20,25,26,30];
 // each option's benefit at `e` years after issue (e=0 at year 1), per its carrier's growth model
 function growthCell(o,e){
   if(isOmni(o)){ const f=omFactorAtElapsed(o,e); let s='$'+Math.round(o.facilityDaily*f)+'/day'; if(o.homeCare) s+='<div class="gc-sub">+$'+Math.round(o.hcDaily*f)+' home</div>'; return s; }
