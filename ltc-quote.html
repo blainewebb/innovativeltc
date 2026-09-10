@@ -278,7 +278,7 @@
         <select id="carrier" onchange="setCarrier(this.value); setView('quote')">
           <option value="ngl">NGL — HonestLTC</option>
           <option value="carescout">CareScout</option>
-          <option value="omniflex">Manhattan Life — Omniflex STC</option>
+          <option value="omniflex">Manhattan Life — OmniFlex™ STC</option>
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
@@ -473,7 +473,7 @@
 
   <div class="card" id="omnicard" hidden>
     <div class="cs-head">
-      <h2 style="margin:0 0 2px">Manhattan Life <span style="color:var(--muted);font-weight:600;font-size:.9rem">Omniflex — Short-Term Care</span></h2>
+      <h2 style="margin:0 0 2px">Manhattan Life <span style="color:var(--muted);font-weight:600;font-size:.9rem">OmniFlex™ — Short-Term Care</span></h2>
       <p class="hint" style="margin:0">Short-Term Care: a daily benefit for a fixed number of benefit days. Issue ages 45–89, unisex rates. Filed in MI &amp; TX. Verified against the carrier's rate exhibits.</p>
     </div>
     <div class="grid">
@@ -508,9 +508,9 @@
       <label><input type="checkbox" id="om_spousal"> Spousal discount (−10%)</label>
       <label title="Caps facility &amp; home care at $100/day and turns off inflation — the max a limited-benefit case can buy. Elimination period is still your choice, and you can choose lower daily amounts."><input type="checkbox" id="om_limited" onchange="omniLimitedToggle()"> Limited Benefit ($100 max)</label>
     </div>
-    <div class="warn" style="margin-top:2px">Filed in Michigan and Texas only. A $25 one-time policy fee applies. The facility &amp; home-care cash benefits equal 50% of the daily benefit (included). Verified to the penny against an Omniflex illustration.</div>
+    <div class="warn" style="margin-top:2px">Filed in Michigan and Texas only. A $25 one-time policy fee applies. The facility &amp; home-care cash benefits equal 50% of the daily benefit (included). Verified to the penny against an OmniFlex™ illustration.</div>
     <div class="actions">
-      <button class="run" onclick="omniRunSingle()">Run Omniflex quote</button>
+      <button class="run" onclick="omniRunSingle()">Run OmniFlex™ quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
@@ -2829,7 +2829,7 @@ function makeOmni(R){
   }
   function quote(o){
     const st=(o.state||'').toUpperCase();
-    if(!R.rates[st]) throw new Error('Manhattan Life Omniflex is filed only in MI and TX.');
+    if(!R.rates[st]) throw new Error('Manhattan Life OmniFlex™ is filed only in MI and TX.');
     const age=+o.age; if(age<45||age>89) throw new Error('Issue age must be 45–89.');
     const fd=+o.facilityDaily; if(!(fd>0)||fd%10) throw new Error('Facility daily benefit must be a multiple of $10.');
     const fbp=+o.facilityBP, fep=+o.facilityEP;
@@ -2970,7 +2970,7 @@ function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
 function omMonths(days){ return Math.round(days/30); }
 // condensed one-liner for the comparison tray
-function omniConfigText(o){ const elim=(o.homeCare&&o.hcEP!==o.facilityEP)?(' · '+o.facilityEP+'/'+o.hcEP+'d elim'):(o.facilityEP?' · '+o.facilityEP+'d elim':''); return o.age+' · Omniflex '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+elim+(o.inflation?' · 5% Simple*':''); }
+function omniConfigText(o){ const elim=(o.homeCare&&o.hcEP!==o.facilityEP)?(' · '+o.facilityEP+'/'+o.hcEP+'d elim'):(o.facilityEP?' · '+o.facilityEP+'d elim':''); return o.age+' · OmniFlex™ '+o.state+' · $'+o.facilityDaily+'/day fac'+(o.homeCare?' / $'+o.hcDaily+'/day home':'')+' · '+omMonths(o.facilityBP)+'-mo'+elim+(o.inflation?' · 5% Simple*':''); }
 function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr) · '+o.deductible+'-day · '+csInflLabel(o.inflation)+' · '+o.uwClass+' · '+csMaritalLabel(o.marital)+(o.zeroDayHc?' · 0-day HC':'')+(o.nonforfeiture?' · nonforfeiture':'')+(o.state?' · '+o.state:''); }
 
@@ -3004,7 +3004,7 @@ function setCarrier(c){
   $('askCard').style.display = ngl ? '' : 'none';
   $('cscard').hidden = !cs;
   if($('omnicard')) $('omnicard').hidden = !om;
-  $('carrierBadge').textContent = cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · Omniflex STC' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -3295,7 +3295,7 @@ const CARRIERS = [
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
         design:'$'+daily+'/day · '+fmt0(pool)+' pool each (≈'+ratio.toFixed(1)+' yr) · married class', sub:'Two individual policies (combined)', trayObj:coupleCombine([oA,oB])};
     } },
-  { id:'omniflex', label:'Manhattan Life — Omniflex STC',
+  { id:'omniflex', label:'Manhattan Life — OmniFlex™ STC',
     _design(p, daily){   // one Omniflex design at a given facility daily benefit (home care matched, capped $300)
       const st=(p.state||'').toUpperCase(); const infl=(+p.inflation||0)>0; const hd=Math.min(daily,300);
       return {carrier:'omniflex', state:st, age:p.age, facilityDaily:daily, facilityBP:360, facilityEP:0,
@@ -3304,7 +3304,7 @@ const CARRIERS = [
     },
     _avail(p){ const st=(p.state||'').toUpperCase();
       if(st!=='MI'&&st!=='TX') return 'Filed only in MI &amp; TX — pick a state.';
-      if(p.age<45||p.age>89) return 'Omniflex issues ages 45–89.';
+      if(p.age<45||p.age>89) return 'OmniFlex™ issues ages 45–89.';
       return null; },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
@@ -4031,7 +4031,7 @@ function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$(
 let EDIT_PAT = -1;
 function patternSummary(p){
   if(p.options && p.options.length){
-    const carriers=[...new Set(p.options.map(o=>isOmni(o)?'Omniflex':isCS(o)?'CareScout':'NGL'))].join('/');
+    const carriers=[...new Set(p.options.map(o=>isOmni(o)?'OmniFlex™':isCS(o)?'CareScout':'NGL'))].join('/');
     const optStr=o=> isOmni(o)?('$'+o.facilityDaily+'/day STC') : isCS(o)?('$'+o.dailyBenefit+'/day') : (fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr'+(o.inflation?'/'+(o.inflation*100)+'%':''));
     return carriers+' · '+p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(optStr).join(', ');
   }
@@ -4149,7 +4149,7 @@ function benefitGrowthSection(items, order){
   if(!items.length) return '';
   const uniform = items.every(o=>(+o.age)===(+items[0].age));
   const issueAge = uniform ? +items[0].age : null;
-  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'Manhattan Life':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
+  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'ManhattanLife':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div></th>').join('');
   const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
     return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
   return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
@@ -4267,7 +4267,7 @@ function renderSheet(){
   // option column order (view-only; reset each time the sheet is opened)
   if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
   const order = QSHEET.colOrder;
-  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'Manhattan Life':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isOmni(items[idx])?'ManhattanLife':isCS(items[idx])?'CareScout':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
