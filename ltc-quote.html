@@ -2871,8 +2871,9 @@ const DISC = 'This is an independent illustration not provided or approved by th
 // Ramp applies to every Manhattan plan; the 5% simple growth is added only with the rider.
 const OMNI_RAMP_NOTE = '*Manhattan Life benefits start at 50% of the selected amount and build 10% of the original each year to 100% by year 6 (a 5-year ramp-up).';
 const OMNI_INFL_ADD = ' With the inflation rider, the benefit then grows 5% simple of the original each year for 20 years (years 6–26), then stays level.';
+const OMNI_FEE_NOTE = 'Total Premium does not include Your one-time $25 policy fee.';
 function omniNoteText(items){ items=items||[]; if(!items.some(o=>isOmni(o))) return ''; return OMNI_RAMP_NOTE + (items.some(o=>isOmni(o)&&o.inflation)?OMNI_INFL_ADD:''); }
-function omniInflNote(items){ const t=omniNoteText(items); return t ? '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+t+'</div>' : ''; }
+function omniInflNote(items){ if(!(items||[]).some(o=>isOmni(o))) return ''; return '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">'+omniNoteText(items)+'<br>'+OMNI_FEE_NOTE+'</div>'; }
 let MODE = 'manual';
 
 /* ---------- storage ---------- */
@@ -3159,7 +3160,7 @@ function omniShowCouple(item){
   show('<div class="res-head">'+head+'<div style="color:var(--muted);font-weight:600">Manhattan Life · joint household</div></div>'
     +'<div class="config-line">'+who+' (couple) &middot; '+omniConfigText(item.parts[0]).replace(/·/g,'&middot;')+' each &middot; spousal &minus;10%</div>'
     +'<div class="resbtns">'+addBtn(item)+'</div>'+infl
-    +'<div class="disc">Two individual Short-Term Care policies (one per spouse), each with the &minus;10% spousal discount, combined into one household premium. A $25 one-time policy fee applies per policy. '+DISC+'</div>');
+    +'<div class="disc">Two individual Short-Term Care policies (one per spouse), each with the &minus;10% spousal discount, combined into one household premium. The one-time $25 policy fee applies to each policy. '+DISC+'</div>');
 }
 function omniPriceHead(q){ const per={monthly:'/mo',semiannual:'/6mo',annual:'/yr'}[q.mode];
   return '<div class="price">'+fmt(q.modalPayment)+' <small>'+per+'</small></div><div class="price2">'+fmt(q.annualPremium)+' / yr <small>+ $'+q.policyFee+' one-time</small></div>'; }
@@ -3173,7 +3174,7 @@ function omniValueMetrics(o,q){
 }
 function omniShowSingle(o){
   const q=OMNI.quote(o);
-  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+omniInflNote([o])+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. A $25 one-time policy fee applies. '+DISC+'</div>');
+  show('<div class="res-head">'+omniPriceHead(q)+'<div style="color:var(--muted);font-weight:600">'+q.company+'</div></div><div class="config-line">'+omniConfigText(o).replace(/·/g,'&middot;')+'</div>'+omniValueMetrics(o,q)+'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+omniInflNote([o])+'<div class="disc">Short-Term Care — a fixed daily benefit for a set number of benefit days after the elimination wait. '+DISC+'</div>');
 }
 
 /* ---------- "most I can buy" — solve a budget across every carrier ---------- */
