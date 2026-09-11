@@ -239,6 +239,7 @@
   table.growth-tab td,table.growth-tab th{text-align:center;font-size:.85rem}
   table.growth-tab tbody td:first-child,table.growth-tab tbody td:nth-child(2){color:var(--muted);font-weight:700}
   .growth-tab .gc-sub{font-size:.7rem;color:var(--muted);font-weight:600}
+  .shared-total{text-align:center;font-size:1rem;color:#166534;margin:6px 0 2px;font-weight:600}
   @media print{ .growth-page{page-break-before:always} }
   table.qtab th .colmove{display:inline-flex;gap:3px;justify-content:center;margin-top:5px}
   table.qtab th .colmove button{border:1px solid var(--border);background:#fff;color:var(--primary-d);border-radius:6px;width:22px;height:20px;line-height:1;font-size:.7rem;font-weight:800;cursor:pointer;padding:0}
@@ -617,6 +618,7 @@
       <input id="qsProjAge" type="number" min="70" max="100" step="1" value="80" onchange="setProjAge(this.value)">
     </label>
     <label class="qs-proj" id="qsGrowthToggle" title="Add a year-by-year benefit-growth page to the printout"><input type="checkbox" id="qsGrowth" onchange="toggleGrowth(this.checked)" style="width:auto;margin-right:6px"> Benefit-growth page</label>
+    <label class="qs-proj" id="qsSharedToggle" title="Add an NGL shared-care explainer page to the printout"><input type="checkbox" id="qsSharedPage" onchange="toggleSharedPage(this.checked)" style="width:auto;margin-right:6px"> Shared-care page</label>
     <div class="sp">
       <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
       <button class="tb close" onclick="closeSheet()">Close</button>
@@ -4163,6 +4165,41 @@ function benefitGrowthSection(items, order){
     + omniInflNote(items)
     + '</div>';
 }
+/* ---------- NGL shared-care explainer page ("Mickey ears": two policyholders + a shared pool) ---------- */
+function isNglItem(o){ return !!o && !isCS(o) && !isOmni(o); }
+function toggleSharedPage(on){ QSHEET.sharedPage=!!on; renderSheet(); }
+function sharedRiderPage(items){
+  const ngl = items.find(o=>isNglItem(o)&&o.riderSharedAdditional) || items.find(o=>isNglItem(o));
+  if(!ngl) return '';
+  // names: split a "A & B" client name into two; otherwise fall back to Policyholder 1/2
+  const nm=((QSHEET.client&&QSHEET.client.name)||'').trim();
+  let n1='Policyholder 1', n2='Policyholder 2';
+  if(nm){ const parts=nm.split(/\s*(?:&|\band\b|\+)\s*/i).map(s=>s.trim()).filter(Boolean); if(parts.length>=2){ n1=parts[0]; n2=parts.slice(1).join(' '); } else { n1=nm; } }
+  const mb=Math.round(+ngl.monthlyBenefit||4500);
+  const bpM=parseInt(ngl.benefitPeriod||ngl.totalBenefitPeriod||'36')||36;
+  const bpY=(bpM%12)?(bpM/12).toFixed(1):(bpM/12);
+  const pool=mb*bpM, total=pool*3;
+  const svg = '<svg viewBox="0 0 640 470" width="100%" style="max-width:520px;display:block;margin:6px auto 2px" font-family="Inter,system-ui,sans-serif">'
+    + '<circle cx="185" cy="150" r="108" fill="#dbeafe" fill-opacity="0.82" stroke="#2563eb" stroke-width="2.5"/>'
+    + '<circle cx="455" cy="150" r="108" fill="#e0e7ff" fill-opacity="0.82" stroke="#4f46e5" stroke-width="2.5"/>'
+    + '<circle cx="320" cy="332" r="132" fill="#dcfce7" fill-opacity="0.8" stroke="#16a34a" stroke-width="2.5"/>'
+    + '<text x="185" y="118" text-anchor="middle" font-size="19" font-weight="800" fill="#1e3a8a">'+esc(n1)+'</text>'
+    + '<text x="185" y="145" text-anchor="middle" font-size="15" fill="#1e40af">'+fmt0(mb)+'/mo · '+bpY+'-yr</text>'
+    + '<text x="185" y="169" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">'+fmt0(pool)+' pool</text>'
+    + '<text x="455" y="118" text-anchor="middle" font-size="19" font-weight="800" fill="#3730a3">'+esc(n2)+'</text>'
+    + '<text x="455" y="145" text-anchor="middle" font-size="15" fill="#4338ca">'+fmt0(mb)+'/mo · '+bpY+'-yr</text>'
+    + '<text x="455" y="169" text-anchor="middle" font-size="15" font-weight="700" fill="#4338ca">'+fmt0(pool)+' pool</text>'
+    + '<text x="320" y="360" text-anchor="middle" font-size="20" font-weight="800" fill="#14532d">Shared Pool</text>'
+    + '<text x="320" y="386" text-anchor="middle" font-size="15" fill="#166534">either of you can draw from it</text>'
+    + '<text x="320" y="413" text-anchor="middle" font-size="17" font-weight="800" fill="#166534">'+fmt0(pool)+'</text>'
+    + '</svg>';
+  return '<div class="growth-page shared-page"><h3 class="growth-h">How the Shared Care rider works</h3>'
+    + svg
+    + '<div class="hint" style="margin:2px 0 8px">Each of you has your <b>own</b> benefit pool. NGL’s <b>Shared Additional Policy Limit</b> rider adds a <b>third pool you share</b> — if one of you needs care longer than your own pool covers, you can draw from the shared pool instead of running out. Neither of you loses coverage while the other still has benefits left.</div>'
+    + '<div class="shared-total">Combined household protection ≈ <b>'+fmt0(total)+'</b> &nbsp;('+fmt0(pool)+' each + '+fmt0(pool)+' shared)</div>'
+    + '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Illustrative example at '+fmt0(mb)+'/mo over '+bpY+' years each. The actual shared benefit follows the issued policy and rider.</div>'
+    + '</div>';
+}
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
@@ -4247,6 +4284,8 @@ function renderSheet(){
   $('qsProjAge').value = QSHEET.projAge||80;
   if($('qsGrowth')) $('qsGrowth').checked = !!QSHEET.growth;
   if($('qsGrowthToggle')) $('qsGrowthToggle').classList.toggle('show', (cl.items||[]).length>0);
+  if($('qsSharedPage')) $('qsSharedPage').checked = !!QSHEET.sharedPage;
+  if($('qsSharedToggle')) $('qsSharedToggle').classList.toggle('show', (cl.items||[]).some(o=>isNglItem(o)));
   const quotes = items.map(o=>{ try{ return anyQuote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
   let rows;
@@ -4297,7 +4336,7 @@ function renderSheet(){
     + nameHtml
     + '<div class="sh-sub">'+sub+'</div>'
     + (items.length
-        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote+omniInflNote(items)+(QSHEET.growth?benefitGrowthSection(items, order):'')
+        ? '<div style="overflow-x:auto"><table class="qtab"><thead><tr><th></th>'+colHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+projNote+omniInflNote(items)+(QSHEET.growth?benefitGrowthSection(items, order):'')+(QSHEET.sharedPage?sharedRiderPage(items):'')
         : '<p class="empty">No options saved for this client.</p>')
     + '<div class="qs-cta">Ready to talk it through? <a href="'+LEVITATE+'">Book a Benefits &amp; Pricing Zoom &rarr;</a></div>'
     + '<div class="disc">'+DISC+'</div>';
