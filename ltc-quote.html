@@ -283,6 +283,7 @@
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
+      <button class="hdrbtn" id="taxBtn" onclick="openTaxLimits()" title="IRS age-based LTC premium limits for HSA use and tax deductions">🧾 HSA / Tax</button>
       <button class="hdrbtn" id="clientsBtn" onclick="openClients()">👥 Clients</button>
       <span class="gear" title="Settings" onclick="openSettings()">⚙︎</span>
     </div>
@@ -602,6 +603,17 @@
       <button class="ghost" onclick="clearKey()">Clear key</button>
       <button class="run" onclick="saveSettings()">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- HSA / tax-deduction limits -->
+<div class="modal" id="taxModal">
+  <div class="box">
+    <h3>HSA &amp; tax-deduction limits <span id="taxYearLbl" style="color:var(--muted);font-weight:600;font-size:.85rem"></span></h3>
+    <p style="margin:0 0 8px">The IRS caps how much of a <b>tax-qualified LTC</b> premium counts each year — the same age-based limit is the most you can pay tax-free from an <b>HSA</b> and the most you can take as a <b>self-employed / business</b> deduction.</p>
+    <div id="taxTable"></div>
+    <div class="warn" style="margin-top:10px">Applies to <b>tax-qualified LTC</b> insurance (NGL HonestLTC, CareScout). <b>Short-Term Care (OmniFlex™) is not tax-qualified LTC</b>, so these limits don’t apply to it. Not tax advice — confirm with the client’s tax professional.</div>
+    <div class="row"><button class="run" onclick="$('taxModal').classList.remove('show')">Close</button></div>
   </div>
 </div>
 
@@ -2940,6 +2952,23 @@ function syncProviderUI(){
   $('keyhelp').textContent=P.help;
 }
 function openSettings(){ $('provider').value=LS.provider(); syncProviderUI(); $('settings').classList.add('show'); }
+// IRS age-based "Eligible Long-Term Care Premium" limits (tax-qualified LTC). Update yearly:
+// change the year + five figures here and the box updates everywhere.
+const LTC_TAX_LIMITS = { year:2025, bands:[
+  ['Age 40 or younger', 480],
+  ['Age 41–50',          900],
+  ['Age 51–60',        1800],
+  ['Age 61–70',        4810],
+  ['Age 71 or older',  6020],
+]};
+function openTaxLimits(){
+  const t=LTC_TAX_LIMITS;
+  $('taxYearLbl').textContent = '· '+t.year+' limits';
+  $('taxTable').innerHTML = '<table class="opts"><tr><th>Insured’s age at year-end</th><th style="text-align:right">Most that counts (per year)</th></tr>'
+    + t.bands.map(([lbl,amt])=>'<tr><td class="b">'+lbl+'</td><td class="p">'+fmt0(amt)+'</td></tr>').join('')
+    + '</table>';
+  $('taxModal').classList.add('show');
+}
 function saveSettings(){ const p=$('provider').value, P=PROVIDERS[p]; LS.setProvider(p); localStorage.setItem(P.keyStore, $('apikey').value.trim()); localStorage.setItem(P.modelStore, $('model').value); $('settings').classList.remove('show'); updateAiKeyNote(); }
 function clearKey(){ const P=PROVIDERS[$('provider').value]; localStorage.removeItem(P.keyStore); $('apikey').value=''; }
 function toggle(id){ $(id).hidden=!$(id).hidden; }
