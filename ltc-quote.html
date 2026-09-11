@@ -2954,12 +2954,12 @@ function syncProviderUI(){
 function openSettings(){ $('provider').value=LS.provider(); syncProviderUI(); $('settings').classList.add('show'); }
 // IRS age-based "Eligible Long-Term Care Premium" limits (tax-qualified LTC). Update yearly:
 // change the year + five figures here and the box updates everywhere.
-const LTC_TAX_LIMITS = { year:2025, bands:[
-  ['Age 40 or younger', 480],
-  ['Age 41–50',          900],
-  ['Age 51–60',        1800],
-  ['Age 61–70',        4810],
-  ['Age 71 or older',  6020],
+const LTC_TAX_LIMITS = { year:2026, bands:[
+  ['Age 40 or younger', 500],
+  ['Age 41–50',          930],
+  ['Age 51–60',        1860],
+  ['Age 61–70',        4960],
+  ['Age 71 or older',  6200],
 ]};
 function openTaxLimits(){
   const t=LTC_TAX_LIMITS;
