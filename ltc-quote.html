@@ -589,6 +589,16 @@
       <div class="field"><label>Inflation term</label><select id="mooc_infterm" onchange="moocSyncInfl()"><option value="none">None (level)</option><option value="10 Years">10 years</option><option value="15 Years">15 years</option><option value="20 Years">20 years</option><option value="Lifetime" selected>Lifetime</option></select></div>
       <div class="field"><label>Inflation percent</label><select id="mooc_infpct"></select></div>
     </div>
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:12px 0 4px">Optional benefits</div>
+    <div class="grid">
+      <div class="field"><label>ALF reduction (assisted living)</label><select id="mooc_alf"><option value="100" selected>100% (Built In)</option><option value="75">75%</option><option value="50">50%</option></select></div>
+      <div class="field"><label>HHC reduction (home health care)</label><select id="mooc_hhc"><option value="100" selected>100% (Built In)</option><option value="75">75%</option><option value="50">50%</option></select></div>
+    </div>
+    <div class="riders">
+      <label title="Professional Home Health Care rider (+3%)"><input type="checkbox" id="mooc_prohhc"> Pro HHC (+3%)</label>
+      <label title="Home Health Care Waiver of premium (+15%)"><input type="checkbox" id="mooc_hhcwaiver"> HHC Waiver (+15%)</label>
+      <label title="Nonforfeiture — Shortened Benefit Period rider (+12–20% by age)"><input type="checkbox" id="mooc_nfsbp"> NF-SBP (nonforfeiture)</label>
+    </div>
     <div class="warn" style="margin-top:2px">Texas only. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). Any inflation lasting to age 76+ includes Partnership at no extra cost. Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
     <div class="actions">
       <button class="run" onclick="moocRunSingle()">Run MutualCare Custom quote</button>
@@ -3082,6 +3092,16 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     '20 Years':'{p}% compound (20-yr)','Lifetime':'{p}% compound'};
   function codeLabel(term,pct){ var t=(term==='none'||term==null)?'none':term;
     var base=TERM_LABEL[t]||'{p}% compound'; return base.replace('{p}',(''+pct)); }
+  // Optional-benefit factors (verified: pure multipliers, gender- and
+  // inflation-independent, linear in benefit; NF-SBP is age-banded).
+  var ALF_RED={'100':1.0,'75':0.97,'50':0.90}, HHC_RED={'100':1.0,'75':0.968091,'50':0.895601};
+  function riderFactor(o,age){ var f=1.0;
+    if(o.proHHC) f*=1.03;
+    if(o.hhcWaiver) f*=1.15;
+    if(o.nfsbp) f*=interp(Math.min(75,Math.max(40,age)),{40:1.20,60:1.16,75:1.12});
+    if(o.alfReduction!=null && ALF_RED[''+o.alfReduction]!=null) f*=ALF_RED[''+o.alfReduction];
+    if(o.hhcReduction!=null && HHC_RED[''+o.hhcReduction]!=null) f*=HHC_RED[''+o.hhcReduction];
+    return f; }
   function quote(o){
     var age=+o.age, g=gkey(o.gender), cls=CLASS_ALIAS[o.uwClass||o.cls]||'Preferred';
     var monthly=+o.monthlyBenefit||3000, years=+o.years||3, elim=(o.elimination!=null?+o.elimination:90);
@@ -3090,7 +3110,8 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(EP[elim]==null) throw new Error('Elimination must be 0, 30, 60, 90, 180 or 365 days.');
     var bn=baseNone(age,g,cls), inf=inflFactor(age,o.gender,term,pct), bp=bpFactor(age,o.gender,years), ep=epFactor(elim);
     var scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
-    var ann=bn*inf*bp*ep*scale*(partner?0.85:1);
+    var rf=riderFactor(o,age);
+    var ann=bn*inf*bp*ep*rf*scale*(partner?0.85:1);
     var r2=function(x){return Math.round(x*100)/100;};
     var mode=o.mode||'monthly';
     var modal = mode==='annual'?ann : mode==='semiannual'?ann*1.02/2 : mode==='quarterly'?ann*1.04/4 : ann*1.08/12;
@@ -3099,6 +3120,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(years!==3) steps.push([years+'-year benefit ×'+bp.toFixed(4), r2(bn*inf*bp)]);
     if(elim!==90) steps.push([elim+'-day elimination ×'+ep.toFixed(4), r2(bn*inf*bp*ep)]);
     if(scale!==1) steps.push([monthly+'/mo benefit ×'+scale.toFixed(4), r2(bn*inf*bp*ep*scale)]);
+    if(rf!==1.0) steps.push(['Optional benefits ×'+rf.toFixed(4), r2(bn*inf*bp*ep*rf*scale)]);
     if(partner) steps.push(['Partner discount ×0.85', r2(ann)]);
     return { carrier:'mooc', state:'TX', issueAge:age, age:age, gender:o.gender, uwClass:cls,
       monthlyBenefit:monthly, years:years, elimination:elim, inflTerm:term, inflPct:pct,
@@ -3244,7 +3266,7 @@ function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.cod
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' ('+fmt0(o.monthlyBenefit*12*(o.years||3))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' benefit ('+fmt0(o.monthlyBenefit*12*(o.years||3))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'; }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' benefit ('+fmt0(o.monthlyBenefit*12*(o.years||3))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
@@ -3549,8 +3571,16 @@ function moocOpts(){
   else { years=+$('mooc_bp').value; policyLimit=monthly*12*years; }
   return {carrier:'mooc', state:'TX', age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
     monthlyBenefit:monthly, years:years, policyLimit:policyLimit, elimination:+$('mooc_ep').value,
-    inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value};
+    inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value,
+    alfReduction:+$('mooc_alf').value, hhcReduction:+$('mooc_hhc').value,
+    proHHC:$('mooc_prohhc').checked, hhcWaiver:$('mooc_hhcwaiver').checked, nfsbp:$('mooc_nfsbp').checked};
 }
+// One-liner of any non-default optional benefits, for config text.
+function moocRiderText(o){ const r=[];
+  if(o.proHHC) r.push('Pro HHC'); if(o.hhcWaiver) r.push('HHC Waiver'); if(o.nfsbp) r.push('NF-SBP');
+  if(o.alfReduction && +o.alfReduction!==100) r.push('ALF '+o.alfReduction+'%');
+  if(o.hhcReduction && +o.hhcReduction!==100) r.push('HHC '+o.hhcReduction+'%');
+  return r.length?' · '+r.join(' + '):''; }
 function moocCoupleToggle(){
   const on=$('mooc_couple').checked;
   $('mooc_couplebox').hidden = !on;
@@ -4538,6 +4568,11 @@ function fillMoocForm(o){
   moocCovBasis();
   $('mooc_infterm').value=o.inflTerm||'none'; if($('mooc_infpct')&&o.inflPct) $('mooc_infpct').value=String(o.inflPct);
   moocSyncInfl(); $('mooc_mode').value=o.mode||'monthly';
+  if($('mooc_alf')) $('mooc_alf').value=String(o.alfReduction||100);
+  if($('mooc_hhc')) $('mooc_hhc').value=String(o.hhcReduction||100);
+  if($('mooc_prohhc')) $('mooc_prohhc').checked=!!o.proHHC;
+  if($('mooc_hhcwaiver')) $('mooc_hhcwaiver').checked=!!o.hhcWaiver;
+  if($('mooc_nfsbp')) $('mooc_nfsbp').checked=!!o.nfsbp;
 }
 function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+'”?')) return; c.splice(i,1); LS.setClients(c); renderClients(); }
 function openClients(){ renderClientsList(); $('clientsModal').classList.add('show'); }
