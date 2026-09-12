@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Innovative LTC",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "identifier": "com.innovativeltc.quote",
   "build": {
     "frontendDist": "../dist",
@@ -35,6 +35,6 @@
     ],
     "category": "Business",
     "shortDescription": "LTC/STC instant quoting",
-    "longDescription": "Instant long-term and short-term care insurance quoting for NGL HonestLTC, CareScout, and Manhattan Life Omniflex — verified rates, works offline."
+    "longDescription": "Instant long-term and short-term care insurance quoting for NGL HonestLTC, CareScout, Manhattan Life OmniFlex, and Mutual of Omaha MutualCare Secure & Custom — verified rates, works offline."
   }
 }
