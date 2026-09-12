@@ -579,8 +579,10 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Benefit design <span id="mooc_eachnote" style="color:var(--muted);font-weight:600" hidden>— same design for each spouse</span></div>
     <div class="grid">
-      <div class="field"><label>Monthly benefit</label><div class="pickrow"><select class="picksel" id="mooc_benpick" onchange="pickInto(this,'mooc_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="2000">$2,000</option><option value="3000">$3,000</option><option value="4000">$4,000</option><option value="5000">$5,000</option><option value="6000">$6,000</option></select><input id="mooc_benefit" type="number" value="3000" step="50" min="1500" max="15000"></div></div>
-      <div class="field"><label>Benefit period</label><select id="mooc_bp"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
+      <div class="field"><label>Monthly benefit</label><div class="pickrow"><select class="picksel" id="mooc_benpick" onchange="pickInto(this,'mooc_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="2000">$2,000</option><option value="3000">$3,000</option><option value="4000">$4,000</option><option value="5000">$5,000</option><option value="6000">$6,000</option></select><input id="mooc_benefit" type="number" value="3000" step="50" min="1500" max="15000" oninput="moocTotHint()"></div></div>
+      <div class="field"><label>Coverage set by</label><select id="mooc_covbasis" onchange="moocCovBasis()"><option value="years" selected>Benefit period (years)</option><option value="total">Total benefit ($)</option></select></div>
+      <div class="field" id="mooc_yearsfield"><label>Benefit period</label><select id="mooc_bp"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
+      <div class="field" id="mooc_totfield" hidden><label>Total benefit ($50,000–$500,000)</label><input id="mooc_totben" type="number" value="108000" step="500" min="50000" max="500000" oninput="moocTotHint()"><div class="hint" id="mooc_yrshint" style="margin-top:4px"></div></div>
       <div class="field"><label>Elimination period</label><select id="mooc_ep"><option value="0">0 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90" selected>90 days</option><option value="180">180 days</option><option value="365">365 days</option></select></div>
     </div>
     <div class="grid" style="margin-top:6px">
@@ -3056,12 +3058,16 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     for(var j=pcts.length-1;j>=0;j--){ if(pcts[j]>=p)hi=pcts[j]; }
     var flo=interp(age,G[lo]), fhi=interp(age,G[hi]);
     if(hi===lo)return flo; var tt=(p-lo)/(hi-lo); return flo*(1-tt)+fhi*tt; }
-  function bpFactor(age,gender,years){ if(years===3)return 1.0; var g=gkey(gender);
+  // Benefit-period factor. Custom's policy limit is continuous, so years may be
+  // fractional (e.g. 2.5, 3.72). Interpolate age per year-anchor {2,3,4,5,6}, then
+  // interpolate across years; clamp to the measured [2,6] range.
+  function bpFactor(age,gender,years){ var g=gkey(gender);
     var ages=Object.keys(BP[g]).map(Number).sort(function(a,b){return a-b;});
     var a=Math.min(Math.max(age,ages[0]),ages[ages.length-1]);
-    // interp the year-factor across the age anchors
-    var pts={}; for(var i=0;i<ages.length;i++){ pts[ages[i]]=BP[g][ages[i]][years]; }
-    return interp(a,pts); }
+    var yrs=[2,3,4,5,6], yf={};
+    for(var k=0;k<yrs.length;k++){ var y=yrs[k]; if(y===3){ yf[3]=1.0; continue; }
+      var pts={}; for(var i=0;i<ages.length;i++){ pts[ages[i]]=BP[g][ages[i]][y]; } yf[y]=interp(a,pts); }
+    var yy=Math.min(6,Math.max(2,years)); return interp(yy,yf); }
   function epFactor(days){ return EP[days]!=null?EP[days]:1.0; }
   // Normalize inflation input: {term:'Lifetime'|'20 Years'|..., percent:3} OR legacy
   function normTerm(o){ if(o.inflTerm!=null)return o.inflTerm; if(o.term!=null)return o.term;
@@ -3236,9 +3242,9 @@ function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delet
 // MutualCare Custom — condensed one-liner for the comparison tray
 function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.codeLabel(o.inflTerm,o.inflPct) : 'level'; }
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+(o.years||3)+'-yr · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
+  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' ('+fmt0(o.monthlyBenefit*12*(o.years||3))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+(o.years||3)+'-year benefit · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'; }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' benefit ('+fmt0(o.monthlyBenefit*12*(o.years||3))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'; }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
@@ -3521,10 +3527,28 @@ function moocFillPct(){ const sel=$('mooc_infpct'); if(!sel||sel.options.length)
   sel.innerHTML=html; }
 function moocSyncInfl(){ const none=$('mooc_infterm').value==='none'; const sel=$('mooc_infpct');
   if(sel){ sel.disabled=none; sel.style.opacity=none?.45:''; } }
+// A Custom benefit period may be any total-benefit amount, so it can be a
+// fractional number of years (e.g. 2.5 or 3.72). Enter it either way.
+function moocCovBasis(){ const total=$('mooc_covbasis').value==='total';
+  if($('mooc_yearsfield')) $('mooc_yearsfield').hidden=total;
+  if($('mooc_totfield')) $('mooc_totfield').hidden=!total;
+  if(total){ // seed the total from the current years so switching keeps the design
+    const mb=+$('mooc_benefit').value||3000; if($('mooc_totben')&&$('mooc_bp')) $('mooc_totben').value=(+$('mooc_bp').value||3)*mb*12; }
+  moocTotHint(); }
+function moocTotSnap(){ let t=Math.round((+$('mooc_totben').value||0)/500)*500; return Math.min(500000,Math.max(50000,t)); }
+function moocTotHint(){ if(!$('mooc_yrshint')||$('mooc_covbasis').value!=='total') return;
+  const mb=+$('mooc_benefit').value||3000, yrs=moocTotSnap()/(mb*12);
+  let note='≈ '+moocYearsNum(yrs)+' years of coverage'; if(yrs>6.001) note+=' — over 6 yrs is estimated (verify)'; if(yrs<2) note+=' — under 2 yrs is estimated (verify)';
+  $('mooc_yrshint').textContent=note; }
+function moocYearsNum(y){ const r=Math.round(y*100)/100; return (r===Math.round(r))?String(r):r.toFixed(2); }
+function moocYearsLabel(o){ return moocYearsNum(o.years||3)+'-year'; }
 function moocOpts(){
-  const term=$('mooc_infterm').value;
+  const term=$('mooc_infterm').value, monthly=+$('mooc_benefit').value;
+  let years, policyLimit;
+  if($('mooc_covbasis') && $('mooc_covbasis').value==='total'){ policyLimit=moocTotSnap(); years=policyLimit/(monthly*12); }
+  else { years=+$('mooc_bp').value; policyLimit=monthly*12*years; }
   return {carrier:'mooc', state:'TX', age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
-    monthlyBenefit:+$('mooc_benefit').value, years:+$('mooc_bp').value, elimination:+$('mooc_ep').value,
+    monthlyBenefit:monthly, years:years, policyLimit:policyLimit, elimination:+$('mooc_ep').value,
     inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value};
 }
 function moocCoupleToggle(){
@@ -3551,7 +3575,7 @@ function moocPriceHead(q){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:
 function moocValueMetrics(o,q){
   const cells=[];
   cells.push([fmt0(o.monthlyBenefit), 'monthly benefit']);
-  cells.push([(o.years||3)+'-yr', 'benefit period']);
+  cells.push([moocYearsNum(o.years||3)+'-yr', 'benefit period']);
   cells.push([fmt0(o.monthlyBenefit*12*(o.years||3)), 'total benefit pool']);
   cells.push([moocInflLabel(o).replace(' (no inflation)','').replace('level','level'), 'inflation']);
   return '<div class="metrics">'+cells.map(c=>'<div class="metric"><div class="mv">'+c[0]+'</div><div class="ml">'+c[1]+'</div></div>').join('')+'</div>';
@@ -4507,7 +4531,11 @@ function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
   $('mooc_age').value=o.age; $('mooc_gender').value=o.gender||'male'; $('mooc_class').value=o.uwClass||'Preferred';
-  $('mooc_benefit').value=o.monthlyBenefit||3000; $('mooc_bp').value=String(o.years||3); $('mooc_ep').value=String(o.elimination||90);
+  $('mooc_benefit').value=o.monthlyBenefit||3000; $('mooc_ep').value=String(o.elimination||90);
+  const yrs=o.years||3, whole=(yrs>=2&&yrs<=6&&yrs===Math.round(yrs));
+  if($('mooc_covbasis')){ $('mooc_covbasis').value= whole?'years':'total'; }
+  if(whole){ $('mooc_bp').value=String(yrs); } else { if($('mooc_totben')) $('mooc_totben').value=Math.round((o.monthlyBenefit||3000)*12*yrs); }
+  moocCovBasis();
   $('mooc_infterm').value=o.inflTerm||'none'; if($('mooc_infpct')&&o.inflPct) $('mooc_infpct').value=String(o.inflPct);
   moocSyncInfl(); $('mooc_mode').value=o.mode||'monthly';
 }
@@ -4590,7 +4618,7 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> isCoupleItem(o) ? o._ages.map((a,i)=>a+' '+gL(o._genders[i])).join(' + ')+(isOmni(o)?' · '+o.state:'') : isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
   benefit:  {label:()=>{ const it=(QSHEET.client&&QSHEET.client.items)||[]; return (it.length && it.every(o=>isOmni(o))) ? 'Facility benefit' : 'Benefit amount'; }, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo)' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
-  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : (isMoo(o)||isMooc(o)) ? (o.years||3)+'-year benefit' : poolYearsLabel(o)},
+  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : isMooc(o) ? moocYearsNum(o.years||3)+'-year benefit' : isMoo(o) ? (o.years||3)+'-year benefit' : poolYearsLabel(o)},
   pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; if(isMoo(o)||isMooc(o)) return fmt0(o.monthlyBenefit*12*(o.years||3)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
   projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)){ const fac=omProjFac(o); let s='$'+fac+'/day ('+fmt0(fac*30)+'/mo)'; if(o.homeCare){ const h=Math.round(o.hcDaily*omInflFactor(o,QSHEET.projAge)); s+='<br>$'+h+'/day ('+fmt0(h*30)+'/mo) home'; } return s; } if(isMoo(o)) return fmt0(MOO.projBenefit(o,QSHEET.projAge))+'/mo'; if(isMooc(o)) return fmt0(MOOC.projBenefit(o,QSHEET.projAge))+'/mo'; return isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'; }},
   projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(omProjPool(o)); if(isCS(o)) return fmt0(csProjPool(o)); if(isMoo(o)) return fmt0(MOO.projBenefit(o,QSHEET.projAge)*12*(o.years||3)); if(isMooc(o)) return fmt0(MOOC.projBenefit(o,QSHEET.projAge)*12*(o.years||3)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
