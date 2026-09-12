@@ -661,7 +661,7 @@
     <div class="grid">
       <div class="field"><label>Issue age</label><input id="sb_age" type="number" value="60" min="30" max="79"></div>
       <div class="field"><label>Gender</label><select id="sb_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Monthly benefit ($)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'sb_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="3000">$3,000</option><option value="4500">$4,500</option><option value="5000">$5,000</option><option value="6000">$6,000</option><option value="7500">$7,500</option></select><input id="sb_benefit" type="number" value="5000" step="100" min="300" max="12000"></div></div>
+      <div class="field"><label>Monthly benefit ($, $300 steps)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'sb_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="3000">$3,000</option><option value="4500">$4,500</option><option value="6000">$6,000</option><option value="7500">$7,500</option><option value="9000">$9,000</option></select><input id="sb_benefit" type="number" value="4500" step="300" min="1500" max="12000"></div></div>
       <div class="field"><label>Benefit period</label><select id="sb_years"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
       <div class="field"><label>Inflation protection</label><select id="sb_infl"><option value="0">None (level)</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
       <div class="field"><label>Elimination period</label><select id="sb_elim"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
@@ -4057,13 +4057,18 @@ function sameBenefitFor(cid,p){ return cid==='ngl'?nglSameBenefit(p):cid==='moo'
 function sameBenefitAll(p){ return SAME_CARRIERS.map(cid=>{ try{ return Object.assign({carrier:cid}, sameBenefitFor(cid,p)); }catch(e){ return {carrier:cid, label:carrierLabel(cid), fits:false, note:e.message}; } }); }
 function openSameBenefit(){ setCarrier('ngl'); $('sameCard').hidden=false; $('sameCard').scrollIntoView({behavior:'smooth',block:'start'}); }
 function sbMaritalChange(){ $('sb_spouse').hidden = $('sb_marital').value!=='married-both'; }
+// Coarsest benefit increment among the compared carriers so the amount is one
+// every carrier can actually issue (NGL sells $300 steps; Mutual of Omaha $50).
+const SAME_BENEFIT_STEP=300;
 function runSameBenefit(){ try{
   const marital=$('sb_marital').value;
-  const p={age:+$('sb_age').value, gender:$('sb_gender').value, monthlyBenefit:+$('sb_benefit').value,
+  const raw=+$('sb_benefit').value;
+  if(!raw||raw<300) return showErr('Enter a monthly benefit (e.g. 5000).');
+  const snapped=Math.min(12000, Math.max(1500, Math.round(raw/SAME_BENEFIT_STEP)*SAME_BENEFIT_STEP));
+  const p={age:+$('sb_age').value, gender:$('sb_gender').value, monthlyBenefit:snapped, rawBenefit:raw,
     years:+$('sb_years').value, inflation:parseFloat($('sb_infl').value)||0, elimination:+$('sb_elim').value,
     state:$('sb_state').value||null, marital};
   if(!p.age) return showErr('Enter an issue age.');
-  if(!p.monthlyBenefit||p.monthlyBenefit<300) return showErr('Enter a monthly benefit (e.g. 5000).');
   if(marital==='married-both'){ p.age2=+$('sb_age2').value; p.gender2=$('sb_gender2').value; if(!p.age2) return showErr('Enter the spouse’s age.'); }
   showSameBenefit(p);
 }catch(e){ showErr(e.message); } }
@@ -4075,7 +4080,9 @@ function showSameBenefit(p){
   let lo=null; results.forEach(r=>{ if(r.fits && (lo===null || r.premium<lo)) lo=r.premium; });
   const who = couple ? p.age+' '+gL(p.gender)+' + '+p.age2+' '+gL(p.gender2)+' (household)' : p.age+' '+gL(p.gender);
   const design = fmt0(p.monthlyBenefit)+'/mo · '+p.years+'-yr · '+pctL(p.inflation)+' · '+(p.elimination||90)+'-day';
-  const head='<div class="config-line">⚖️ <b>Same benefit, every carrier</b> &middot; '+who+' &middot; '+design+(p.state?' &middot; '+p.state:'')+'</div>';
+  const snapNote = (p.rawBenefit && p.rawBenefit!==p.monthlyBenefit)
+    ? '<div class="hint" style="margin-top:6px">Compared at <b>'+fmt0(p.monthlyBenefit)+'/mo</b> — the nearest amount every carrier can issue (NGL sells coverage in $300 steps). You asked for '+fmt0(p.rawBenefit)+'.</div>' : '';
+  const head='<div class="config-line">⚖️ <b>Same benefit, every carrier</b> &middot; '+who+' &middot; '+design+(p.state?' &middot; '+p.state:'')+'</div>'+snapNote;
   const unit = couple ? '/mo household' : '/mo';
   const rows=results.map(r=>{
     if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td style="color:var(--muted)">'+(r.note||'Not available')+'</td><td style="text-align:right;color:var(--muted)">—</td><td></td></tr>';
