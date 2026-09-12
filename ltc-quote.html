@@ -534,14 +534,14 @@
       <div class="field"><label>Gender</label><select id="moo_gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Health class</label><select id="moo_class"><option value="Preferred" selected>Preferred</option><option value="Class 1">Select (Class 1)</option><option value="Class 2">Class 2</option></select></div>
+      <div class="field"><label>Health class</label><select id="moo_class"><option value="Select" selected>Select</option><option value="Preferred">Preferred</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
       <div class="field"><label>Premium mode</label><select id="moo_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="moo_couple" onchange="mooCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label></div>
     <div class="grid" id="moo_couplebox" hidden>
       <div class="field"><label>Spouse — age (40–75)</label><input id="moo_age2" type="number" value="58" min="40" max="75"></div>
       <div class="field"><label>Spouse — gender</label><select id="moo_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Spouse — health class</label><select id="moo_class2"><option value="Preferred" selected>Preferred</option><option value="Class 1">Select (Class 1)</option><option value="Class 2">Class 2</option></select></div>
+      <div class="field"><label>Spouse — health class</label><select id="moo_class2"><option value="Select" selected>Select</option><option value="Preferred">Preferred</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Benefit design <span id="moo_eachnote" style="color:var(--muted);font-weight:600" hidden>— same design for each spouse</span></div>
     <div class="grid">
@@ -572,14 +572,14 @@
       <div class="field"><label>Gender</label><select id="mooc_gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Health class</label><select id="mooc_class"><option value="Preferred" selected>Preferred</option><option value="Select">Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
+      <div class="field"><label>Health class</label><select id="mooc_class"><option value="Preferred">Preferred</option><option value="Select" selected>Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
       <div class="field"><label>Premium mode</label><select id="mooc_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="mooc_couple" onchange="moocCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label></div>
     <div class="grid" id="mooc_couplebox" hidden>
       <div class="field"><label>Spouse — age (30–79)</label><input id="mooc_age2" type="number" value="58" min="30" max="79"></div>
       <div class="field"><label>Spouse — gender</label><select id="mooc_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Spouse — health class</label><select id="mooc_class2"><option value="Preferred" selected>Preferred</option><option value="Select">Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
+      <div class="field"><label>Spouse — health class</label><select id="mooc_class2"><option value="Preferred">Preferred</option><option value="Select" selected>Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Benefit design <span id="mooc_eachnote" style="color:var(--muted);font-weight:600" hidden>— same design for each spouse</span></div>
     <div class="grid">
@@ -3044,11 +3044,11 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     const yrs=Math.min(Math.max(0,(+projAge||80)-(+o.age)), CODE_CAP[code]);
     return (+o.monthlyBenefit||3000)*Math.pow(1+CODE_RATE[code], yrs); }
   function quote(o){
-    const age=+o.age, gender=gcode(o.gender), cls=o.uwClass||o.cls||'Preferred';
+    const age=+o.age, gender=gcode(o.gender), cls=o.uwClass||o.cls||'Select';
     const monthly=+o.monthlyBenefit||3000, years=+o.years||3, elim=+o.elimination||90;
     const code=inflCode(o.inflation!=null?o.inflation:o.code);
     if(age<40||age>75) throw new Error('MutualCare Secure issues ages 40–75.');
-    if(!GIDX[gender+'|'+cls]&&GIDX[gender+'|'+cls]!==0) throw new Error('Pick a health class.');
+    if(['Select','Preferred','Class 1','Class 2'].indexOf(cls)<0) throw new Error('Pick a health class.');
     const bn=baseNone(age,gender,cls), inf=inflFactor(age,gender,code), bp=bpFactor(age,years,gender), ep=EPF[elim]||1.0;
     const scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
     let ann=bn*inf*bp*ep*scale*(partner?0.85:1);
@@ -3150,7 +3150,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(o.hhcReduction!=null && HHC_RED[''+o.hhcReduction]!=null) f*=HHC_RED[''+o.hhcReduction];
     return f; }
   function quote(o){
-    var age=+o.age, g=gkey(o.gender), cls=CLASS_ALIAS[o.uwClass||o.cls]||'Preferred';
+    var age=+o.age, g=gkey(o.gender), cls=CLASS_ALIAS[o.uwClass||o.cls]||'Select';
     var monthly=+o.monthlyBenefit||3000, years=+o.years||3, elim=(o.elimination!=null?+o.elimination:90);
     var term=normTerm(o), pct=normPct(o);
     if(age<30||age>79) throw new Error('MutualCare Custom issues ages 30–79.');
@@ -3846,7 +3846,7 @@ const CARRIERS = [
       if(st!=='TX') return 'MutualCare Secure is loaded for Texas only — pick TX.';
       if(p.age<40||p.age>75) return 'MutualCare Secure issues ages 40–75.';
       return null; },
-    _mk(p, mb, partner){ return {carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Preferred',
+    _mk(p, mb, partner){ return {carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
       monthlyBenefit:mb, years:Math.min(4,Math.max(2,p.years||3)), elimination:90, inflation:mooInflCode(p.inflation), mode:'monthly', partner:!!partner}; },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
@@ -3866,7 +3866,7 @@ const CARRIERS = [
     sweetSpot(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.moo, code=(p.inflation==null?s.inflation:mooInflCode(p.inflation));
-      const o={carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Preferred',
+      const o={carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly'};
       const q=MOO.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
@@ -3877,7 +3877,7 @@ const CARRIERS = [
       const a=this._avail({age:p.age, state:p.state}); if(a) return {label:this.label+' · couple', fits:false, note:a};
       const b=this._avail({age:p.age2, state:p.state}); if(b) return {label:this.label+' · couple', fits:false, note:b};
       const s=SWEETSPOT.moo, code=(p.inflation==null?s.inflation:mooInflCode(p.inflation));
-      const mk=(age,gender)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Preferred',
+      const mk=(age,gender)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly', partner:true});
       const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=MOO.quote(oA), qB=MOO.quote(oB);
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
@@ -3890,7 +3890,7 @@ const CARRIERS = [
       return null; },
     _infl(dec){ dec=+dec||0; if(dec<=0) return {inflTerm:'none', inflPct:0}; return {inflTerm:'Lifetime', inflPct:Math.round(dec*100*4)/4}; },
     _mk(p, mb, partner){ const inf=this._infl(p.inflation);
-      return Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Preferred',
+      return Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
       monthlyBenefit:mb, years:Math.min(6,Math.max(2,p.years||3)), elimination:90, mode:'monthly', partner:!!partner}, inf); },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
@@ -3910,7 +3910,7 @@ const CARRIERS = [
     sweetSpot(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.mooc; const inf=(p.inflation==null)?{inflTerm:s.inflTerm,inflPct:s.inflPct}:this._infl(p.inflation);
-      const o=Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Preferred',
+      const o=Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly'}, inf);
       const q=MOOC.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
@@ -3920,7 +3920,7 @@ const CARRIERS = [
       const a=this._avail({age:p.age, state:p.state}); if(a) return {label:this.label+' · couple', fits:false, note:a};
       const b=this._avail({age:p.age2, state:p.state}); if(b) return {label:this.label+' · couple', fits:false, note:b};
       const s=SWEETSPOT.mooc; const inf=(p.inflation==null)?{inflTerm:s.inflTerm,inflPct:s.inflPct}:this._infl(p.inflation);
-      const mk=(age,gender)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Preferred',
+      const mk=(age,gender)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly', partner:true}, inf);
       const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
@@ -4035,7 +4035,7 @@ function mooSameBenefit(p){
   if(p.years<2||p.years>4) return {label:carrierLabel('moo'), fits:false, note:'Benefit periods run 2–4 years.'};
   const code=mooInflCode(p.inflation);
   if((p.inflation||0)>0 && code==='none') return {label:carrierLabel('moo'), fits:false, note:'Offers 3/4/5% compound only.'};
-  const mk=(age,gender,partner)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Preferred', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
+  const mk=(age,gender,partner)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
   if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOO.quote(oA), qB=MOO.quote(oB);
     return {label:carrierLabel('moo')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
   const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOO.quote(o);
@@ -4047,7 +4047,7 @@ function moocSameBenefit(p){
   if(p.age<30||p.age>79||(p.marital==='married-both'&&(p.age2<30||p.age2>79))) return {label:carrierLabel('mooc'), fits:false, note:'Issues ages 30–79.'};
   if(p.years<2||p.years>6) return {label:carrierLabel('mooc'), fits:false, note:'Benefit periods run 2–6 years.'};
   const inf=((p.inflation||0)>0)?{inflTerm:'Lifetime', inflPct:Math.round(p.inflation*100*4)/4}:{inflTerm:'none', inflPct:0};
-  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Preferred', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
+  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
   if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
     return {label:carrierLabel('mooc')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
   const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOOC.quote(o);
@@ -4702,14 +4702,14 @@ function fillOmniForm(o){
 function fillMooForm(o){
   setCarrier('moo');
   if($('moo_couple')){ $('moo_couple').checked=false; mooCoupleToggle(); }
-  $('moo_age').value=o.age; $('moo_gender').value=o.gender||'male'; $('moo_class').value=o.uwClass||'Preferred';
+  $('moo_age').value=o.age; $('moo_gender').value=o.gender||'male'; $('moo_class').value=o.uwClass||'Select';
   $('moo_benefit').value=o.monthlyBenefit||3000; $('moo_bp').value=String(o.years||3); $('moo_ep').value=String(o.elimination||90);
   $('moo_infl').value=o.inflation||'none'; $('moo_mode').value=o.mode||'monthly';
 }
 function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
-  $('mooc_age').value=o.age; $('mooc_gender').value=o.gender||'male'; $('mooc_class').value=o.uwClass||'Preferred';
+  $('mooc_age').value=o.age; $('mooc_gender').value=o.gender||'male'; $('mooc_class').value=o.uwClass||'Select';
   $('mooc_benefit').value=o.monthlyBenefit||3000; $('mooc_ep').value=String(o.elimination||90);
   const yrs=o.years||3, whole=(yrs>=2&&yrs<=6&&yrs===Math.round(yrs));
   if($('mooc_covbasis')){ $('mooc_covbasis').value= whole?'years':'total'; }
