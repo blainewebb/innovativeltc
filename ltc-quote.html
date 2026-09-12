@@ -339,6 +339,7 @@
     <div class="quicktools">
       <span class="lbl">Tools:</span>
       <button class="qtool" onclick="openSweet()">⭐ Sweet spot</button>
+      <button class="qtool" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="qtool" onclick="openBudgetAll()">💰 Most I can buy</button>
       <button class="qtool" onclick="openWaiting()">📉 Cost of waiting</button>
       <button class="qtool" onclick="openCare()">🏥 Cost of Care</button>
@@ -471,6 +472,7 @@
     <div class="actions">
       <button class="run" onclick="csRunSingle()">Run CareScout quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
   </div>
@@ -516,6 +518,7 @@
     <div class="actions">
       <button class="run" onclick="omniRunSingle()">Run OmniFlex™ quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
   </div>
@@ -553,6 +556,7 @@
     <div class="actions">
       <button class="run" onclick="mooRunSingle()">Run MutualCare Secure quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
   </div>
@@ -604,6 +608,7 @@
     <div class="actions">
       <button class="run" onclick="moocRunSingle()">Run MutualCare Custom quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
+      <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
     </div>
   </div>
@@ -646,6 +651,29 @@
       <label><input type="checkbox" id="sw_shared"> Include a shared benefit pool (couples, where the carrier offers it)</label>
     </div>
     <div class="actions"><button class="run" onclick="runSweetSpot()">Compare best-value designs</button></div>
+  </div>
+
+  <div class="card" id="sameCard" hidden>
+    <div class="cs-head">
+      <h2 style="margin:0 0 2px">⚖️ Compare carriers <span style="color:var(--muted);font-weight:600;font-size:.9rem">— the same benefit, side by side</span></h2>
+      <p class="hint" style="margin:0">Pick one design and price it across every carrier that writes a monthly-benefit LTC policy — NGL and Mutual of Omaha (Secure &amp; Custom) today; more as you add them. CareScout and Manhattan Life use a different benefit structure, so they’re compared under ⭐ Sweet spot.</p>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Issue age</label><input id="sb_age" type="number" value="60" min="30" max="79"></div>
+      <div class="field"><label>Gender</label><select id="sb_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
+      <div class="field"><label>Monthly benefit ($)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'sb_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="3000">$3,000</option><option value="4500">$4,500</option><option value="5000">$5,000</option><option value="6000">$6,000</option><option value="7500">$7,500</option></select><input id="sb_benefit" type="number" value="5000" step="100" min="300" max="12000"></div></div>
+      <div class="field"><label>Benefit period</label><select id="sb_years"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
+      <div class="field"><label>Inflation protection</label><select id="sb_infl"><option value="0">None (level)</option><option value="0.03" selected>3% compound</option><option value="0.04">4% compound</option><option value="0.05">5% compound</option></select></div>
+      <div class="field"><label>Elimination period</label><select id="sb_elim"><option value="90" selected>90 days</option><option value="180">180 days</option></select></div>
+      <div class="field"><label>Marital status</label><select id="sb_marital" onchange="sbMaritalChange()"><option value="single" selected>Single</option><option value="married-both">Married — both applying</option><option value="married-one">Married — one applying</option></select></div>
+      <div class="field"><label>State</label><select id="sb_state" class="statesel"></select></div>
+    </div>
+    <div class="grid" id="sb_spouse" hidden>
+      <div class="field"><label>Spouse — issue age</label><input id="sb_age2" type="number" value="58" min="30" max="79"></div>
+      <div class="field"><label>Spouse — gender</label><select id="sb_gender2"><option value="male">Male</option><option value="female">Female</option></select></div>
+    </div>
+    <div class="warn" style="margin-top:2px">A fair apples-to-apples comparison needs the same state and an age both carriers issue. Mutual of Omaha is Texas-only (Secure 40–75, Custom 30–79); NGL writes nationwide. Rows that a carrier can’t match show why.</div>
+    <div class="actions"><button class="run" onclick="runSameBenefit()">Compare this benefit</button></div>
   </div>
 
   <div class="card" id="resultCard" hidden><div id="result"></div></div>
@@ -3307,7 +3335,7 @@ function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith(
 function pickInto(sel, targetId){ const t=$(targetId); if(!t) return; if(sel.value!==''){ t.value=sel.value; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } sel.selectedIndex=0; }
 // Top-level view switcher: "New Quote" (carrier forms) vs "Quick Commands".
 let VIEW='quote';
-const QUOTE_CARDS=['manual','cscard','omnicard','moocard','mooccard','budgetCard','sweetCard'];
+const QUOTE_CARDS=['manual','cscard','omnicard','moocard','mooccard','budgetCard','sweetCard','sameCard'];
 function setView(v){
   VIEW = v==='qc' ? 'qc' : 'quote';
   const qc = VIEW==='qc';
@@ -3976,6 +4004,91 @@ function runSweetSpot(){ try{
     if(!p.age2) return showErr('Enter the spouse’s age for a joint quote.'); }
   showSweetSpot(p, $('sw_shared').checked);
 }catch(e){ showErr(e.message); } }
+
+/* ---------- Compare carriers — the SAME benefit design, priced side by side ----------
+   Holds monthly benefit / years / inflation / elimination fixed and quotes every
+   carrier that takes a monthly-benefit LTC design. CareScout (daily-benefit pool)
+   and Manhattan Life (short-term care) use a different structure, so they are not
+   included here — compare those via Sweet spot. Add new carriers to SAME_CARRIERS. */
+const SAME_CARRIERS=['ngl','moo','mooc'];
+function carrierLabel(cid){ const c=CARRIERS.find(x=>x.id===cid); return c?c.label:cid; }
+function nglSameBenefit(p){
+  const bp=String(p.years*12);
+  if(!['24','36','48','60','72'].includes(bp)) return {label:carrierLabel('ngl'), fits:false, note:'Benefit periods run 2–6 years.'};
+  const elim=String(p.elimination||90);
+  if(!['90','180'].includes(elim)) return {label:carrierLabel('ngl'), fits:false, note:'Elimination is 90 or 180 days.'};
+  const opts={benefitPeriod:bp, elimination:elim, inflation:p.inflation||0, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp};
+  if(p.marital==='married-both' && p.age2){
+    let r; try{ r=E.quoteCouple(p.age,p.gender,p.age2,p.gender2,p.monthlyBenefit,opts); }catch(e){ return {label:carrierLabel('ngl')+' · joint', fits:false, note:e.message}; }
+    const c=r.combined_joint, older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
+    const trayObj=withCoupleAges(Object.assign({}, opts, older, {monthlyBenefit:p.monthlyBenefit, joint:true}), p.age,p.gender,p.age2,p.gender2);
+    return {label:carrierLabel('ngl')+' · joint', fits:true, premium:c.modalPayment, annual:c.annualPremium, sub:'One joint (two-life) policy', trayObjs:[trayObj]};
+  }
+  const o=Object.assign({age:p.age, gender:p.gender, monthlyBenefit:p.monthlyBenefit, maritalDiscount:p.marital==='married-one'}, opts);
+  let q; try{ q=E.quote(o); }catch(e){ return {label:carrierLabel('ngl'), fits:false, note:e.message}; }
+  return {label:carrierLabel('ngl'), fits:true, premium:q.modalPayment, annual:q.annualPremium, sub:'Comprehensive LTC', trayObj:o};
+}
+function mooSameBenefit(p){
+  const st=(p.state||'').toUpperCase();
+  if(st!=='TX') return {label:carrierLabel('moo'), fits:false, note:'Texas only.'};
+  if(p.age<40||p.age>75||(p.marital==='married-both'&&(p.age2<40||p.age2>75))) return {label:carrierLabel('moo'), fits:false, note:'Issues ages 40–75.'};
+  if(p.years<2||p.years>4) return {label:carrierLabel('moo'), fits:false, note:'Benefit periods run 2–4 years.'};
+  const code=mooInflCode(p.inflation);
+  if((p.inflation||0)>0 && code==='none') return {label:carrierLabel('moo'), fits:false, note:'Offers 3/4/5% compound only.'};
+  const mk=(age,gender,partner)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Preferred', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
+  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOO.quote(oA), qB=MOO.quote(oB);
+    return {label:carrierLabel('moo')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
+  const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOO.quote(o);
+  return {label:carrierLabel('moo'), fits:true, premium:q.modalPayment, annual:q.annualPremium, sub:'Comprehensive · home care built in', trayObj:o};
+}
+function moocSameBenefit(p){
+  const st=(p.state||'').toUpperCase();
+  if(st!=='TX') return {label:carrierLabel('mooc'), fits:false, note:'Texas only.'};
+  if(p.age<30||p.age>79||(p.marital==='married-both'&&(p.age2<30||p.age2>79))) return {label:carrierLabel('mooc'), fits:false, note:'Issues ages 30–79.'};
+  if(p.years<2||p.years>6) return {label:carrierLabel('mooc'), fits:false, note:'Benefit periods run 2–6 years.'};
+  const inf=((p.inflation||0)>0)?{inflTerm:'Lifetime', inflPct:Math.round(p.inflation*100*4)/4}:{inflTerm:'none', inflPct:0};
+  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Preferred', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
+  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
+    return {label:carrierLabel('mooc')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
+  const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOOC.quote(o);
+  return {label:carrierLabel('mooc'), fits:true, premium:q.modalPayment, annual:q.annualPremium, sub:'Fully customizable · home care built in', trayObj:o};
+}
+function sameBenefitFor(cid,p){ return cid==='ngl'?nglSameBenefit(p):cid==='moo'?mooSameBenefit(p):cid==='mooc'?moocSameBenefit(p):null; }
+function sameBenefitAll(p){ return SAME_CARRIERS.map(cid=>{ try{ return Object.assign({carrier:cid}, sameBenefitFor(cid,p)); }catch(e){ return {carrier:cid, label:carrierLabel(cid), fits:false, note:e.message}; } }); }
+function openSameBenefit(){ setCarrier('ngl'); $('sameCard').hidden=false; $('sameCard').scrollIntoView({behavior:'smooth',block:'start'}); }
+function sbMaritalChange(){ $('sb_spouse').hidden = $('sb_marital').value!=='married-both'; }
+function runSameBenefit(){ try{
+  const marital=$('sb_marital').value;
+  const p={age:+$('sb_age').value, gender:$('sb_gender').value, monthlyBenefit:+$('sb_benefit').value,
+    years:+$('sb_years').value, inflation:parseFloat($('sb_infl').value)||0, elimination:+$('sb_elim').value,
+    state:$('sb_state').value||null, marital};
+  if(!p.age) return showErr('Enter an issue age.');
+  if(!p.monthlyBenefit||p.monthlyBenefit<300) return showErr('Enter a monthly benefit (e.g. 5000).');
+  if(marital==='married-both'){ p.age2=+$('sb_age2').value; p.gender2=$('sb_gender2').value; if(!p.age2) return showErr('Enter the spouse’s age.'); }
+  showSameBenefit(p);
+}catch(e){ showErr(e.message); } }
+function showSameBenefit(p){
+  const couple = p.marital==='married-both' && p.age2;
+  const results=sameBenefitAll(p);
+  const fitList=results.filter(r=>r.fits).flatMap(r=>ssObjs(r));
+  // cheapest fitting carrier → highlight
+  let lo=null; results.forEach(r=>{ if(r.fits && (lo===null || r.premium<lo)) lo=r.premium; });
+  const who = couple ? p.age+' '+gL(p.gender)+' + '+p.age2+' '+gL(p.gender2)+' (household)' : p.age+' '+gL(p.gender);
+  const design = fmt0(p.monthlyBenefit)+'/mo · '+p.years+'-yr · '+pctL(p.inflation)+' · '+(p.elimination||90)+'-day';
+  const head='<div class="config-line">⚖️ <b>Same benefit, every carrier</b> &middot; '+who+' &middot; '+design+(p.state?' &middot; '+p.state:'')+'</div>';
+  const unit = couple ? '/mo household' : '/mo';
+  const rows=results.map(r=>{
+    if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td style="color:var(--muted)">'+(r.note||'Not available')+'</td><td style="text-align:right;color:var(--muted)">—</td><td></td></tr>';
+    const best = (r.premium===lo) ? ' style="background:#f0fdf4"' : '';
+    const tag = (r.premium===lo) ? ' <span style="color:var(--success);font-weight:800;font-size:.7rem">◆ lowest</span>' : '';
+    const objs=ssObjs(r);
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addAllToTray('+JSON.stringify(objs)+')\'>＋ add</button>';
+    return '<tr'+best+'><td class="b">'+r.label+tag+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+(r.sub||'')+'</div></td><td class="b">'+design+'</td><td class="p">'+fmt(r.premium)+unit+'</td><td style="text-align:right">'+add+'</td></tr>';
+  }).join('');
+  const addAll = fitList.length>1 ? '<button class="run" style="margin-top:12px" onclick=\'addAllToTray('+JSON.stringify(fitList)+')\'>＋ Add all to comparison</button>' : '';
+  const note='<div class="hint" style="margin-top:8px">The identical design priced by every carrier that writes a monthly-benefit LTC policy. CareScout (daily-benefit pool) and Manhattan Life (short-term care) use a different benefit structure — compare those with ⭐ Sweet spot.</div>';
+  show(resultBrand('Compare Carriers — Same Benefit')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Design</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+addAll+note+omniInflNote(fitList)+'<div class="disc">'+DISC+'</div>');
+}
 
 /* ---------- tabs ---------- */
 function activateTab(mode){
