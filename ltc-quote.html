@@ -564,7 +564,7 @@
     </div>
     <div class="grid">
       <div class="field"><label>State</label><select id="mooc_state"><option value="TX" selected>Texas</option></select></div>
-      <div class="field"><label>Issue age (30–79)</label><input id="mooc_age" type="number" value="60" min="30" max="79"></div>
+      <div class="field"><label>Issue age (30–79)</label><input id="mooc_age" type="number" value="60" min="30" max="79" oninput="moocSyncRop()"></div>
       <div class="field"><label>Gender</label><select id="mooc_gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
     <div class="grid">
@@ -593,6 +593,7 @@
     <div class="grid">
       <div class="field"><label>ALF reduction (assisted living)</label><select id="mooc_alf"><option value="100" selected>100% (Built In)</option><option value="75">75%</option><option value="50">50%</option></select></div>
       <div class="field"><label>HHC reduction (home health care)</label><select id="mooc_hhc"><option value="100" selected>100% (Built In)</option><option value="75">75%</option><option value="50">50%</option></select></div>
+      <div class="field" id="mooc_ropfield"><label>Return of Premium <span class="hint" id="mooc_ropnote" style="font-weight:600">(ages 30–64)</span></label><select id="mooc_rop"><option value="none" selected>None</option><option value="3xmmb">3 × MMB</option><option value="before65">Before 65</option><option value="lessclaims">Less Claims</option></select></div>
     </div>
     <div class="riders">
       <label title="Professional Home Health Care rider (+3%)"><input type="checkbox" id="mooc_prohhc"> Pro HHC (+3%)</label>
@@ -3055,11 +3056,15 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
   function interp(x,pts){ var ks=Object.keys(pts).map(Number).sort(function(a,b){return a-b;});
     if(x<=ks[0])return pts[ks[0]]; if(x>=ks[ks.length-1])return pts[ks[ks.length-1]];
     for(var k=0;k<ks.length-1;k++){ if(ks[k]<=x&&x<=ks[k+1]){ var t=(x-ks[k])/(ks[k+1]-ks[k]); return pts[ks[k]]*(1-t)+pts[ks[k+1]]*t; } } }
+  function loginterp(x,pts){ var ks=Object.keys(pts).map(Number).sort(function(a,b){return a-b;});
+    if(x<=ks[0])return pts[ks[0]]; if(x>=ks[ks.length-1])return pts[ks[ks.length-1]];
+    for(var k=0;k<ks.length-1;k++){ if(ks[k]<=x&&x<=ks[k+1]){ var t=(x-ks[k])/(ks[k+1]-ks[k]);
+      return Math.exp(Math.log(pts[ks[k]])*(1-t)+Math.log(pts[ks[k+1]])*t); } } }
   function gkey(g){ return (g==='F'||g==='female'||g==='Female')?'Female':'Male'; }
   var GCOL={'Male':{'Preferred':0,'Class 1':1,'Class 2':2},'Female':{'Preferred':3,'Class 1':4,'Class 2':5}};
   function baseNone(age,gender,cls){ var g=gkey(gender); var a=Math.max(40,age); cls=CLASS_ALIAS[cls]||'Preferred';
-    if(cls==='Select'){ var pref={}; for(var k in D.BASE6) pref[k]=D.BASE6[k][GCOL[g]['Preferred']]; return Math.round(interp(a,pref)*D.SELECTK*100)/100; }
-    var col=GCOL[g][cls]; var pts={}; for(var k2 in D.BASE6) pts[k2]=D.BASE6[k2][col]; return interp(a,pts); }
+    if(cls==='Select'){ var pref={}; for(var k in D.BASE6) pref[k]=D.BASE6[k][GCOL[g]['Preferred']]; return Math.round(loginterp(a,pref)*D.SELECTK*100)/100; }
+    var col=GCOL[g][cls]; var pts={}; for(var k2 in D.BASE6) pts[k2]=D.BASE6[k2][col]; return loginterp(a,pts); }
   function inflFactor(age,gender,term,pct){ var t=TERMKEY[term]; if(!t||t==='none')return 1.0;
     var g=gkey(gender); var G=FAC[g][t]; var pcts=Object.keys(G).map(Number).sort(function(a,b){return a-b;});
     var p=Math.min(Math.max(pct,pcts[0]),pcts[pcts.length-1]);
@@ -3094,8 +3099,17 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     var base=TERM_LABEL[t]||'{p}% compound'; return base.replace('{p}',(''+pct)); }
   // Optional-benefit factors (verified: pure multipliers, gender- and
   // inflation-independent, linear in benefit; NF-SBP is age-banded).
+  // Return of Premium — age x gender load (available ages 30-64 only). Clamp age
+  // to [40,64]; inflation-independent; composes multiplicatively.
+  var ROP={
+    '3xmmb':{Male:{40:1.09898,50:1.12901,60:1.12400,64:1.10900},Female:{40:1.04600,50:1.05401,60:1.04700,64:1.04201}},
+    'before65':{Male:{40:1.06701,50:1.04501,60:1.00900,64:1.00201},Female:{40:1.03901,50:1.02700,60:1.00600,64:1.00100}},
+    'lessclaims':{Male:{40:1.26802,50:1.39501,60:1.58400,64:1.92101},Female:{40:1.19200,50:1.26200,60:1.34000,64:1.39299}}};
+  var ROP_LABEL={'3xmmb':'ROP 3×MMB','before65':'ROP Before 65','lessclaims':'ROP Less Claims'};
+  function ropFactor(o,age,gender){ var k=o.rop; if(!k||k==='none')return 1.0; var T=ROP[k]; if(!T)return 1.0;
+    var g=(gkey(gender)==='Female')?'Female':'Male'; return interp(Math.min(64,Math.max(40,age)),T[g]); }
   var ALF_RED={'100':1.0,'75':0.97,'50':0.90}, HHC_RED={'100':1.0,'75':0.968091,'50':0.895601};
-  function riderFactor(o,age){ var f=1.0;
+  function riderFactor(o,age,gender){ var f=1.0; f*=ropFactor(o,age,gender);
     if(o.proHHC) f*=1.03;
     if(o.hhcWaiver) f*=1.15;
     if(o.nfsbp) f*=interp(Math.min(75,Math.max(40,age)),{40:1.20,60:1.16,75:1.12});
@@ -3110,7 +3124,8 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(EP[elim]==null) throw new Error('Elimination must be 0, 30, 60, 90, 180 or 365 days.');
     var bn=baseNone(age,g,cls), inf=inflFactor(age,o.gender,term,pct), bp=bpFactor(age,o.gender,years), ep=epFactor(elim);
     var scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
-    var rf=riderFactor(o,age);
+    if(o.rop && o.rop!=='none' && age>64) throw new Error('Return of Premium is available only through age 64.');
+    var rf=riderFactor(o,age,o.gender);
     var ann=bn*inf*bp*ep*rf*scale*(partner?0.85:1);
     var r2=function(x){return Math.round(x*100)/100;};
     var mode=o.mode||'monthly';
@@ -3573,13 +3588,21 @@ function moocOpts(){
     monthlyBenefit:monthly, years:years, policyLimit:policyLimit, elimination:+$('mooc_ep').value,
     inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value,
     alfReduction:+$('mooc_alf').value, hhcReduction:+$('mooc_hhc').value,
-    proHHC:$('mooc_prohhc').checked, hhcWaiver:$('mooc_hhcwaiver').checked, nfsbp:$('mooc_nfsbp').checked};
+    proHHC:$('mooc_prohhc').checked, hhcWaiver:$('mooc_hhcwaiver').checked, nfsbp:$('mooc_nfsbp').checked,
+    rop:(+$('mooc_age').value<=64 ? $('mooc_rop').value : 'none')};
 }
+// Return of Premium is only sold ages 30–64 — grey it out and force None above 64.
+function moocSyncRop(){ const ok=(+$('mooc_age').value<=64);
+  if($('mooc_rop')){ $('mooc_rop').disabled=!ok; if(!ok) $('mooc_rop').value='none'; }
+  if($('mooc_ropfield')) $('mooc_ropfield').style.opacity=ok?'':.5;
+  if($('mooc_ropnote')) $('mooc_ropnote').textContent=ok?'(ages 30–64)':'(not available 65+)'; }
+const ROP_LABELS={'3xmmb':'ROP 3×MMB','before65':'ROP Before 65','lessclaims':'ROP Less Claims'};
 // One-liner of any non-default optional benefits, for config text.
 function moocRiderText(o){ const r=[];
   if(o.proHHC) r.push('Pro HHC'); if(o.hhcWaiver) r.push('HHC Waiver'); if(o.nfsbp) r.push('NF-SBP');
   if(o.alfReduction && +o.alfReduction!==100) r.push('ALF '+o.alfReduction+'%');
   if(o.hhcReduction && +o.hhcReduction!==100) r.push('HHC '+o.hhcReduction+'%');
+  if(o.rop && o.rop!=='none') r.push(ROP_LABELS[o.rop]||'ROP');
   return r.length?' · '+r.join(' + '):''; }
 function moocCoupleToggle(){
   const on=$('mooc_couple').checked;
@@ -4573,6 +4596,8 @@ function fillMoocForm(o){
   if($('mooc_prohhc')) $('mooc_prohhc').checked=!!o.proHHC;
   if($('mooc_hhcwaiver')) $('mooc_hhcwaiver').checked=!!o.hhcWaiver;
   if($('mooc_nfsbp')) $('mooc_nfsbp').checked=!!o.nfsbp;
+  if($('mooc_rop')) $('mooc_rop').value=o.rop||'none';
+  moocSyncRop();
 }
 function delClient(i){ const c=LS.clients(); if(!confirm('Delete “'+c[i].name+'”?')) return; c.splice(i,1); LS.setClients(c); renderClients(); }
 function openClients(){ renderClientsList(); $('clientsModal').classList.add('show'); }
