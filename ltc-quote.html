@@ -3319,15 +3319,15 @@ function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delet
 // MutualCare Custom — condensed one-liner for the comparison tray
 function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.codeLabel(o.inflTerm,o.inflPct) : 'level'; }
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' ('+fmt0(o.monthlyBenefit*12*(o.years||3))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
+  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsLabel(o)+' benefit ('+fmt0(o.monthlyBenefit*12*(o.years||3))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'+moocRiderText(o); }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+(o.years||3)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+' · TX'; }
+  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+' · TX'; }
 function mooConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+(o.years||3)+'-year benefit · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+' · Texas'; }
+  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+' · Texas'; }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3581,8 +3581,8 @@ function mooPriceHead(q){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'
 function mooValueMetrics(o,q){
   const cells=[];
   cells.push([fmt0(o.monthlyBenefit), 'monthly benefit']);
-  cells.push([(o.years||3)+'-yr', 'benefit period']);
-  cells.push([fmt0(o.monthlyBenefit*12*(o.years||3)), 'total benefit pool']);
+  cells.push([mooEffYears(o)+'-yr', 'benefit period']);
+  cells.push([fmt0(mooEffPool(o)), 'total benefit pool']);
   cells.push([(MOO.CODE_LABEL[o.inflation]||'level').replace(' (no inflation)',''), 'inflation']);
   return '<div class="metrics">'+cells.map(c=>'<div class="metric"><div class="mv">'+c[0]+'</div><div class="ml">'+c[1]+'</div></div>').join('')+'</div>';
 }
@@ -3595,7 +3595,7 @@ function mooShowCouple(item){
   const head='<div class="price">'+fmt(q.modalPayment)+' <small>'+per+' household</small></div><div class="price2">'+fmt(q.annualPremium)+' / yr <small>combined · both policies</small></div>';
   const who=item._ages.map((a,i)=>a+' '+gL(item._genders[i])).join(' + ');
   show('<div class="res-head">'+head+'<div style="color:var(--muted);font-weight:600">Mutual of Omaha · joint household</div></div>'
-    +'<div class="config-line">'+who+' (couple) &middot; '+mooConfigText(item.parts[0]).replace(/·/g,'&middot;')+' each &middot; partner &minus;15%</div>'
+    +'<div class="config-line">'+who+' (couple) &middot; '+mooConfigText(item.parts[0]).replace(/·/g,'&middot;')+(item.parts[0]&&item.parts[0].sharedCare?' &middot; combined pool':' each')+' &middot; partner &minus;15%</div>'
     +'<div class="resbtns">'+addBtn(item)+'</div>'
     +'<div class="disc">Two MutualCare Secure policies (one per spouse), each with the &minus;15% partner discount, combined into one household premium.'+(item.parts[0]&&item.parts[0].sharedCare?' Shared Care benefit added (+16% each) — the couple can draw on each other’s benefit pool once their own is exhausted; both must keep the same monthly benefit and benefit period.':'')+' '+DISC+'</div>');
 }
@@ -3648,6 +3648,13 @@ function moocRiderText(o){ const r=[];
   if(o.hhcReduction && +o.hhcReduction!==100) r.push('HHC '+o.hhcReduction+'%');
   if(o.rop && o.rop!=='none') r.push(ROP_LABELS[o.rop]||'ROP');
   return r.length?' · '+r.join(' + '):''; }
+// Shared Care pools the two partners' benefits, so the shared design shows double the
+// benefit period and double the total pool (monthly benefit is unchanged).
+function mooShareMult(o){ return (o && (o.sharedCare || (o.__couple && o.parts && o.parts.some(x=>x.sharedCare)))) ? 2 : 1; }
+// For a combined couple item the benefit spec lives on the individual parts, so read from parts[0].
+function mooSpecSrc(o){ return (o && o.__couple && o.parts && o.parts[0]) ? o.parts[0] : o; }
+function mooEffYears(o){ const s=mooSpecSrc(o); return (+s.years||3) * mooShareMult(o); }
+function mooEffPool(o){ const s=mooSpecSrc(o); return (+s.monthlyBenefit||0) * 12 * mooEffYears(o); }
 // Mutual of Omaha optional benefits for the client sheet (Shared Care has its own row, so it's excluded here).
 function mooSheetOpts(o){ if(!o) return '';
   const src=(o.__couple && o.parts && o.parts[0]) ? o.parts[0] : o;
@@ -3685,8 +3692,8 @@ function moocPriceHead(q){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:
 function moocValueMetrics(o,q){
   const cells=[];
   cells.push([fmt0(o.monthlyBenefit), 'monthly benefit']);
-  cells.push([moocYearsNum(o.years||3)+'-yr', 'benefit period']);
-  cells.push([fmt0(o.monthlyBenefit*12*(o.years||3)), 'total benefit pool']);
+  cells.push([moocYearsNum(mooEffYears(o))+'-yr', 'benefit period']);
+  cells.push([fmt0(mooEffPool(o)), 'total benefit pool']);
   cells.push([moocInflLabel(o).replace(' (no inflation)','').replace('level','level'), 'inflation']);
   return '<div class="metrics">'+cells.map(c=>'<div class="metric"><div class="mv">'+c[0]+'</div><div class="ml">'+c[1]+'</div></div>').join('')+'</div>';
 }
@@ -3700,7 +3707,7 @@ function moocShowCouple(item){
   const head='<div class="price">'+fmt(q.modalPayment)+' <small>'+per+' household</small></div><div class="price2">'+fmt(q.annualPremium)+' / yr <small>combined · both policies</small></div>';
   const who=item._ages.map((a,i)=>a+' '+gL(item._genders[i])).join(' + ');
   show('<div class="res-head">'+head+'<div style="color:var(--muted);font-weight:600">Mutual of Omaha · joint household</div></div>'
-    +'<div class="config-line">'+who+' (couple) &middot; '+moocConfigText(item.parts[0]).replace(/·/g,'&middot;')+' each &middot; partner &minus;15%</div>'
+    +'<div class="config-line">'+who+' (couple) &middot; '+moocConfigText(item.parts[0]).replace(/·/g,'&middot;')+(item.parts[0]&&item.parts[0].sharedCare?' &middot; combined pool':' each')+' &middot; partner &minus;15%</div>'
     +'<div class="resbtns">'+addBtn(item)+'</div>'
     +'<div class="disc">Two MutualCare Custom policies (one per spouse), each with the &minus;15% partner discount, combined into one household premium.'+(item.parts[0]&&item.parts[0].sharedCare?' Shared Care benefit added (+16% each) — the couple can draw on each other’s benefit pool once their own is exhausted; both must keep the same monthly benefit and benefit period.':'')+' '+DISC+'</div>');
 }
@@ -4852,10 +4859,10 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&
 const QCATS = {
   applicant:{label:'Applicant',            v:(o)=> isCoupleItem(o) ? o._ages.map((a,i)=>a+' '+gL(o._genders[i])).join(' + ')+(isOmni(o)?' · '+o.state:'') : isOmni(o) ? o.age+' · '+o.state : o.age+' '+gL(o.gender)},
   benefit:  {label:()=>{ const it=(QSHEET.client&&QSHEET.client.items)||[]; return (it.length && it.every(o=>isOmni(o))) ? 'Facility benefit' : 'Benefit amount'; }, v:(o)=> isOmni(o) ? '$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo)' : isCS(o) ? '$'+o.dailyBenefit+'/day' : fmt0(o.monthlyBenefit)+'/mo'},
-  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : isMooc(o) ? moocYearsNum(o.years||3)+'-year benefit' : isMoo(o) ? (o.years||3)+'-year benefit' : poolYearsLabel(o)},
-  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; if(isMoo(o)||isMooc(o)) return fmt0(o.monthlyBenefit*12*(o.years||3)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
+  period:   {label:'Coverage',             v:(o)=> isOmni(o) ? omCoverageText(o) : isCS(o) ? fmt0(o.coverageMax)+' pool (≈'+csRatioYrs(o).toFixed(1)+' yr)' : isMooc(o) ? moocYearsNum(mooEffYears(o))+'-year benefit'+(mooShareMult(o)>1?' (Shared Care)':'') : isMoo(o) ? mooEffYears(o)+'-year benefit'+(mooShareMult(o)>1?' (Shared Care)':'') : poolYearsLabel(o)},
+  pool:     {label:'Total benefit pool',   v:(o)=> { if(isOmni(o)) return fmt0(omPool(o)); if(isCS(o)) return fmt0(o.coverageMax)+' max'; if(isMoo(o)||isMooc(o)) return fmt0(mooEffPool(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(o.monthlyBenefit*pm); }},
   projMonthly:{label:()=>'Benefit at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)){ const fac=omProjFac(o); let s='$'+fac+'/day ('+fmt0(fac*30)+'/mo)'; if(o.homeCare){ const h=Math.round(o.hcDaily*omInflFactor(o,QSHEET.projAge)); s+='<br>$'+h+'/day ('+fmt0(h*30)+'/mo) home'; } return s; } if(isMoo(o)) return fmt0(MOO.projBenefit(o,QSHEET.projAge))+'/mo'; if(isMooc(o)) return fmt0(MOOC.projBenefit(o,QSHEET.projAge))+'/mo'; return isCS(o) ? '$'+projBenefitAt(o)+'/day' : fmt0(projBenefitAt(o))+'/mo'; }},
-  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(omProjPool(o)); if(isCS(o)) return fmt0(csProjPool(o)); if(isMoo(o)) return fmt0(MOO.projBenefit(o,QSHEET.projAge)*12*(o.years||3)); if(isMooc(o)) return fmt0(MOOC.projBenefit(o,QSHEET.projAge)*12*(o.years||3)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
+  projPool:   {label:()=>'Total benefit pool at age '+QSHEET.projAge, v:(o)=> { if(isOmni(o)) return fmt0(omProjPool(o)); if(isCS(o)) return fmt0(csProjPool(o)); if(isMoo(o)) return fmt0(MOO.projBenefit(o,QSHEET.projAge)*12*mooEffYears(o)); if(isMooc(o)) return fmt0(MOOC.projBenefit(o,QSHEET.projAge)*12*mooEffYears(o)); const pm=poolMonths(o); return pm==null ? 'Unlimited (lifetime)' : fmt0(projBenefitAt(o)*pm); }},
   elim:     {label:'Elimination period',   v:(o)=> isOmni(o) ? (o.homeCare && o.hcEP!==o.facilityEP ? o.facilityEP+' / '+o.hcEP+'-day (facility / home)' : o.facilityEP+'-day wait') : isCS(o) ? o.deductible+'-day wait' : o.elimination+'-day wait'},
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : isMoo(o) ? (MOO.CODE_LABEL[o.inflation]||'None') : isMooc(o) ? ((o.inflTerm&&o.inflTerm!=='none')?MOOC.codeLabel(o.inflTerm,o.inflPct):'None') : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : isMoo(o) ? (o.inflation && o.inflation!=='none') : isMooc(o) ? (o.inflTerm && o.inflTerm!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
