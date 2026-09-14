@@ -556,6 +556,7 @@
     <div class="warn" style="margin-top:2px">Texas only. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). In Texas any inflation option includes Partnership at no extra cost. Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
     <div class="actions">
       <button class="run" onclick="mooRunSingle()">Run MutualCare Secure quote</button>
+      <button class="run" style="background:#334155" onclick="mooClassCompare()">🩺 Compare classes</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
       <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
@@ -609,6 +610,7 @@
     <div class="warn" style="margin-top:2px">Texas only. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). Any inflation lasting to age 76+ includes Partnership at no extra cost. Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
     <div class="actions">
       <button class="run" onclick="moocRunSingle()">Run MutualCare Custom quote</button>
+      <button class="run" style="background:#334155" onclick="mooClassCompare()">🩺 Compare classes</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
       <button class="run" style="background:#334155" onclick="openSameBenefit()">⚖️ Compare carriers</button>
       <button class="run" style="background:#334155" onclick="openBudgetAll()">💰 Most I can buy</button>
@@ -3646,6 +3648,16 @@ function moocRiderText(o){ const r=[];
   if(o.hhcReduction && +o.hhcReduction!==100) r.push('HHC '+o.hhcReduction+'%');
   if(o.rop && o.rop!=='none') r.push(ROP_LABELS[o.rop]||'ROP');
   return r.length?' · '+r.join(' + '):''; }
+// Mutual of Omaha optional benefits for the client sheet (Shared Care has its own row, so it's excluded here).
+function mooSheetOpts(o){ if(!o) return '';
+  const src=(o.__couple && o.parts && o.parts[0]) ? o.parts[0] : o;
+  if(!(isMoo(src)||isMooc(src))) return '';
+  const r=[];
+  if(src.rop && src.rop!=='none') r.push(ROP_LABELS[src.rop]||'Return of Premium');
+  if(src.proHHC) r.push('Pro HHC'); if(src.hhcWaiver) r.push('HHC Waiver'); if(src.nfsbp) r.push('NF-SBP');
+  if(src.alfReduction && +src.alfReduction!==100) r.push('ALF '+src.alfReduction+'%');
+  if(src.hhcReduction && +src.hhcReduction!==100) r.push('HHC '+src.hhcReduction+'%');
+  return r.join(', '); }
 function moocCoupleToggle(){
   const on=$('mooc_couple').checked;
   $('mooc_couplebox').hidden = !on;
@@ -3692,6 +3704,31 @@ function moocShowCouple(item){
     +'<div class="resbtns">'+addBtn(item)+'</div>'
     +'<div class="disc">Two MutualCare Custom policies (one per spouse), each with the &minus;15% partner discount, combined into one household premium.'+(item.parts[0]&&item.parts[0].sharedCare?' Shared Care benefit added (+16% each) — the couple can draw on each other’s benefit pool once their own is exhausted; both must keep the same monthly benefit and benefit period.':'')+' '+DISC+'</div>');
 }
+// Mutual of Omaha — the current design priced across all four health classes (Select is the quoter's default).
+function mooClassCompare(){ try{
+  if(CARRIER!=='moo' && CARRIER!=='mooc') return showErr('Open a Mutual of Omaha carrier (Secure or Custom) first.');
+  const isCustom = CARRIER==='mooc';
+  const base = isCustom ? moocOpts() : mooOpts();
+  const eng = isCustom ? MOOC : MOO, label = isCustom ? 'MutualCare Custom' : 'MutualCare Secure';
+  const inflLabel = isCustom ? ((base.inflTerm&&base.inflTerm!=='none')?MOOC.codeLabel(base.inflTerm,base.inflPct):'level (no inflation)') : (MOO.CODE_LABEL[base.inflation]||'level (no inflation)');
+  const design = fmt0(base.monthlyBenefit)+'/mo · '+(isCustom?moocYearsNum(base.years||3):(base.years||3))+'-yr · '+(base.elimination||90)+'-day · '+inflLabel;
+  const cur = base.uwClass||'Select';
+  const rows = ['Preferred','Select','Class 1','Class 2'].map(cls=>{ const o=Object.assign({}, base, {uwClass:cls});
+    let q; try{ q=eng.quote(o); }catch(e){ return {cls, fits:false, note:e.message}; }
+    return {cls, fits:true, premium:q.modalPayment, annual:q.annualPremium, o}; });
+  const pref=rows[0], p0=(pref&&pref.fits)?pref.premium:null;
+  const body=rows.map(r=>{
+    if(!r.fits) return '<tr><td class="b">'+r.cls+'</td><td colspan="3" style="color:var(--muted)">'+(r.note||'n/a')+'</td></tr>';
+    const relTxt = r.cls==='Preferred' ? '<span style="color:var(--muted)">baseline</span>' : (p0!=null?('+'+(((r.premium/p0)-1)*100).toFixed(1)+'%'):'');
+    const tag = r.cls===cur ? ' <span style="color:var(--primary-d);font-weight:800;font-size:.7rem">◀ selected</span>' : (r.cls==='Select'?' <span style="color:var(--muted);font-size:.7rem">quoter default</span>':'');
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.o)+')\'>＋ add</button>';
+    return '<tr'+(r.cls===cur?' style="background:#eef2ff"':'')+'><td class="b">'+r.cls+tag+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td class="b">'+relTxt+'</td><td style="text-align:right">'+add+'</td></tr>';
+  }).join('');
+  show(resultBrand(label+' — Premium by Class')+printBtn()
+    +'<div class="config-line">🩺 <b>'+label+' — premium by health class</b> &middot; '+base.age+' '+gL(base.gender)+' &middot; '+design.replace(/·/g,'&middot;')+(base.state?' &middot; '+base.state:'')+'</div>'
+    +'<table class="opts"><tr><th>Health class</th><th style="text-align:right">Premium</th><th>vs Preferred</th><th></th></tr>'+body+'</table>'
+    +'<div class="hint" style="margin-top:8px">Class order best→worst: <b>Preferred → Select → Class 1 → Class 2</b>. The Mutual of Omaha quoter defaults to <b>Select</b>. Quote the class the client is most likely to qualify for; tap ＋ to drop any into the comparison.</div><div class="disc">'+DISC+'</div>');
+}catch(e){ showErr(e.message); } }
 
 /* ---------- "most I can buy" — solve a budget across every carrier ---------- */
 function inflToBio(dec){ dec=+dec||0; return dec>=0.05?'5':(dec>=0.03?'3':(dec>=0.01?'1':'none')); }
@@ -4323,8 +4360,8 @@ function showWaiting(d){
 
 /* ---------- manual tabs ---------- */
 function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked, maritalDiscount:$('s_marital').checked}; }
-function runSingle(){ try{ showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
-function runCouple(){ try{ showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
+function runSingle(){ try{ if($('s_benefit')) $('s_benefit').value=SNAP($('s_benefit').value); showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
+function runCouple(){ try{ if($('c_benefit')) $('c_benefit').value=SNAP($('c_benefit').value); showCouple(+$('c_age1').value,$('c_g1').value,+$('c_age2').value,$('c_g2').value,{monthlyBenefit:SNAP($('c_benefit').value),benefitPeriod:$('c_bp').value,elimination:$('c_ep').value,inflation:parseFloat($('c_infl').value)||null,mode:'monthly',riderSharedAdditional:$('c_sba').checked,totalBenefitPeriod:$('c_bp').value}); }catch(e){ showErr(e.message); } }
 function runBudget(){ try{ showBudget(+$('b_target').value,+$('b_age').value,$('b_gender').value,{benefitPeriod:$('b_bp').value,elimination:'90',inflation:parseFloat($('b_infl').value)||null,mode:'monthly',state:$('b_state').value||null}); }catch(e){ showErr(e.message); } }
 function runStandard(){ try{
   const type=$('t_type').value, age=+$('t_age').value, state=$('t_state').value||null;
@@ -4823,7 +4860,8 @@ const QCATS = {
   inflation:{label:'Inflation protection', v:(o)=> isOmni(o) ? (o.inflation?'5% Simple*':'None') : isCS(o) ? csInflLabel(o.inflation) : isMoo(o) ? (MOO.CODE_LABEL[o.inflation]||'None') : isMooc(o) ? ((o.inflTerm&&o.inflTerm!=='none')?MOOC.codeLabel(o.inflTerm,o.inflPct):'None') : pctL(o.inflation)},
   inflationYN:{label:'Inflation',          v:(o)=> (isOmni(o) ? o.inflation : isCS(o) ? (o.inflation && o.inflation!=='none') : isMoo(o) ? (o.inflation && o.inflation!=='none') : isMooc(o) ? (o.inflTerm && o.inflTerm!=='none') : o.inflation) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : ''},
   shared:   {label:'Home care',            v:(o)=> isOmni(o) ? (o.homeCare?'$'+o.hcDaily+'/day ('+fmt0(o.hcDaily*30)+'/mo)':'—') : (isMoo(o)||isMooc(o)) ? 'Included (100%)' : '—'},
-  sharedcare:{label:'Shared care',         v:(o)=> (o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional))) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span> Yes' : '—'},
+  sharedcare:{label:'Shared care',         v:(o)=> (o.riderSharedAdditional || o.sharedCare || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional||x.sharedCare))) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span> Yes' : '—'},
+  optbenefits:{label:'Optional benefits',   v:(o)=> mooSheetOpts(o) || '—'},
   rxbenefit:{label:'Prescription Drug Benefit', v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
   fast50:   {label:'Fast-50',               v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
   restoration:{label:'Restoration of Benefits', v:(o)=> isOmni(o) ? '<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>' : '—'},
@@ -4838,8 +4876,8 @@ const QLAYOUTS = {
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
 // Customize mode: every available line item, and which are on by default.
-const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','rxbenefit','fast50','restoration','marital','annual','premium'];
-const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,rxbenefit:false,fast50:false,restoration:false,marital:false,annual:true,premium:true};
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','optbenefits','rxbenefit','fast50','restoration','marital','annual','premium'];
+const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,optbenefits:false,rxbenefit:false,fast50:false,restoration:false,marital:false,annual:true,premium:true};
 function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
   let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
 function catLabelPlain(key){ const c=QCATS[key]; if(!c) return key; return (typeof c.label==='function')?c.label():c.label; }
@@ -5025,10 +5063,14 @@ function renderSheet(){
     if(!items.some(o=>isOmni(o)&&o.homeCare)) rows = rows.filter(k=>k!=='shared');
     // Omniflex with home care → show the Home care line right under Facility (Benefit amount), in any layout
     if(items.some(o=>isOmni(o)&&o.homeCare)){ rows = rows.filter(k=>k!=='shared'); const bi=rows.indexOf('benefit'); rows.splice(bi<0?0:bi+1, 0, 'shared'); }
-    // Shared-care row appears whenever any option carries the shared-care rider
-    const anyShared = items.some(o=>o.riderSharedAdditional || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional)));
+    // Shared-care row appears whenever any option carries a shared-care rider (NGL or Mutual of Omaha)
+    const anyShared = items.some(o=>o.riderSharedAdditional || o.sharedCare || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional||x.sharedCare)));
     if(anyShared && !rows.includes('sharedcare')){ const ii=rows.indexOf('inflation'); rows.splice(ii<0?rows.indexOf('premium'):ii+1, 0, 'sharedcare'); }
     else if(!anyShared) rows = rows.filter(k=>k!=='sharedcare');
+    // Mutual of Omaha optional benefits (ROP, Pro HHC, HHC Waiver, NF-SBP, ALF/HHC reduction) → list row when any are selected
+    const anyMooOpt = items.some(o=>mooSheetOpts(o));
+    if(QSHEET.layout!=='essentials' && anyMooOpt && !rows.includes('optbenefits')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'optbenefits'); }
+    else if(!anyMooOpt) rows = rows.filter(k=>k!=='optbenefits');
     // OmniFlex-only sheet → show its built-in benefit lines (Rx, Fast-50, Restoration of
     // Benefits); kept out of cross-carrier comparisons so those stay clean, and off the
     // minimal Essentials view. In Customize mode the user's choice governs.
