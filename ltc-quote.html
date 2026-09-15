@@ -520,9 +520,9 @@
       <label title="Caps facility &amp; home care at $100/day and turns off inflation — the max a limited-benefit case can buy. Elimination period is still your choice, and you can choose lower daily amounts."><input type="checkbox" id="om_limited" onchange="omniLimitedToggle()"> Limited Benefit ($100 max)</label>
     </div>
     <div class="warn" style="margin-top:2px">Filed in Michigan, Texas, Virginia, Pennsylvania, and Maine. A $25 one-time policy fee applies. The facility &amp; home-care cash benefits equal 50% of the daily benefit (included). Verified to the penny against the carrier's rate exhibits.</div>
-    <div class="hint" id="om_vanote" hidden style="margin-top:6px;color:var(--primary-d)">Virginia (form AL7060): elimination periods are 0 / 20 / 30 days, and the prescription-drug benefit is not offered on this form.</div>
+    <div class="hint" id="om_vanote" hidden style="margin-top:6px;color:var(--primary-d)">Virginia (form AL7060): only 0 and 20-day elimination are available (no 60 / 90-day rates are filed for VA), and the prescription-drug benefit is not offered on this form.</div>
     <div class="hint" id="om_panote" hidden style="margin-top:6px;color:var(--primary-d)">Pennsylvania (form AL7060): issue ages 18–89; no inflation option is filed; an optional hospital-confinement rider is available (3 / 6 / 10 / 20-day).</div>
-    <div class="hint" id="om_menote" hidden style="margin-top:6px;color:var(--primary-d)">Maine (form AT7002): all options available — six elimination periods, inflation, prescription-drug benefit, and the hospital-confinement rider.</div>
+    <div class="hint" id="om_menote" hidden style="margin-top:6px;color:var(--primary-d)">Maine (form AT7002): all options available — inflation, prescription-drug benefit, and the hospital-confinement rider.</div>
     <div class="actions">
       <button class="run" onclick="omniRunSingle()">Run OmniFlex™ quote</button>
       <button class="run" style="background:#334155" onclick="openSweet()">⭐ Sweet spot (all carriers)</button>
@@ -2966,10 +2966,14 @@ const OMNI_RATES = {"product": "Manhattan Life Omniflex \u2014 Short-Term Care",
 function makeOmni(R){
   const BPS=R.benefit_periods, EPS=R.elim_periods, F=R.factors, RXM=R.rx_max, FEE=R.policy_fee;
   const r2=x=>Math.round(x*100)/100;
+  // Manhattan Life only sells 0 / 20 / 60 / 90-day elimination — never 30 or 100 — in any state.
+  const SELL_EP=[0,20,60,90];
   function rate(st,tbl,ep,age,bp){
     if(BPS.indexOf(bp)<0) throw new Error('Benefit period must be 90 / 180 / 270 / 360 days.');
-    if(EPS.indexOf(ep)<0) throw new Error('Elimination period must be 0 / 20 / 30 / 60 / 90 / 100 days.');
-    return R.rates[st][tbl][String(ep)][String(age)][BPS.indexOf(bp)];
+    if(SELL_EP.indexOf(ep)<0) throw new Error('Elimination period must be 0 / 20 / 60 / 90 days.');
+    const T=R.rates[st][tbl];
+    if(!T || !T[String(ep)]) throw new Error('The '+ep+'-day elimination period is not available in '+st+'.');
+    return T[String(ep)][String(age)][BPS.indexOf(bp)];
   }
   function quote(o){
     const st=(o.state||'').toUpperCase();
@@ -3484,14 +3488,15 @@ function csShowSingle(o){
 
 /* ---------- Manhattan Life Omniflex (Short-Term Care) ---------- */
 function omniSyncHc(){ $('om_hcbox').hidden = !$('om_hc').checked; }
-// State gating. Elimination options come from an explicit per-state map (so MI/TX keep their
-// marketed 0/20/60/90); Rx, inflation, the hospital rider, and the minimum issue age are all
-// data-driven from the rate tables actually filed for the state.
-//   VA: elim 0/20/30, no Rx.   PA: 0/20/30/60/90/100, ages 18–89, no inflation, + hospital.   ME: all six elims + inflation + Rx + hospital.   MI/TX: 0/20/60/90.
+// State gating, all data-driven from the filed rate tables. Manhattan sells only 0/20/60/90-day
+// elimination (never 30 or 100); each state offers those it filed. Rx, inflation, the hospital
+// rider, and the minimum issue age likewise follow what the state actually filed.
+//   VA: 0/20 only (filed 0/20/30, no 60/90), no Rx.   PA: 0/20/60/90, ages 18–89, no inflation, + hospital.   ME: 0/20/60/90 + inflation + Rx + hospital.   MI/TX: 0/20/60/90.
 function omniSyncState(){
   var st=$('om_state').value, S=(OMNI_RATES.rates[st]||{}), ST=(OMNI_RATES.states[st]||{});
-  var EPS={VA:[0,20,30], PA:[0,20,30,60,90,100], ME:[0,20,30,60,90,100]};
-  var eps=EPS[st]||[0,20,60,90];
+  // Only 0/20/60/90 are sold; offer those that are actually filed for the state (VA filed only 0/20/30 → 0/20).
+  var avail=S.facility_none?Object.keys(S.facility_none).map(Number):[];
+  var eps=[0,20,60,90].filter(function(d){ return avail.indexOf(d)>=0; }); if(!eps.length) eps=[0];
   ['om_ep','om_hcep'].forEach(function(id){ var sel=$(id); if(!sel) return; var cur=+sel.value;
     sel.innerHTML=eps.map(function(d){return '<option value="'+d+'">'+d+' days</option>';}).join('');
     sel.value=(eps.indexOf(cur)>=0?cur:0); });
