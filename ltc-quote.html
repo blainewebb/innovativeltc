@@ -551,7 +551,7 @@
       <div class="field"><label>Spouse — gender</label><select id="moo_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Spouse — health class</label><select id="moo_class2"><option value="Select" selected>Select</option><option value="Preferred">Preferred</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
     </div>
-    <div class="riders" id="moo_sharedwrap" hidden><label title="Shared Care benefit — the couple can draw from each other's benefit pool once their own is used up. +16% per person. Requires the same monthly benefit and benefit period for both."><input type="checkbox" id="moo_shared"> Add Shared Care benefit (+16% each — shared benefit pool)</label></div>
+    <div class="riders" id="moo_sharedwrap" hidden><label title="Shared Care benefit — the couple can draw from each other's benefit pool once their own is used up. +16% per person. Requires the same monthly benefit and benefit period for both."><input type="checkbox" id="moo_shared"> Add Shared Care benefit (+16% each — shared benefit pool)</label><label title="Joint Waiver of Premium — if either spouse goes on claim, premiums are waived for both. +2% per policy."><input type="checkbox" id="moo_jwp"> Add Joint Waiver of Premium (+2% each)</label></div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Benefit design <span id="moo_eachnote" style="color:var(--muted);font-weight:600" hidden>— same design for each spouse</span></div>
     <div class="grid">
       <div class="field"><label>Monthly benefit</label><div class="pickrow"><select class="picksel" id="moo_benpick" onchange="pickInto(this,'moo_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="2000">$2,000</option><option value="3000">$3,000</option><option value="4000">$4,000</option><option value="5000">$5,000</option><option value="6000">$6,000</option></select><input id="moo_benefit" type="number" value="3000" step="100" min="1500" max="12000"></div></div>
@@ -591,7 +591,7 @@
       <div class="field"><label>Spouse — gender</label><select id="mooc_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
       <div class="field"><label>Spouse — health class</label><select id="mooc_class2"><option value="Preferred">Preferred</option><option value="Select" selected>Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
     </div>
-    <div class="riders" id="mooc_sharedwrap" hidden><label title="Shared Care benefit — the couple can draw from each other's benefit pool once their own is used up. +16% per person. Requires the same monthly benefit and benefit period for both."><input type="checkbox" id="mooc_shared"> Add Shared Care benefit (+16% each — shared benefit pool)</label></div>
+    <div class="riders" id="mooc_sharedwrap" hidden><label title="Shared Care benefit — the couple can draw from each other's benefit pool once their own is used up. +16% per person. Requires the same monthly benefit and benefit period for both."><input type="checkbox" id="mooc_shared"> Add Shared Care benefit (+16% each — shared benefit pool)</label><label title="Joint Waiver of Premium — if either spouse goes on claim, premiums are waived for both. +2% per policy."><input type="checkbox" id="mooc_jwp"> Add Joint Waiver of Premium (+2% each)</label></div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Benefit design <span id="mooc_eachnote" style="color:var(--muted);font-weight:600" hidden>— same design for each spouse</span></div>
     <div class="grid">
       <div class="field"><label>Monthly benefit</label><div class="pickrow"><select class="picksel" id="mooc_benpick" onchange="pickInto(this,'mooc_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="2000">$2,000</option><option value="3000">$3,000</option><option value="4000">$4,000</option><option value="5000">$5,000</option><option value="6000">$6,000</option></select><input id="mooc_benefit" type="number" value="3000" step="50" min="1500" max="15000" oninput="moocTotHint()"></div></div>
@@ -3081,7 +3081,8 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     const bn=baseNone(age,gender,cls), inf=inflFactor(age,gender,code), bp=bpFactor(age,years,gender), ep=EPF[elim]||1.0;
     const scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
     const shared=o.sharedCare?1.16:1;   // couple-only shared-care rider: +16% per partner (verified, same as Custom)
-    let ann=bn*inf*bp*ep*scale*shared*(partner?0.85:1);
+    const jwp=o.jointWaiver?1.02:1;     // couple-only Joint Waiver of Premium: +2% per policy (verified on Custom; same factor assumed on Secure)
+    let ann=bn*inf*bp*ep*scale*shared*jwp*(partner?0.85:1);
     const r2=x=>Math.round(x*100)/100;
     const mode=o.mode||'monthly';
     const modal = mode==='annual'?ann : mode==='semiannual'?ann*1.02/2 : mode==='quarterly'?ann*1.04/4 : ann*1.08/12;
@@ -3177,6 +3178,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(o.hhcWaiver) f*=1.15;
     if(o.nfsbp) f*=interp(Math.min(75,Math.max(40,age)),{40:1.20,60:1.16,75:1.12});
     if(o.sharedCare) f*=1.16;   // couple-only shared-care rider: +16% per partner (verified flat)
+    if(o.jointWaiver) f*=1.02;  // couple-only Joint Waiver of Premium: +2% per policy (verified flat, age/gender-independent)
     if(o.alfReduction!=null && ALF_RED[''+o.alfReduction]!=null) f*=ALF_RED[''+o.alfReduction];
     if(o.hhcReduction!=null && HHC_RED[''+o.hhcReduction]!=null) f*=HHC_RED[''+o.hhcReduction];
     return f; }
@@ -3352,9 +3354,9 @@ function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWit
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+' · '+(o.state||'TX'); }
+  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+(o.state||'TX'); }
 function mooConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+' · '+stateFull(o.state); }
+  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+stateFull(o.state); }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3614,6 +3616,7 @@ function mooCoupleToggle(){
   $('moo_couplebox').hidden = !on;
   if($('moo_sharedwrap')) $('moo_sharedwrap').hidden = !on;
   if(!on && $('moo_shared')) $('moo_shared').checked=false;   // Shared Care is couple-only
+  if(!on && $('moo_jwp')) $('moo_jwp').checked=false;         // Joint Waiver is couple-only
   if($('moo_eachnote')) $('moo_eachnote').hidden = !on;
 }
 function mooRunSingle(){ try{
@@ -3628,8 +3631,9 @@ function mooRunCouple(){ try{
   const a2=+$('moo_age2').value;
   if(!(a2>=40&&a2<=75)) return showErr('Enter the spouse’s age (40–75).');
   const shared = $('moo_shared') && $('moo_shared').checked;
-  const partA=Object.assign({}, base, {partner:true, sharedCare:shared});
-  const partB=Object.assign({}, base, {age:a2, gender:$('moo_g2').value, uwClass:$('moo_class2').value, partner:true, sharedCare:shared});
+  const jwp = $('moo_jwp') && $('moo_jwp').checked;
+  const partA=Object.assign({}, base, {partner:true, sharedCare:shared, jointWaiver:jwp});
+  const partB=Object.assign({}, base, {age:a2, gender:$('moo_g2').value, uwClass:$('moo_class2').value, partner:true, sharedCare:shared, jointWaiver:jwp});
   MOO.quote(partA); MOO.quote(partB);                       // validate both before combining
   mooShowCouple(coupleCombine([partA, partB]));
 }catch(e){ showErr(e.message); } }
@@ -3700,6 +3704,7 @@ const ROP_LABELS={'3xmmb':'ROP 3×MMB','before65':'ROP Before 65','lessclaims':'
 // One-liner of any non-default optional benefits, for config text.
 function moocRiderText(o){ const r=[];
   if(o.sharedCare) r.push('Shared Care');
+  if(o.jointWaiver) r.push('Joint Waiver');
   if(o.proHHC) r.push('Pro HHC'); if(o.hhcWaiver) r.push('HHC Waiver'); if(o.nfsbp) r.push('NF-SBP');
   if(o.alfReduction && +o.alfReduction!==100) r.push('ALF '+o.alfReduction+'%');
   if(o.hhcReduction && +o.hhcReduction!==100) r.push('HHC '+o.hhcReduction+'%');
@@ -3727,6 +3732,7 @@ function moocCoupleToggle(){
   $('mooc_couplebox').hidden = !on;
   if($('mooc_sharedwrap')) $('mooc_sharedwrap').hidden = !on;
   if(!on && $('mooc_shared')) $('mooc_shared').checked=false;   // Shared Care is couple-only
+  if(!on && $('mooc_jwp')) $('mooc_jwp').checked=false;         // Joint Waiver is couple-only
   if($('mooc_eachnote')) $('mooc_eachnote').hidden = !on;
 }
 function moocRunSingle(){ try{
@@ -3739,8 +3745,9 @@ function moocRunCouple(){ try{
   const a2=+$('mooc_age2').value;
   if(!(a2>=30&&a2<=79)) return showErr('Enter the spouse’s age (30–79).');
   const shared = $('mooc_shared') && $('mooc_shared').checked;   // couple-only; same design both (enforced)
-  const partA=Object.assign({}, base, {partner:true, sharedCare:shared});
-  const partB=Object.assign({}, base, {age:a2, gender:$('mooc_g2').value, uwClass:$('mooc_class2').value, partner:true, sharedCare:shared});
+  const jwp = $('mooc_jwp') && $('mooc_jwp').checked;
+  const partA=Object.assign({}, base, {partner:true, sharedCare:shared, jointWaiver:jwp});
+  const partB=Object.assign({}, base, {age:a2, gender:$('mooc_g2').value, uwClass:$('mooc_class2').value, partner:true, sharedCare:shared, jointWaiver:jwp});
   MOOC.quote(partA); MOOC.quote(partB);
   moocShowCouple(coupleCombine([partA, partB]));
 }catch(e){ showErr(e.message); } }
