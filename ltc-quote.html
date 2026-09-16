@@ -534,10 +534,10 @@
   <div class="card" id="moocard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">Mutual of Omaha <span style="color:var(--muted);font-weight:600;font-size:.9rem">MutualCare Secure Solution</span></h2>
-      <p class="hint" style="margin:0">Comprehensive long-term care. Home care &amp; assisted living covered at 100% of the monthly benefit (built in). Issue ages 40–75. <b>Texas only.</b> Verified against the carrier's quoter.</p>
+      <p class="hint" style="margin:0">Comprehensive long-term care. Home care &amp; assisted living covered at 100% of the monthly benefit (built in). Issue ages 40–75. <b>Available in every state except CA, NY, MT &amp; FL</b> (rates match the Texas filing). Verified against the carrier's quoter.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>State</label><select id="moo_state"><option value="TX" selected>Texas</option></select></div>
+      <div class="field"><label>State</label><select id="moo_state" class="moostatesel"><option value="TX" selected>Texas</option></select></div>
       <div class="field"><label>Issue age (40–75)</label><input id="moo_age" type="number" value="60" min="40" max="75"></div>
       <div class="field"><label>Gender</label><select id="moo_gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
@@ -561,7 +561,7 @@
     <div class="grid" style="margin-top:6px">
       <div class="field"><label>Inflation protection</label><select id="moo_infl"><option value="none">None (level)</option><option value="3L" selected>3% compound (lifetime)</option><option value="4L">4% compound (lifetime)</option><option value="5L">5% compound (lifetime)</option><option value="320">3% compound (20-year)</option><option value="520">5% compound (20-year)</option></select></div>
     </div>
-    <div class="warn" style="margin-top:2px">Texas only. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). In Texas any inflation option includes Partnership at no extra cost. Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
+    <div class="warn" style="margin-top:2px">Available in every state except CA, NY, MT &amp; FL, where MutualCare rates differ — quote those directly with Mutual of Omaha. Rates match the Texas filing. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
     <div class="actions">
       <button class="run" onclick="mooRunSingle()">Run MutualCare Secure quote</button>
       <button class="run" style="background:#334155" onclick="mooClassCompare()">🩺 Compare classes</button>
@@ -574,10 +574,10 @@
   <div class="card" id="mooccard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">Mutual of Omaha <span style="color:var(--muted);font-weight:600;font-size:.9rem">MutualCare Custom Solution</span></h2>
-      <p class="hint" style="margin:0">Fully customizable long-term care. Home care &amp; assisted living covered at 100% of the monthly benefit (built in). Issue ages 30–79. <b>Texas only.</b> Verified against the carrier's quoter.</p>
+      <p class="hint" style="margin:0">Fully customizable long-term care. Home care &amp; assisted living covered at 100% of the monthly benefit (built in). Issue ages 30–79. <b>Available in every state except CA, NY, MT &amp; FL</b> (rates match the Texas filing). Verified against the carrier's quoter.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>State</label><select id="mooc_state"><option value="TX" selected>Texas</option></select></div>
+      <div class="field"><label>State</label><select id="mooc_state" class="moostatesel"><option value="TX" selected>Texas</option></select></div>
       <div class="field"><label>Issue age (30–79)</label><input id="mooc_age" type="number" value="60" min="30" max="79" oninput="moocSyncRop()"></div>
       <div class="field"><label>Gender</label><select id="mooc_gender"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
@@ -615,7 +615,7 @@
       <label title="Home Health Care Waiver of premium (+15%)"><input type="checkbox" id="mooc_hhcwaiver"> HHC Waiver (+15%)</label>
       <label title="Nonforfeiture — Shortened Benefit Period rider (+12–20% by age)"><input type="checkbox" id="mooc_nfsbp"> NF-SBP (nonforfeiture)</label>
     </div>
-    <div class="warn" style="margin-top:2px">Texas only. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). Any inflation lasting to age 76+ includes Partnership at no extra cost. Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
+    <div class="warn" style="margin-top:2px">Available in every state except CA, NY, MT &amp; FL, where MutualCare rates differ — quote those directly with Mutual of Omaha. Rates match the Texas filing. Home health care &amp; assisted living covered at 100% of the monthly benefit (built in). Cash benefit 25% of the monthly benefit. Verified against Mutual of Omaha's own quoter.</div>
     <div class="actions">
       <button class="run" onclick="moocRunSingle()">Run MutualCare Custom quote</button>
       <button class="run" style="background:#334155" onclick="mooClassCompare()">🩺 Compare classes</button>
@@ -3074,6 +3074,8 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     const age=+o.age, gender=gcode(o.gender), cls=o.uwClass||o.cls||'Select';
     const monthly=+o.monthlyBenefit||3000, years=+o.years||3, elim=+o.elimination||90;
     const code=inflCode(o.inflation!=null?o.inflation:o.code);
+    const st=(o.state||'TX').toUpperCase();
+    if(['CA','NY','MT','FL'].indexOf(st)>=0) throw new Error('MutualCare rates differ in CA, NY, MT, and FL — quote those directly with Mutual of Omaha.');
     if(age<40||age>75) throw new Error('MutualCare Secure issues ages 40–75.');
     if(['Select','Preferred','Class 1','Class 2'].indexOf(cls)<0) throw new Error('Pick a health class.');
     const bn=baseNone(age,gender,cls), inf=inflFactor(age,gender,code), bp=bpFactor(age,years,gender), ep=EPF[elim]||1.0;
@@ -3089,7 +3091,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(elim!==90) steps.push([elim+'-day elimination ×'+ep.toFixed(4), r2(bn*inf*bp*ep)]);
     if(scale!==1) steps.push([fmt0(monthly)+'/mo benefit ×'+scale.toFixed(4), r2(bn*inf*bp*ep*scale)]);
     if(partner) steps.push(['Partner discount ×0.85', r2(ann)]);
-    return { carrier:'moo', state:'TX', issueAge:age, age:age, gender:o.gender, uwClass:cls,
+    return { carrier:'moo', state:st, issueAge:age, age:age, gender:o.gender, uwClass:cls,
       monthlyBenefit:monthly, years:years, elimination:elim, inflation:code, code:code, codeLabel:CODE_LABEL[code],
       policyLimit:monthly*12*years, annualPremium:r2(ann), mode:mode, modalPayment:r2(modal), steps:steps };
   }
@@ -3182,6 +3184,8 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     var age=+o.age, g=gkey(o.gender), cls=CLASS_ALIAS[o.uwClass||o.cls]||'Select';
     var monthly=+o.monthlyBenefit||3000, years=+o.years||3, elim=(o.elimination!=null?+o.elimination:90);
     var term=normTerm(o), pct=normPct(o);
+    var st=(o.state||'TX').toUpperCase();
+    if(['CA','NY','MT','FL'].indexOf(st)>=0) throw new Error('MutualCare rates differ in CA, NY, MT, and FL — quote those directly with Mutual of Omaha.');
     if(age<30||age>79) throw new Error('MutualCare Custom issues ages 30–79.');
     if(EP[elim]==null) throw new Error('Elimination must be 0, 30, 60, 90, 180 or 365 days.');
     var bn=baseNone(age,g,cls), inf=inflFactor(age,o.gender,term,pct), bp=bpFactor(age,o.gender,years), ep=epFactor(elim);
@@ -3199,7 +3203,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(scale!==1) steps.push([monthly+'/mo benefit ×'+scale.toFixed(4), r2(bn*inf*bp*ep*scale)]);
     if(rf!==1.0) steps.push(['Optional benefits ×'+rf.toFixed(4), r2(bn*inf*bp*ep*rf*scale)]);
     if(partner) steps.push(['Partner discount ×0.85', r2(ann)]);
-    return { carrier:'mooc', state:'TX', issueAge:age, age:age, gender:o.gender, uwClass:cls,
+    return { carrier:'mooc', state:st, issueAge:age, age:age, gender:o.gender, uwClass:cls,
       monthlyBenefit:monthly, years:years, elimination:elim, inflTerm:term, inflPct:pct,
       codeLabel:codeLabel(term,pct), policyLimit:monthly*12*years, annualPremium:r2(ann),
       mode:mode, modalPayment:r2(modal), partnership:needsPartnership(age,term), steps:steps };
@@ -3342,15 +3346,15 @@ function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delet
 // MutualCare Custom — condensed one-liner for the comparison tray
 function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.codeLabel(o.inflTerm,o.inflPct) : 'level'; }
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · TX'; }
+  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · '+(o.state||'TX'); }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · Texas'+moocRiderText(o); }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · '+stateFull(o.state)+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+' · TX'; }
+  return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+' · '+(o.state||'TX'); }
 function mooConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+' · Texas'; }
+  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+' · '+stateFull(o.state); }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3601,7 +3605,7 @@ function omniShowSingle(o){
 
 /* ---------- Mutual of Omaha — MutualCare Secure (Texas) ---------- */
 function mooOpts(){
-  return {carrier:'moo', state:'TX', age:+$('moo_age').value, gender:$('moo_gender').value, uwClass:$('moo_class').value,
+  return {carrier:'moo', state:($('moo_state')?$('moo_state').value:'TX'), age:+$('moo_age').value, gender:$('moo_gender').value, uwClass:$('moo_class').value,
     monthlyBenefit:+$('moo_benefit').value, years:+$('moo_bp').value, elimination:+$('moo_ep').value,
     inflation:$('moo_infl').value, mode:$('moo_mode').value};
 }
@@ -3680,7 +3684,7 @@ function moocOpts(){
   let years, policyLimit;
   if($('mooc_covbasis') && $('mooc_covbasis').value==='total'){ policyLimit=moocTotSnap(); years=policyLimit/(monthly*12); }
   else { years=+$('mooc_bp').value; policyLimit=monthly*12*years; }
-  return {carrier:'mooc', state:'TX', age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
+  return {carrier:'mooc', state:($('mooc_state')?$('mooc_state').value:'TX'), age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
     monthlyBenefit:monthly, years:years, policyLimit:policyLimit, elimination:+$('mooc_ep').value,
     inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value,
     alfReduction:+$('mooc_alf').value, hhcReduction:+$('mooc_hhc').value,
@@ -3951,10 +3955,10 @@ const CARRIERS = [
     } },
   { id:'moo', label:'Mutual of Omaha — MutualCare Secure',
     _avail(p){ const st=(p.state||'').toUpperCase();
-      if(st!=='TX') return 'MutualCare Secure is loaded for Texas only — pick TX.';
+      if(st && MOO_OFF_STATES.indexOf(st)>=0) return 'MutualCare rates differ in CA, NY, MT & FL — quote those directly with Mutual of Omaha.';
       if(p.age<40||p.age>75) return 'MutualCare Secure issues ages 40–75.';
       return null; },
-    _mk(p, mb, partner){ return {carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
+    _mk(p, mb, partner){ return {carrier:'moo', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
       monthlyBenefit:mb, years:Math.min(4,Math.max(2,p.years||3)), elimination:90, inflation:mooInflCode(p.inflation), mode:'monthly', partner:!!partner}; },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
@@ -3974,7 +3978,7 @@ const CARRIERS = [
     sweetSpot(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.moo, code=(p.inflation==null?s.inflation:mooInflCode(p.inflation));
-      const o={carrier:'moo', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
+      const o={carrier:'moo', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly'};
       const q=MOO.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
@@ -3985,7 +3989,7 @@ const CARRIERS = [
       const a=this._avail({age:p.age, state:p.state}); if(a) return {label:this.label+' · couple', fits:false, note:a};
       const b=this._avail({age:p.age2, state:p.state}); if(b) return {label:this.label+' · couple', fits:false, note:b};
       const s=SWEETSPOT.moo, code=(p.inflation==null?s.inflation:mooInflCode(p.inflation));
-      const mk=(age,gender)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Select',
+      const mk=(age,gender)=>({carrier:'moo', state:(p.state||'TX'), age, gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly', partner:true});
       const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=MOO.quote(oA), qB=MOO.quote(oB);
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
@@ -3993,12 +3997,12 @@ const CARRIERS = [
     } },
   { id:'mooc', label:'Mutual of Omaha — MutualCare Custom',
     _avail(p){ const st=(p.state||'').toUpperCase();
-      if(st!=='TX') return 'MutualCare Custom is loaded for Texas only — pick TX.';
+      if(st && MOO_OFF_STATES.indexOf(st)>=0) return 'MutualCare rates differ in CA, NY, MT & FL — quote those directly with Mutual of Omaha.';
       if(p.age<30||p.age>79) return 'MutualCare Custom issues ages 30–79.';
       return null; },
     _infl(dec){ dec=+dec||0; if(dec<=0) return {inflTerm:'none', inflPct:0}; return {inflTerm:'Lifetime', inflPct:Math.round(dec*100*4)/4}; },
     _mk(p, mb, partner){ const inf=this._infl(p.inflation);
-      return Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
+      return Object.assign({carrier:'mooc', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
       monthlyBenefit:mb, years:Math.min(6,Math.max(2,p.years||3)), elimination:90, mode:'monthly', partner:!!partner}, inf); },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
@@ -4018,7 +4022,7 @@ const CARRIERS = [
     sweetSpot(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.mooc; const inf=(p.inflation==null)?{inflTerm:s.inflTerm,inflPct:s.inflPct}:this._infl(p.inflation);
-      const o=Object.assign({carrier:'mooc', state:'TX', age:p.age, gender:p.gender, uwClass:'Select',
+      const o=Object.assign({carrier:'mooc', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly'}, inf);
       const q=MOOC.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
@@ -4028,7 +4032,7 @@ const CARRIERS = [
       const a=this._avail({age:p.age, state:p.state}); if(a) return {label:this.label+' · couple', fits:false, note:a};
       const b=this._avail({age:p.age2, state:p.state}); if(b) return {label:this.label+' · couple', fits:false, note:b};
       const s=SWEETSPOT.mooc; const inf=(p.inflation==null)?{inflTerm:s.inflTerm,inflPct:s.inflPct}:this._infl(p.inflation);
-      const mk=(age,gender)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Select',
+      const mk=(age,gender)=>Object.assign({carrier:'mooc', state:(p.state||'TX'), age, gender, uwClass:'Select',
         monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly', partner:true}, inf);
       const oA=mk(p.age,p.gender), oB=mk(p.age2,p.gender2), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
       return {label:this.label+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium,
@@ -4138,12 +4142,12 @@ function nglSameBenefit(p){
 }
 function mooSameBenefit(p){
   const st=(p.state||'').toUpperCase();
-  if(st!=='TX') return {label:carrierLabel('moo'), fits:false, note:'Texas only.'};
+  if(st && MOO_OFF_STATES.indexOf(st)>=0) return {label:carrierLabel('moo'), fits:false, note:'Rates differ in CA/NY/MT/FL.'};
   if(p.age<40||p.age>75||(p.marital==='married-both'&&(p.age2<40||p.age2>75))) return {label:carrierLabel('moo'), fits:false, note:'Issues ages 40–75.'};
   if(p.years<2||p.years>4) return {label:carrierLabel('moo'), fits:false, note:'Benefit periods run 2–4 years.'};
   const code=mooInflCode(p.inflation);
   if((p.inflation||0)>0 && code==='none') return {label:carrierLabel('moo'), fits:false, note:'Offers 3/4/5% compound only.'};
-  const mk=(age,gender,partner)=>({carrier:'moo', state:'TX', age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
+  const mk=(age,gender,partner)=>({carrier:'moo', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
   if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOO.quote(oA), qB=MOO.quote(oB);
     return {label:carrierLabel('moo')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
   const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOO.quote(o);
@@ -4151,11 +4155,11 @@ function mooSameBenefit(p){
 }
 function moocSameBenefit(p){
   const st=(p.state||'').toUpperCase();
-  if(st!=='TX') return {label:carrierLabel('mooc'), fits:false, note:'Texas only.'};
+  if(st && MOO_OFF_STATES.indexOf(st)>=0) return {label:carrierLabel('mooc'), fits:false, note:'Rates differ in CA/NY/MT/FL.'};
   if(p.age<30||p.age>79||(p.marital==='married-both'&&(p.age2<30||p.age2>79))) return {label:carrierLabel('mooc'), fits:false, note:'Issues ages 30–79.'};
   if(p.years<2||p.years>6) return {label:carrierLabel('mooc'), fits:false, note:'Benefit periods run 2–6 years.'};
   const inf=((p.inflation||0)>0)?{inflTerm:'Lifetime', inflPct:Math.round(p.inflation*100*4)/4}:{inflTerm:'none', inflPct:0};
-  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:'TX', age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
+  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
   if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
     return {label:carrierLabel('mooc')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
   const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOOC.quote(o);
@@ -4810,6 +4814,7 @@ function fillOmniForm(o){
 function fillMooForm(o){
   setCarrier('moo');
   if($('moo_couple')){ $('moo_couple').checked=false; mooCoupleToggle(); }
+  if($('moo_state')&&o.state) $('moo_state').value=(MOO_OFF_STATES.indexOf(String(o.state).toUpperCase())<0?o.state:'TX');
   $('moo_age').value=o.age; $('moo_gender').value=o.gender||'male'; $('moo_class').value=o.uwClass||'Select';
   $('moo_benefit').value=o.monthlyBenefit||3000; $('moo_bp').value=String(o.years||3); $('moo_ep').value=String(o.elimination||90);
   $('moo_infl').value=o.inflation||'none'; $('moo_mode').value=o.mode||'monthly';
@@ -4817,6 +4822,7 @@ function fillMooForm(o){
 function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
+  if($('mooc_state')&&o.state) $('mooc_state').value=(MOO_OFF_STATES.indexOf(String(o.state).toUpperCase())<0?o.state:'TX');
   $('mooc_age').value=o.age; $('mooc_gender').value=o.gender||'male'; $('mooc_class').value=o.uwClass||'Select';
   $('mooc_benefit').value=o.monthlyBenefit||3000; $('mooc_ep').value=String(o.elimination||90);
   const yrs=o.years||3, whole=(yrs>=2&&yrs<=6&&yrs===Math.round(yrs));
@@ -5175,9 +5181,17 @@ function fillStates(){
   const opts='<option value="">Any state (non-CO)</option>'+US_STATES.map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join('');
   document.querySelectorAll('select.statesel').forEach(s=>{ const cur=s.value; s.innerHTML=opts; s.value=cur; });
 }
+// Mutual of Omaha: identical rates to Texas in every state EXCEPT these four (rates differ; not in this tool).
+const MOO_OFF_STATES=['CA','NY','MT','FL'];
+function fillMooStates(){
+  const opts=US_STATES.filter(([c])=>MOO_OFF_STATES.indexOf(c)<0).map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join('');
+  document.querySelectorAll('select.moostatesel').forEach(s=>{ const cur=s.value||'TX'; s.innerHTML=opts; s.value=(MOO_OFF_STATES.indexOf(cur)<0?cur:'TX'); });
+}
+function stateFull(code){ code=(code||'TX').toUpperCase(); const f=US_STATES.find(x=>x[0]===code); return f?f[1]:code; }
 
 /* ---------- init ---------- */
 fillStates();
+fillMooStates();
 renderTray(); renderClients(); renderPatterns();
 setMode('manual');   // start on the click-in form
 csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
