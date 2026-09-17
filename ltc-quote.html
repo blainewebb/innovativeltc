@@ -637,8 +637,12 @@
       <div class="field"><label>Target years of coverage</label><select id="ba_years"><option value="2">2 years</option><option value="3" selected>3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option></select></div>
       <div class="field"><label>Inflation protection</label><select id="ba_infl"><option value="0">None (level)</option><option value="0.01">1% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
       <div class="field"><label>Underwriting (CareScout)</label><select id="ba_uw"><option value="Standard" selected>Standard</option><option value="Preferred">Preferred</option></select></div>
-      <div class="field"><label>Marital status</label><select id="ba_marital"><option value="single" selected>Single</option><option value="married-both">Married — both applying</option><option value="married-one">Married — one applying</option></select></div>
+      <div class="field"><label>Marital status</label><select id="ba_marital" onchange="baMaritalChange()"><option value="single" selected>Single</option><option value="married-both">Married — both applying (joint)</option><option value="married-one">Married — one applying</option></select></div>
       <div class="field"><label>State</label><select id="ba_state" class="statesel"></select></div>
+    </div>
+    <div class="grid" id="ba_spouse" hidden>
+      <div class="field"><label>Spouse — issue age</label><input id="ba_age2" type="number" value="60" min="18" max="79"></div>
+      <div class="field"><label>Spouse — gender</label><select id="ba_gender2"><option value="male">Male</option><option value="female">Female</option></select></div>
     </div>
     <div class="actions"><button class="run" onclick="runBudgetAll()">Show the most I can buy</button></div>
   </div>
@@ -3923,7 +3927,7 @@ const CARRIERS = [
         smoker:false, spousal:(p.marital&&p.marital!=='single'), mode:'monthly'};
     },
     _avail(p){ const st=(p.state||'').toUpperCase();
-      if(st!=='MI'&&st!=='TX') return 'Filed only in MI &amp; TX — pick a state.';
+      if(!OMNI_RATES.rates[st]) return 'OmniFlex™ is filed in MI, TX, VA, PA, ME &amp; MO — pick one.';
       if(p.age<45||p.age>89) return 'OmniFlex™ issues ages 45–89.';
       return null; },
     solve(p){
@@ -4053,26 +4057,93 @@ function sweetSpotAll(p, includeShared){
   return out;
 }
 function ssObjs(r){ return r.trayObjs || (r.trayObj?[r.trayObj]:[]); }
-function budgetSolveAll(p){ return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
+function budgetSolveAll(p){ const couple = p.age2 && p.marital==='married-both';
+  return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, couple? carrierSolveCouple(c,p) : c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
+// Household (both-applying) budget solve: the richest design where the COMBINED two-life
+// premium fits the budget. Reuses each carrier's own design helpers; NGL is a real two-life
+// joint policy, the others are two individual policies with the couple/spousal discount.
+function carrierSolveCouple(c, p){
+  const CL=c.label+' · couple';
+  if(c.id==='ngl'){
+    const bp=String(p.years*12);
+    if(!['24','36','48','60','72'].includes(bp)) return {label:CL, fits:false, note:'NGL benefit periods run 2–6 years.'};
+    const opts={benefitPeriod:bp, elimination:'90', inflation:p.inflation||0, pay:'level', mode:'monthly', state:p.state||null, totalBenefitPeriod:bp};
+    const older=(p.age>=p.age2?{age:p.age,gender:p.gender}:{age:p.age2,gender:p.gender2});
+    const comb=(mb)=>{ try{ return E.quoteCouple(p.age,p.gender,p.age2,p.gender2,mb,opts).combined_joint; }catch(e){ return null; } };
+    let mb; try{ mb=FLOOR3(E.benefitForPremium(p.budget,older.age,older.gender,opts).solvedMonthlyBenefit); }catch(e){ mb=MAX_BENEFIT; }
+    let cj=comb(mb);
+    while(mb>300 && (!cj||cj.modalPayment>p.budget+0.005)){ mb=FLOOR3(mb-300); cj=comb(mb); }
+    if(!cj||cj.modalPayment>p.budget+0.005) return {label:CL, fits:false, note:'Even a $300/mo benefit is above this budget.'};
+    const tray=withCoupleAges(Object.assign({},opts,older,{monthlyBenefit:mb,joint:true}),p.age,p.gender,p.age2,p.gender2);
+    let stepUp=null; const mbUp=Math.min(MAX_BENEFIT,mb+300);
+    if(mbUp>mb){ const cu=comb(mbUp); if(cu&&cu.modalPayment>p.budget+0.005&&cu.modalPayment<=p.budget*1.12) stepUp={design:fmt0(mbUp)+'/mo each · '+p.years+'-yr', premium:cu.modalPayment, trayObj:withCoupleAges(Object.assign({},opts,older,{monthlyBenefit:mbUp,joint:true}),p.age,p.gender,p.age2,p.gender2)}; }
+    return {label:CL, fits:true, premium:cj.modalPayment, annual:cj.annualPremium, design:fmt0(mb)+'/mo each · '+p.years+'-yr · '+pctL(p.inflation)+' · joint', sub:'One two-life (joint) policy', trayObj:tray, stepUp:stepUp};
+  }
+  if(c.id==='moo'||c.id==='mooc'){
+    const bad=(c._avail({age:p.age,state:p.state})||c._avail({age:p.age2,state:p.state})); if(bad) return {label:CL, fits:false, note:bad};
+    const eng=c.id==='moo'?MOO:MOOC, step=c.id==='moo'?100:50, cap=c.id==='moo'?12000:15000;
+    const comb=(mb)=>{ const oA=c._mk(p,mb,true), oB=Object.assign({},c._mk(p,mb,true),{age:p.age2,gender:p.gender2}); try{ const qA=eng.quote(oA), qB=eng.quote(oB);
+      return {p:qA.modalPayment+qB.modalPayment, a:qA.annualPremium+qB.annualPremium, oA, oB, yrs:oA.years, infl:(c.id==='moo'?(MOO.CODE_LABEL[oA.inflation]||'level').replace(' (no inflation)',''):moocInflLabel(oA))}; }catch(e){ return null; } };
+    const base=comb(3000); if(!base) return {label:CL, fits:false, note:'Design not available.'};
+    let mb=Math.min(cap,Math.max(1500, Math.floor((3000*(p.budget/base.p))/step)*step));
+    let r=comb(mb);
+    while(mb>1500 && (!r||r.p>p.budget+0.005)){ mb-=step; r=comb(mb); }
+    if(!r||r.p>p.budget+0.005) return {label:CL, fits:false, note:'Even a $1,500/mo benefit is above this budget.'};
+    let stepUp=null; const mbUp=Math.min(cap,mb+500);
+    if(mbUp>mb){ const ru=comb(mbUp); if(ru&&ru.p>p.budget+0.005&&ru.p<=p.budget*1.12) stepUp={design:fmt0(mbUp)+'/mo each · '+ru.yrs+'-yr', premium:ru.p, trayObj:coupleCombine([ru.oA,ru.oB])}; }
+    return {label:CL, fits:true, premium:r.p, annual:r.a, design:fmt0(mb)+'/mo each · '+r.yrs+'-yr · '+r.infl+' · partner −15%', sub:'Two individual policies (combined)', trayObj:coupleCombine([r.oA,r.oB]), stepUp:stepUp};
+  }
+  if(c.id==='carescout'){
+    const st=p.state||''; if(!csAvailableState(st)) return {label:CL, fits:false, note:'Not offered in '+(st?csStateName(st):'this state')+'.'};
+    if(p.age<40||p.age>65||p.age2<40||p.age2>65) return {label:CL, fits:false, note:'CareScout issues ages 40–65 (both applicants).'};
+    const bio=inflToBio(p.inflation), uw=p.uw||'Standard';
+    const mk=(age,gender,daily,pool)=>({carrier:'carescout', age, gender, uwClass:uw, marital:'Married', dailyBenefit:daily, coverageMax:pool, inflation:bio, deductible:90, mode:'monthly', state:st||null});
+    let best=null;
+    for(const daily of csDailies(st)){ for(const pool of csPoolsFor(daily,st)){ const ratio=pool/daily/365.25; if(ratio<p.years-0.5) continue;
+      let qA,qB; try{ qA=CS.quote(mk(p.age,p.gender,daily,pool)); qB=CS.quote(mk(p.age2,p.gender2,daily,pool)); }catch(e){ continue; }
+      const prem=qA.modalPayment+qB.modalPayment;
+      if(prem<=p.budget+0.005 && (!best||daily>best.daily||(daily===best.daily&&Math.abs(ratio-p.years)<Math.abs(best.ratio-p.years)))) best={daily,pool,ratio,prem,annual:qA.annualPremium+qB.annualPremium,oA:mk(p.age,p.gender,daily,pool),oB:mk(p.age2,p.gender2,daily,pool)}; } }
+    if(!best) return {label:CL, fits:false, note:'No ≈'+p.years+'-yr design fits '+fmt0(p.budget)+'/mo here.'};
+    return {label:CL, fits:true, premium:best.prem, annual:best.annual, design:'$'+best.daily+'/day · '+fmt0(best.pool)+' pool each (≈'+best.ratio.toFixed(1)+' yr)', sub:'Two individual policies (combined) · married class', trayObj:coupleCombine([best.oA,best.oB])};
+  }
+  if(c.id==='omniflex'){
+    const a=c._avail({age:p.age,state:p.state}); if(a) return {label:CL, fits:false, note:a};
+    const b=c._avail({age:p.age2,state:p.state}); if(b) return {label:CL, fits:false, note:b};
+    for(let d=400; d>=50; d-=10){ const oA=c._design(Object.assign({},p,{marital:'married-both'}),d), oB=c._design(Object.assign({},p,{age:p.age2,marital:'married-both'}),d);
+      let qA,qB; try{ qA=OMNI.quote(oA); qB=OMNI.quote(oB); }catch(e){ continue; }
+      const prem=qA.modalPayment+qB.modalPayment;
+      if(prem<=p.budget+0.005) return {label:CL, fits:true, premium:prem, annual:qA.annualPremium+qB.annualPremium, design:'$'+d+'/day fac + $'+oA.hcDaily+'/day home · 12-mo each', sub:'Two STC policies (combined) · spousal −10%', trayObj:coupleCombine([oA,oB])}; }
+    return {label:CL, fits:false, note:'Even $50/day is above this budget.'};
+  }
+  return {label:CL, fits:false, note:'Joint solve not available for this carrier.'};
+}
 function showBudgetAll(p){
   const results=budgetSolveAll(p);
-  const head='<div class="config-line">💰 <b>Most coverage for '+fmt0(p.budget)+'/mo</b> &middot; '+p.age+' '+gL(p.gender)+' &middot; '+p.years+'-yr &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
-  const stepRow=(r)=> r.stepUp ? '<tr style="background:#fffdf5"><td style="color:#92400e;font-size:.78rem">▲ Step up (just over budget)</td><td class="b" style="color:#92400e">'+r.stepUp.design+'</td><td class="p" style="color:#92400e">'+fmt(r.stepUp.premium)+'/mo</td><td style="text-align:right"><button class="rm" style="background:#fef3c7;color:#92400e" onclick=\'addToTray('+JSON.stringify(r.stepUp.trayObj)+')\'>＋ add</button></td></tr>' : '';
+  const couple = p.age2 && p.marital==='married-both';
+  const unit = couple ? '/mo household' : '/mo';
+  const who = couple ? p.age+' '+gL(p.gender)+' + '+p.age2+' '+gL(p.gender2)+' (joint)' : p.age+' '+gL(p.gender);
+  const head='<div class="config-line">💰 <b>Most coverage for '+fmt0(p.budget)+'/mo</b>'+(couple?' · household':'')+' &middot; '+who+' &middot; '+p.years+'-yr &middot; '+pctL(p.inflation)+(p.state?' &middot; '+p.state:'')+'</div>';
+  const stepRow=(r)=> r.stepUp ? '<tr style="background:#fffdf5"><td style="color:#92400e;font-size:.78rem">▲ Step up (just over budget)</td><td class="b" style="color:#92400e">'+r.stepUp.design+'</td><td class="p" style="color:#92400e">'+fmt(r.stepUp.premium)+unit+'</td><td style="text-align:right"><button class="rm" style="background:#fef3c7;color:#92400e" onclick=\'addToTray('+JSON.stringify(r.stepUp.trayObj)+')\'>＋ add</button></td></tr>' : '';
   const rows=results.map(r=>{
     if(!r.fits) return '<tr><td class="b">'+r.label+'</td><td colspan="2" style="color:var(--muted)">'+(r.note||'No design fits')+'</td><td></td></tr>'+stepRow(r);
     const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.trayObj)+')\'>＋ add</button>';
-    return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+'/mo</td><td style="text-align:right">'+add+'</td></tr>'+stepRow(r);
+    return '<tr><td class="b">'+r.label+'<div style="font-size:.74rem;color:var(--muted);font-weight:600">'+r.sub+'</div></td><td class="b">'+r.design+'</td><td class="p">'+fmt(r.premium)+unit+'</td><td style="text-align:right">'+add+'</td></tr>'+stepRow(r);
   }).join('');
   const omniNote=omniInflNote(results.filter(r=>r.fits).map(r=>r.trayObj));
-  show(resultBrand('Most I Can Buy')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Most coverage that fits</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="hint" style="margin-top:8px">Each carrier shows the richest design at or under your budget for about '+p.years+' year'+(p.years===1?'':'s')+' of coverage. Tap ＋ to drop any into the comparison, then print a side-by-side sheet.</div>'+omniNote+'<div class="disc">'+DISC+'</div>');
+  const coupleNote = couple ? '<div class="hint" style="margin-top:8px">Household premiums: NGL is one two-life (joint) policy; the others are two individual policies (each with the couple/spousal discount), combined. Tap ＋ to build a side-by-side client sheet.</div>' : '<div class="hint" style="margin-top:8px">Each carrier shows the richest design at or under your budget for about '+p.years+' year'+(p.years===1?'':'s')+' of coverage. Tap ＋ to drop any into the comparison, then print a side-by-side sheet.</div>';
+  show(resultBrand('Most I Can Buy')+printBtn()+head+'<table class="opts"><tr><th>Carrier</th><th>Most coverage that fits</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>'+coupleNote+omniNote+'<div class="disc">'+DISC+'</div>');
 }
 function openBudgetAll(){ setCarrier('ngl'); $('budgetCard').hidden=false; $('budgetCard').scrollIntoView({behavior:'smooth',block:'start'}); }
+function baMaritalChange(){ $('ba_spouse').hidden = $('ba_marital').value!=='married-both'; }
 function runBudgetAll(){ try{
+  const marital=$('ba_marital').value;
   const p={budget:+$('ba_budget').value, age:+$('ba_age').value, gender:$('ba_gender').value,
     years:+$('ba_years').value, inflation:parseFloat($('ba_infl').value)||0,
-    uw:$('ba_uw').value, marital:$('ba_marital').value, state:$('ba_state').value||null};
+    uw:$('ba_uw').value, marital, state:$('ba_state').value||null};
   if(!p.budget||p.budget<20) return showErr('Enter a monthly budget (e.g. 300).');
   if(!p.age) return showErr('Enter an issue age.');
+  if(marital==='married-both'){ p.age2=+$('ba_age2').value; p.gender2=$('ba_gender2').value;
+    if(!p.age2) return showErr('Enter the spouse’s age for a joint quote.'); }
   showBudgetAll(p);
 }catch(e){ showErr(e.message); } }
 
