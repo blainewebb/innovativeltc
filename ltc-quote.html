@@ -3393,7 +3393,28 @@ function setView(v){
     if(ngl) setMode(MODE); else if($('manual')) $('manual').hidden=true;
   }
 }
+// Carry the client's age / gender / spouse across carrier products so switching never loses them.
+var CLIENT={};
+const CLIENT_FIELDS={
+  ngl:      {age:['s_age','c_age1'], gender:['s_gender','c_g1'], age2:['c_age2'], gender2:['c_g2']},
+  carescout:{age:['cs_age'], gender:['cs_gender']},
+  omniflex: {age:['om_age'], age2:['om_age2'], gender2:['om_g2']},   // omni primary is unisex (no gender)
+  moo:      {age:['moo_age'], gender:['moo_gender'], age2:['moo_age2'], gender2:['moo_g2']},
+  mooc:     {age:['mooc_age'], gender:['mooc_gender'], age2:['mooc_age2'], gender2:['mooc_g2']}
+};
+const CLIENT_COUPLE={ moo:'moo_couple', mooc:'mooc_couple', omniflex:'om_couple' };
+function coupleToggleFor(c){ return c==='moo'?mooCoupleToggle:c==='mooc'?moocCoupleToggle:c==='omniflex'?omniCoupleToggle:null; }
+function clampField(id,v){ var el=$(id); if(!el)return v; var n=+v; if(isNaN(n))return v;
+  if(el.min!==''&&n<+el.min)n=+el.min; if(el.max!==''&&n>+el.max)n=+el.max; return n; }
+function captureClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
+  Object.keys(m).forEach(function(k){ for(var i=0;i<m[k].length;i++){ var el=$(m[k][i]); if(el&&el.value!==''&&el.value!=null){ CLIENT[k]=el.value; break; } } });
+  var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked; }
+function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
+  Object.keys(m).forEach(function(k){ if(CLIENT[k]==null)return; m[k].forEach(function(id){ var el=$(id); if(!el)return;
+    el.value=(k==='age'||k==='age2')?clampField(id,CLIENT[k]):CLIENT[k]; }); });
+  var cid=CLIENT_COUPLE[carrier]; if(cid&&CLIENT.couple!=null&&$(cid)){ $(cid).checked=CLIENT.couple; var t=coupleToggleFor(carrier); if(t){ try{ t(); }catch(e){} } } }
 function setCarrier(c){
+  const prev=CARRIER; if(prev) captureClient(prev);
   CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc') ? c : 'ngl';
   const cs=CARRIER==='carescout', om=CARRIER==='omniflex', moo=CARRIER==='moo', mooc=CARRIER==='mooc', ngl=CARRIER==='ngl';
   if($('carrier')) $('carrier').value = CARRIER;
@@ -3411,6 +3432,7 @@ function setCarrier(c){
     if(moo){ $('moocard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
     if(mooc){ $('mooccard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
   }
+  applyClient(CARRIER);
 }
 
 // CareScout state availability (Care Assurance Individual). 42 states sell individual
