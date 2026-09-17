@@ -545,7 +545,7 @@
       <div class="field"><label>Health class</label><select id="moo_class"><option value="Select" selected>Select</option><option value="Preferred">Preferred</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
       <div class="field"><label>Premium mode</label><select id="moo_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
-    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="moo_couple" onchange="mooCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label></div>
+    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="moo_couple" onchange="mooCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label><label><input type="checkbox" id="moo_spousal" onchange="if(this.checked){$('moo_couple').checked=false;mooCoupleToggle();}"> Married — spouse not applying (spousal discount)</label></div>
     <div class="grid" id="moo_couplebox" hidden>
       <div class="field"><label>Spouse — age (40–75)</label><input id="moo_age2" type="number" value="58" min="40" max="75"></div>
       <div class="field"><label>Spouse — gender</label><select id="moo_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
@@ -585,7 +585,7 @@
       <div class="field"><label>Health class</label><select id="mooc_class"><option value="Preferred">Preferred</option><option value="Select" selected>Select</option><option value="Class 1">Class 1</option><option value="Class 2">Class 2</option></select></div>
       <div class="field"><label>Premium mode</label><select id="mooc_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
-    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="mooc_couple" onchange="moocCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label></div>
+    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="mooc_couple" onchange="moocCoupleToggle()"> Married — run as a couple (both applying, 15% partner discount)</label><label><input type="checkbox" id="mooc_spousal" onchange="if(this.checked){$('mooc_couple').checked=false;moocCoupleToggle();}"> Married — spouse not applying (spousal discount)</label></div>
     <div class="grid" id="mooc_couplebox" hidden>
       <div class="field"><label>Spouse — age (30–79)</label><input id="mooc_age2" type="number" value="58" min="30" max="79"></div>
       <div class="field"><label>Spouse — gender</label><select id="mooc_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
@@ -3346,13 +3346,13 @@ function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.cod
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · '+(o.state||'TX'); }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class · '+stateFull(o.state)+moocRiderText(o); }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −15%':'')+' · '+stateFull(o.state)+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+(o.state||'TX'); }
 function mooConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+stateFull(o.state); }
+  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −15%':'')+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+stateFull(o.state); }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3603,7 +3603,7 @@ function omniShowSingle(o){
 
 /* ---------- Mutual of Omaha — MutualCare Secure (Texas) ---------- */
 function mooOpts(){
-  return {carrier:'moo', state:($('moo_state')?$('moo_state').value:'TX'), age:+$('moo_age').value, gender:$('moo_gender').value, uwClass:$('moo_class').value,
+  return {carrier:'moo', state:($('moo_state')?$('moo_state').value:'TX'), spousal:!!($('moo_spousal')&&$('moo_spousal').checked), age:+$('moo_age').value, gender:$('moo_gender').value, uwClass:$('moo_class').value,
     monthlyBenefit:+$('moo_benefit').value, years:+$('moo_bp').value, elimination:+$('moo_ep').value,
     inflation:$('moo_infl').value, mode:$('moo_mode').value};
 }
@@ -3613,6 +3613,7 @@ function mooCoupleToggle(){
   if($('moo_sharedwrap')) $('moo_sharedwrap').hidden = !on;
   if(!on && $('moo_shared')) $('moo_shared').checked=false;   // Shared Care is couple-only
   if(!on && $('moo_jwp')) $('moo_jwp').checked=false;         // Joint Waiver is couple-only
+  if(on && $('moo_spousal')) $('moo_spousal').checked=false;  // both-applying supersedes spouse-not-applying
   if($('moo_eachnote')) $('moo_eachnote').hidden = !on;
 }
 function mooRunSingle(){ try{
@@ -3684,7 +3685,7 @@ function moocOpts(){
   let years, policyLimit;
   if($('mooc_covbasis') && $('mooc_covbasis').value==='total'){ policyLimit=moocTotSnap(); years=policyLimit/(monthly*12); }
   else { years=+$('mooc_bp').value; policyLimit=monthly*12*years; }
-  return {carrier:'mooc', state:($('mooc_state')?$('mooc_state').value:'TX'), age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
+  return {carrier:'mooc', state:($('mooc_state')?$('mooc_state').value:'TX'), spousal:!!($('mooc_spousal')&&$('mooc_spousal').checked), age:+$('mooc_age').value, gender:$('mooc_gender').value, uwClass:$('mooc_class').value,
     monthlyBenefit:monthly, years:years, policyLimit:policyLimit, elimination:+$('mooc_ep').value,
     inflTerm:term, inflPct:(term==='none'?0:parseFloat($('mooc_infpct').value)||0), mode:$('mooc_mode').value,
     alfReduction:+$('mooc_alf').value, hhcReduction:+$('mooc_hhc').value,
@@ -3729,6 +3730,7 @@ function moocCoupleToggle(){
   if($('mooc_sharedwrap')) $('mooc_sharedwrap').hidden = !on;
   if(!on && $('mooc_shared')) $('mooc_shared').checked=false;   // Shared Care is couple-only
   if(!on && $('mooc_jwp')) $('mooc_jwp').checked=false;         // Joint Waiver is couple-only
+  if(on && $('mooc_spousal')) $('mooc_spousal').checked=false;  // both-applying supersedes spouse-not-applying
   if($('mooc_eachnote')) $('mooc_eachnote').hidden = !on;
 }
 function moocRunSingle(){ try{
