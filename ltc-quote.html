@@ -3075,10 +3075,13 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(age<40||age>75) throw new Error('MutualCare Secure issues ages 40–75.');
     if(['Select','Preferred','Class 1','Class 2'].indexOf(cls)<0) throw new Error('Pick a health class.');
     const bn=baseNone(age,gender,cls), inf=inflFactor(age,gender,code), bp=bpFactor(age,years,gender), ep=EPF[elim]||1.0;
-    const scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
+    const scale=monthly/3000.0;
+    // Marital discount: 15% (×0.85) when both partners apply; 5% (×0.95) when only one applies (verified).
+    const bothApply=!!(o.partner||o.marital==='married-both'), oneApply=!bothApply&&!!(o.spousal||o.marital==='married-one');
+    const md=bothApply?0.85:oneApply?0.95:1;
     const shared=o.sharedCare?1.16:1;   // couple-only shared-care rider: +16% per partner (verified, same as Custom)
     const jwp=o.jointWaiver?1.02:1;     // couple-only Joint Waiver of Premium: +2% per policy (verified on Custom; same factor assumed on Secure)
-    let ann=bn*inf*bp*ep*scale*shared*jwp*(partner?0.85:1);
+    let ann=bn*inf*bp*ep*scale*shared*jwp*md;
     const r2=x=>Math.round(x*100)/100;
     const mode=o.mode||'monthly';
     const modal = mode==='annual'?ann : mode==='semiannual'?ann*1.02/2 : mode==='quarterly'?ann*1.04/4 : ann*1.08/12;
@@ -3087,7 +3090,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(years!==3) steps.push([years+'-year benefit ×'+bp.toFixed(4), r2(bn*inf*bp)]);
     if(elim!==90) steps.push([elim+'-day elimination ×'+ep.toFixed(4), r2(bn*inf*bp*ep)]);
     if(scale!==1) steps.push([fmt0(monthly)+'/mo benefit ×'+scale.toFixed(4), r2(bn*inf*bp*ep*scale)]);
-    if(partner) steps.push(['Partner discount ×0.85', r2(ann)]);
+    if(md!==1) steps.push([(bothApply?'Partner discount ×0.85':'Spousal discount ×0.95'), r2(ann)]);
     return { carrier:'moo', state:st, issueAge:age, age:age, gender:o.gender, uwClass:cls,
       monthlyBenefit:monthly, years:years, elimination:elim, inflation:code, code:code, codeLabel:CODE_LABEL[code],
       policyLimit:monthly*12*years, annualPremium:r2(ann), mode:mode, modalPayment:r2(modal), steps:steps };
@@ -3187,10 +3190,13 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(age<30||age>79) throw new Error('MutualCare Custom issues ages 30–79.');
     if(EP[elim]==null) throw new Error('Elimination must be 0, 30, 60, 90, 180 or 365 days.');
     var bn=baseNone(age,g,cls), inf=inflFactor(age,o.gender,term,pct), bp=bpFactor(age,o.gender,years), ep=epFactor(elim);
-    var scale=monthly/3000.0, partner=!!(o.partner||o.spousal||o.marital==='married-both'||o.marital==='married-one');
+    var scale=monthly/3000.0;
+    // Marital discount: 15% (×0.85) when both partners apply; 5% (×0.95) when only one applies (verified).
+    var bothApply=!!(o.partner||o.marital==='married-both'), oneApply=!bothApply&&!!(o.spousal||o.marital==='married-one');
+    var md=bothApply?0.85:oneApply?0.95:1;
     if(o.rop && o.rop!=='none' && age>64) throw new Error('Return of Premium is available only through age 64.');
     var rf=riderFactor(o,age,o.gender);
-    var ann=bn*inf*bp*ep*rf*scale*(partner?0.85:1);
+    var ann=bn*inf*bp*ep*rf*scale*md;
     var r2=function(x){return Math.round(x*100)/100;};
     var mode=o.mode||'monthly';
     var modal = mode==='annual'?ann : mode==='semiannual'?ann*1.02/2 : mode==='quarterly'?ann*1.04/4 : ann*1.08/12;
@@ -3200,7 +3206,7 @@ if (typeof window !== "undefined"){ window.OMNI = makeOmni(OMNI_RATES); }
     if(elim!==90) steps.push([elim+'-day elimination ×'+ep.toFixed(4), r2(bn*inf*bp*ep)]);
     if(scale!==1) steps.push([monthly+'/mo benefit ×'+scale.toFixed(4), r2(bn*inf*bp*ep*scale)]);
     if(rf!==1.0) steps.push(['Optional benefits ×'+rf.toFixed(4), r2(bn*inf*bp*ep*rf*scale)]);
-    if(partner) steps.push(['Partner discount ×0.85', r2(ann)]);
+    if(md!==1) steps.push([(bothApply?'Partner discount ×0.85':'Spousal discount ×0.95'), r2(ann)]);
     return { carrier:'mooc', state:st, issueAge:age, age:age, gender:o.gender, uwClass:cls,
       monthlyBenefit:monthly, years:years, elimination:elim, inflTerm:term, inflPct:pct,
       codeLabel:codeLabel(term,pct), policyLimit:monthly*12*years, annualPremium:r2(ann),
@@ -3346,13 +3352,13 @@ function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.cod
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · '+(o.state||'TX'); }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −15%':'')+' · '+stateFull(o.state)+moocRiderText(o); }
+  return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −5%':'')+' · '+stateFull(o.state)+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
 function mooClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2':c==='Select'?'Select':'Preferred'; }
 function mooConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-yr · '+(o.elimination||90)+'-day · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+(o.state||'TX'); }
 function mooConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −15%':'')+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+stateFull(o.state); }
+  return o.age+g+' · Mutual of Omaha MutualCare Secure · '+fmt0(o.monthlyBenefit)+'/mo · '+mooEffYears(o)+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+((MOO.CODE_LABEL[o.inflation]||'level'))+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −5%':'')+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+stateFull(o.state); }
 // condensed one-liner for the comparison tray (the detailed csConfigText is used in the result)
 function csConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · CareScout · $'+o.dailyBenefit+'/day · '+fmt0(o.coverageMax)+' pool ('+csRatioYrs(o).toFixed(1)+'yr) · '+(o.inflation&&o.inflation!=='none'?o.inflation+'%':'level')+(o.zeroDayHc?' · 0-day HC':''); }
@@ -3964,7 +3970,7 @@ const CARRIERS = [
       if(p.age<40||p.age>75) return 'MutualCare Secure issues ages 40–75.';
       return null; },
     _mk(p, mb, partner){ return {carrier:'moo', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
-      monthlyBenefit:mb, years:Math.min(4,Math.max(2,p.years||3)), elimination:90, inflation:mooInflCode(p.inflation), mode:'monthly', partner:!!partner}; },
+      monthlyBenefit:mb, years:Math.min(4,Math.max(2,p.years||3)), elimination:90, inflation:mooInflCode(p.inflation), mode:'monthly', marital:p.marital}; },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const partner=(p.marital==='married-one'||p.marital==='married-both');
@@ -3984,7 +3990,7 @@ const CARRIERS = [
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.moo, code=(p.inflation==null?s.inflation:mooInflCode(p.inflation));
       const o={carrier:'moo', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
-        monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly'};
+        monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, inflation:code, mode:'monthly', marital:p.marital};
       const q=MOO.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo · '+s.years+'-yr · '+(MOO.CODE_LABEL[code]||'level').replace(' (no inflation)',''), sub:'Comprehensive · home care built in · TX', trayObj:o};
@@ -4008,7 +4014,7 @@ const CARRIERS = [
     _infl(dec){ dec=+dec||0; if(dec<=0) return {inflTerm:'none', inflPct:0}; return {inflTerm:'Lifetime', inflPct:Math.round(dec*100*4)/4}; },
     _mk(p, mb, partner){ const inf=this._infl(p.inflation);
       return Object.assign({carrier:'mooc', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
-      monthlyBenefit:mb, years:Math.min(6,Math.max(2,p.years||3)), elimination:90, mode:'monthly', partner:!!partner}, inf); },
+      monthlyBenefit:mb, years:Math.min(6,Math.max(2,p.years||3)), elimination:90, mode:'monthly', marital:p.marital}, inf); },
     solve(p){
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const partner=(p.marital==='married-one'||p.marital==='married-both');
@@ -4028,7 +4034,7 @@ const CARRIERS = [
       const bad=this._avail(p); if(bad) return {label:this.label, fits:false, note:bad};
       const s=SWEETSPOT.mooc; const inf=(p.inflation==null)?{inflTerm:s.inflTerm,inflPct:s.inflPct}:this._infl(p.inflation);
       const o=Object.assign({carrier:'mooc', state:(p.state||'TX'), age:p.age, gender:p.gender, uwClass:'Select',
-        monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly'}, inf);
+        monthlyBenefit:s.monthlyBenefit, years:s.years, elimination:90, mode:'monthly', marital:p.marital}, inf);
       const q=MOOC.quote(o);
       return {label:this.label, fits:true, premium:q.modalPayment, annual:q.annualPremium,
         design:fmt0(s.monthlyBenefit)+'/mo · '+s.years+'-yr · '+moocInflLabel(o), sub:'Fully customizable · home care built in · TX', trayObj:o};
@@ -4219,10 +4225,10 @@ function mooSameBenefit(p){
   if(p.years<2||p.years>4) return {label:carrierLabel('moo'), fits:false, note:'Benefit periods run 2–4 years.'};
   const code=mooInflCode(p.inflation);
   if((p.inflation||0)>0 && code==='none') return {label:carrierLabel('moo'), fits:false, note:'Offers 3/4/5% compound only.'};
-  const mk=(age,gender,partner)=>({carrier:'moo', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', partner:!!partner});
-  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOO.quote(oA), qB=MOO.quote(oB);
+  const mk=(age,gender,marital)=>({carrier:'moo', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, inflation:code, mode:'monthly', marital:marital});
+  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,'married-both'), oB=mk(p.age2,p.gender2,'married-both'), qA=MOO.quote(oA), qB=MOO.quote(oB);
     return {label:carrierLabel('moo')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
-  const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOO.quote(o);
+  const o=mk(p.age,p.gender, p.marital); const q=MOO.quote(o);
   return {label:carrierLabel('moo'), fits:true, premium:q.modalPayment, annual:q.annualPremium, sub:'Comprehensive · home care built in', trayObj:o};
 }
 function moocSameBenefit(p){
@@ -4231,10 +4237,10 @@ function moocSameBenefit(p){
   if(p.age<30||p.age>79||(p.marital==='married-both'&&(p.age2<30||p.age2>79))) return {label:carrierLabel('mooc'), fits:false, note:'Issues ages 30–79.'};
   if(p.years<2||p.years>6) return {label:carrierLabel('mooc'), fits:false, note:'Benefit periods run 2–6 years.'};
   const inf=((p.inflation||0)>0)?{inflTerm:'Lifetime', inflPct:Math.round(p.inflation*100*4)/4}:{inflTerm:'none', inflPct:0};
-  const mk=(age,gender,partner)=>Object.assign({carrier:'mooc', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', partner:!!partner}, inf);
-  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,true), oB=mk(p.age2,p.gender2,true), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
+  const mk=(age,gender,marital)=>Object.assign({carrier:'mooc', state:(p.state||'TX'), age, gender, uwClass:'Select', monthlyBenefit:p.monthlyBenefit, years:p.years, elimination:p.elimination||90, mode:'monthly', marital:marital}, inf);
+  if(p.marital==='married-both' && p.age2){ const oA=mk(p.age,p.gender,'married-both'), oB=mk(p.age2,p.gender2,'married-both'), qA=MOOC.quote(oA), qB=MOOC.quote(oB);
     return {label:carrierLabel('mooc')+' · couple', fits:true, premium:qA.modalPayment+qB.modalPayment, annual:qA.annualPremium+qB.annualPremium, sub:'Two policies · home care built in', trayObj:coupleCombine([oA,oB])}; }
-  const o=mk(p.age,p.gender, p.marital==='married-one'); const q=MOOC.quote(o);
+  const o=mk(p.age,p.gender, p.marital); const q=MOOC.quote(o);
   return {label:carrierLabel('mooc'), fits:true, premium:q.modalPayment, annual:q.annualPremium, sub:'Fully customizable · home care built in', trayObj:o};
 }
 function sameBenefitFor(cid,p){ return cid==='ngl'?nglSameBenefit(p):cid==='moo'?mooSameBenefit(p):cid==='mooc'?moocSameBenefit(p):null; }
