@@ -158,6 +158,26 @@ try {
     await page.waitForTimeout(120);
   }
 
+  /* ---- a second hero, kept entirely separate ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#switchBtn');
+  ok('the hub says you can add a hero, not just switch', /add/i.test(await page.$eval('#switchBtn', e => e.textContent)));
+  await page.click('#switchBtn');
+  await page.waitForSelector('#createProfile');
+  ok('the picker offers to add another hero', /Add another hero/i.test(await page.$eval('.newprof', e => e.textContent)));
+  await page.fill('#newName', 'Second');
+  await page.click('#createProfile');
+  await page.waitForSelector('#startRun');
+  ok('the new hero starts fresh, not on the first one\'s progress',
+     /Deepest floor 0/.test(await page.$eval('.hero-row', e => e.textContent)),
+     await page.$eval('.hero-row', e => e.textContent));
+
+  await page.click('#switchBtn');
+  await page.waitForSelector('.profile-card');
+  const heroNames = await page.$$eval('.profile-card .pn', els => els.map(e => e.textContent.trim()));
+  ok('both heroes are listed', heroNames.includes('Tester') && heroNames.includes('Second'), heroNames.join(','));
+  await page.click('.profile-card');
+
   /* ---- grown-up report card ---- */
   await page.evaluate(() => localStorage.getItem('runebreaker.v1'));
   await page.goto(URL, { waitUntil: 'networkidle' });
@@ -167,8 +187,12 @@ try {
   ok('report card stays shut behind a wrong code', !(await page.$('.report-card')));
   await typeNumber(page, 391, '#go');
   await page.waitForSelector('.report-card');
-  const skillRows = await page.$$('.skill-row');
-  ok('report card lists every skill', skillRows.length >= 11, `${skillRows.length} rows`);
+  const cards = await page.$$('.report-card');
+  ok('the report card has a section per hero', cards.length === 2, `${cards.length} cards`);
+  const perCard = await page.$$eval('.report-card', els => els.map(e => e.querySelectorAll('.skill-row').length));
+  ok('report card lists every skill for each hero', perCard.every(n => n >= 11), perCard.join(','));
+  const played = await page.$$eval('.report-card', els => els.map(e => /0 problems/.test(e.textContent)));
+  ok('the two heroes have independent records', played.filter(Boolean).length === 1, JSON.stringify(played));
   const reportText = await page.$eval('.report-card', e => e.textContent);
   ok('report card shows attempts, not just zeros', /% right/.test(reportText), reportText.slice(0, 200));
 
@@ -176,6 +200,7 @@ try {
   ok('progress persisted across the reload', /Tester/.test(reportText));
 
   /* ---- backup and restore, the way a parent would do it ---- */
+  ok('two heroes unlock a whole-device backup', !!(await page.$('#exportAll')));
   await page.click('[data-export]');
   await page.waitForSelector('#payload');
   const backup = await page.$eval('#payload', e => e.value);
@@ -184,10 +209,12 @@ try {
   await page.click('#back');
   await page.waitForSelector('.report-card');
   // Wipe the device, then bring the hero back from the text.
-  await page.click('details.danger summary');
-  await page.click('[data-reset]');
-  await page.waitForTimeout(100);
-  ok('the hero is gone after a reset', !(await page.$('[data-export]')));
+  while (await page.$('[data-reset]')) {
+    await page.click('details.danger summary');
+    await page.click('[data-reset]');
+    await page.waitForTimeout(100);
+  }
+  ok('the heroes are gone after a reset', !(await page.$('[data-export]')));
 
   await page.click('#importBtn');
   await page.waitForSelector('#paste');

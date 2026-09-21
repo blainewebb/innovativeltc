@@ -138,6 +138,17 @@ Tap "Grown-ups" and answer 23 x 17. Inside, per hero:
 
 Everything stays in `localStorage` on the device. Nothing is uploaded.
 
+## Heroes
+
+Several kids share one device through separate heroes. Each hero has its own
+learning record, its own difficulty level, its own unlocked operators, its own
+drill setting and its own section of the report card. Nothing is shared between
+them.
+
+Add one from the picker: on the hub, **Switch / add hero**, then **Add another
+hero** at the bottom of the list. Give each kid their own rather than sharing
+one, or the adaptation averages two children together and targets neither.
+
 ## Where progress lives, and moving it
 
 There is no account and no server, which is what makes the game work offline

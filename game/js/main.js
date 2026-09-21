@@ -55,6 +55,7 @@ function screenProfiles() {
       <p class="tag">Numbers are your weapon.</p>
       <div class="panel">
         <h2>Who's playing?</h2>
+        ${data.profiles.length > 1 ? '<p class="muted tiny center">Tap a hero to play as them.</p>' : ''}
         <div class="profile-list">
           ${data.profiles.map(p => `
             <button class="profile-card" data-id="${p.id}">
@@ -64,9 +65,11 @@ function screenProfiles() {
             </button>`).join('')}
         </div>
         <div class="newprof">
-          <input id="newName" maxlength="12" placeholder="New hero name" autocomplete="off">
+          <h3>${data.profiles.length ? 'Add another hero' : 'Make your hero'}</h3>
+          ${data.profiles.length ? '<p class="muted tiny">Every hero keeps their own progress, their own difficulty and their own report card. Give each kid their own.</p>' : ''}
+          <input id="newName" maxlength="12" placeholder="${data.profiles.length ? 'Their name' : 'Hero name'}" autocomplete="off">
           <div class="avatars">${AVATARS.map((a, i) => `<button class="av ${i === 0 ? 'on' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
-          <button class="btn primary" id="createProfile">Create hero</button>
+          <button class="btn primary" id="createProfile">${data.profiles.length ? 'Add this hero' : 'Create hero'}</button>
         </div>
       </div>
       ${data.profiles.length ? '<button class="btn ghost small" id="parentBtn">Grown-ups</button>' : ''}
@@ -111,7 +114,7 @@ function screenHub() {
         ${profile.records.wins ? `<button class="btn big" id="startEndless">Endless run</button>
         <p class="muted tiny center">Cleared the Deep ${profile.records.wins} time${profile.records.wins === 1 ? '' : 's'}. Best endless floor: ${profile.records.bestEndless || 0}.</p>` : ''}
         <div class="row">
-          <button class="btn ghost" id="switchBtn">Switch hero</button>
+          <button class="btn ghost" id="switchBtn">Switch / add hero</button>
           <button class="btn ghost" id="soundBtn">Sound: ${isEnabled() ? 'on' : 'off'}</button>
         </div>
       </div>
