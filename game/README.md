@@ -95,6 +95,34 @@ Tap "Grown-ups" and answer 23 x 17. Inside, per hero:
 
 Everything stays in `localStorage` on the device. Nothing is uploaded.
 
+## Where progress lives, and moving it
+
+There is no account and no server, which is what makes the game work offline
+with nothing to maintain. The cost is that a hero exists in exactly one browser
+on one device. Phone Safari, phone Chrome and a laptop are three separate sets
+of heroes, and on iOS a home-screen web app has its own storage container
+separate from the Safari tab, so even those two are different.
+
+**Install it to the home screen rather than bookmarking it.** Safari's tracking
+prevention deletes script-written storage for sites not visited in seven days,
+which would wipe a hero over a school holiday. Installed web apps are exempt.
+That is WebKit's documented ITP behaviour rather than something measured here,
+so treat it as a good reason to install rather than a guarantee.
+
+Because of all that, the grown-up screen has **Back up / move** per hero and
+**Bring a hero in**. A backup is a small JSON file holding the whole record:
+heroes, progress, and everything the report card is built from. Both a file
+download and a copyable text box are offered on every screen, because downloads
+and file pickers are not reliable inside an installed web app on every phone
+while copy and paste always is.
+
+Importing a hero who already exists on the device asks before doing anything:
+use the backup, or keep both as separate heroes. It never merges two divergent
+learning records, because combining them would invent attempts that never
+happened. `normalizeProfile` fills in anything missing from an older export, so
+a backup taken before a skill existed still loads with that skill blank rather
+than crashing the report card later.
+
 ## Running it
 
 It is a static folder. Open `index.html` through any web server:
@@ -117,6 +145,9 @@ connection after the first load.
 ./test/run.sh
 ```
 
+- `test/storage.test.mjs` — backup and restore: round trips, older exports,
+  hand-edited junk, and that a bad file fails with a message a parent can act
+  on rather than a stack trace.
 - `test/engine.test.mjs` — pure logic: skill classification, mastery maths, hand
   generation, the damage formula, the balance budget, riddle generators. No
   browser needed.

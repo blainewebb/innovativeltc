@@ -149,6 +149,52 @@ try {
   /* ---- progress survived a reload ---- */
   ok('progress persisted across the reload', /Tester/.test(reportText));
 
+  /* ---- backup and restore, the way a parent would do it ---- */
+  await page.click('[data-export]');
+  await page.waitForSelector('#payload');
+  const backup = await page.$eval('#payload', e => e.value);
+  ok('the backup contains the hero and their facts', /Tester/.test(backup) && /"facts"/.test(backup), backup.slice(0, 120));
+
+  await page.click('#back');
+  await page.waitForSelector('.report-card');
+  // Wipe the device, then bring the hero back from the text.
+  await page.click('details.danger summary');
+  await page.click('[data-reset]');
+  await page.waitForTimeout(100);
+  ok('the hero is gone after a reset', !(await page.$('[data-export]')));
+
+  await page.click('#importBtn');
+  await page.waitForSelector('#paste');
+  await page.fill('#paste', backup);
+  await page.click('#go');
+  await page.waitForSelector('#done, #err');
+  ok('importing a clean backup needs no further questions', !!(await page.$('#done')));
+  await page.click('#done');
+  await page.waitForSelector('.report-card');
+  const restored = await page.$eval('.report-card', e => e.textContent);
+  ok('the hero came back with their record intact', /Tester/.test(restored) && /% right/.test(restored), restored.slice(0, 160));
+
+  /* ---- importing the same hero twice must not silently overwrite ---- */
+  await page.click('#importBtn');
+  await page.fill('#paste', backup);
+  await page.click('#go');
+  await page.waitForSelector('#replace, #done');
+  ok('a clash asks before overwriting', !!(await page.$('#replace')));
+  await page.click('#copy');
+  await page.waitForSelector('#done');
+  await page.click('#done');
+  await page.waitForSelector('.report-card');
+  ok('keeping both leaves two heroes', (await page.$$('[data-export]')).length === 2);
+
+  /* ---- a junk paste fails politely instead of breaking ---- */
+  await page.click('#importBtn');
+  await page.fill('#paste', 'this is not a backup');
+  await page.click('#go');
+  await page.waitForSelector('#err:not([hidden])');
+  const errText = await page.$eval('#err', e => e.textContent);
+  ok('junk input explains itself', /Runebreaker backup/.test(errText), errText);
+  await page.click('#back');
+
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {
   failed++;

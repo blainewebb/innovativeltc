@@ -11,6 +11,10 @@ fail=0
 echo "== engine =="
 node test/engine.test.mjs || fail=1
 
+echo
+echo "== storage =="
+node test/storage.test.mjs || fail=1
+
 if ! command -v python3 >/dev/null; then
   echo "python3 not found, skipping the browser tests"
   exit $fail

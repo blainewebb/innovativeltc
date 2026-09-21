@@ -895,6 +895,10 @@ function screenReport() {
         <h4>Last 14 days</h4>
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
+        <div class="card-actions">
+          <button class="btn ghost small" data-export="${p.id}">Back up / move ${esc(p.name)}</button>
+        </div>
+
         <details class="danger">
           <summary>Reset ${esc(p.name)}</summary>
           <p class="muted tiny">Wipes progress and the learning record for this hero. Cannot be undone.</p>
@@ -909,17 +913,179 @@ function screenReport() {
         <h2>Report card</h2>
         <button class="btn ghost small" id="back">Done</button>
       </div>
+      <div class="head-actions">
+        <button class="btn ghost small" id="importBtn">Bring a hero in</button>
+        ${data.profiles.length > 1 ? '<button class="btn ghost small" id="exportAll">Back up everything</button>' : ''}
+      </div>
       <p class="muted tiny">Bars combine accuracy and speed, weighted toward recent answers, and stay low until there are enough attempts to judge. Word problems and place value are scored on accuracy alone, since reading and reasoning should take longer. Nothing here leaves this device.</p>
       ${rows || '<p class="muted">No heroes yet.</p>'}
     </div>`);
 
   $('#back').onclick = () => (profile ? screenHub() : screenProfiles());
+  $('#importBtn').onclick = () => { sfx.tap(); screenImport(); };
+  const exAll = $('#exportAll');
+  if (exAll) exAll.onclick = () => { sfx.tap(); screenBackup(data.profiles); };
+  $$('[data-export]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.export);
+    if (hero) { sfx.tap(); screenBackup([hero]); }
+  });
   $$('[data-reset]').forEach(b => b.onclick = () => {
     const id = b.dataset.reset;
     data.profiles = data.profiles.filter(x => x.id !== id);
     if (data.activeId === id) { data.activeId = null; profile = null; run = null; }
     persist(); screenReport();
   });
+}
+
+/* ===================================================== backup / restore ===
+   There is no account and no server, so a hero exists in exactly one browser
+   on one device. Both paths are offered on every screen below, because a
+   download and a file picker are not reliable inside an installed web app on
+   every phone, while copy and paste always is. */
+
+function screenBackup(profiles) {
+  const text = JSON.stringify(store.exportPayload(profiles), null, 2);
+  const filename = store.exportFilename(profiles);
+  const who = profiles.length === 1 ? esc(profiles[0].name) : `all ${profiles.length} heroes`;
+
+  render(`
+    <div class="screen report">
+      <div class="report-head">
+        <h2>Back up ${who}</h2>
+        <button class="btn ghost small" id="back">Done</button>
+      </div>
+      <div class="report-card">
+        <p class="muted tiny">This is the whole record: heroes, progress and everything the report card is built from. Save the file somewhere safe, or paste the text into the other device under "Bring a hero in". Importing does not remove it from this device, so you can keep playing here.</p>
+        <div class="head-actions">
+          <button class="btn primary small" id="download">Download the file</button>
+          <button class="btn ghost small" id="copy">Copy the text</button>
+        </div>
+        <p class="muted tiny" id="status"></p>
+        <textarea class="backup-box" id="payload" readonly spellcheck="false">${esc(text)}</textarea>
+      </div>
+    </div>`);
+
+  const status = $('#status');
+  $('#back').onclick = () => { sfx.tap(); screenReport(); };
+
+  $('#download').onclick = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      status.textContent = `Saved as ${filename}.`;
+      sfx.reward();
+    } catch {
+      status.textContent = 'This device would not download the file. Use "Copy the text" instead.';
+    }
+  };
+
+  $('#copy').onclick = async () => {
+    const box = $('#payload');
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = 'Copied. Paste it into the other device.';
+      sfx.reward();
+    } catch {
+      box.focus();
+      box.select();
+      status.textContent = 'Copying was blocked. The text is selected, copy it by hand.';
+    }
+  };
+}
+
+function screenImport() {
+  render(`
+    <div class="screen report">
+      <div class="report-head">
+        <h2>Bring a hero in</h2>
+        <button class="btn ghost small" id="back">Cancel</button>
+      </div>
+      <div class="report-card">
+        <p class="muted tiny">Load a backup made on another device. Either pick the file, or paste the text you copied.</p>
+        <input type="file" id="file" accept="application/json,.json">
+        <p class="muted tiny center">or</p>
+        <textarea class="backup-box" id="paste" placeholder="Paste the backup text here" spellcheck="false"></textarea>
+        <button class="btn primary small" id="go">Bring them in</button>
+        <p class="flag" id="err" hidden></p>
+      </div>
+    </div>`);
+
+  const fail = msg => { const e = $('#err'); e.hidden = false; e.textContent = msg; sfx.wrong(); };
+  $('#back').onclick = () => { sfx.tap(); screenReport(); };
+  $('#file').onchange = async ev => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    try { handleImport(await f.text()); } catch { fail('That file could not be read.'); }
+  };
+  $('#go').onclick = () => {
+    const text = $('#paste').value.trim();
+    if (!text) return fail('Paste the backup text first, or pick the file.');
+    handleImport(text);
+  };
+
+  function handleImport(text) {
+    let heroes;
+    try { heroes = store.parseImport(text); } catch (e) { return fail(e.message); }
+    const existing = new Set(data.profiles.map(h => h.id));
+    const clashes = heroes.filter(h => existing.has(h.id));
+    if (!clashes.length) return commitImport(heroes, 'add');
+    screenImportClash(heroes, clashes);
+  }
+}
+
+/* The same hero imported onto a device that already has them. Merging two
+   divergent learning records would invent data, so the parent picks. */
+function screenImportClash(heroes, clashes) {
+  render(`
+    <div class="screen center">
+      <div class="panel">
+        <h2>Already here</h2>
+        <p class="center">${clashes.map(h => esc(h.name)).join(', ')} ${clashes.length === 1 ? 'is' : 'are'} already on this device.</p>
+        <div class="choices vertical">
+          <button class="choice wide" id="replace">
+            <span class="ci">\u{1F504}</span><b>Use the backup</b>
+            <small>Overwrite what is on this device. Right when the backup is the newer one.</small>
+          </button>
+          <button class="choice wide" id="copy">
+            <span class="ci">\u{1F465}</span><b>Keep both</b>
+            <small>Add the backup alongside, as a second hero. Nothing is overwritten.</small>
+          </button>
+        </div>
+        <button class="btn ghost small" id="cancel">Cancel</button>
+      </div>
+    </div>`);
+  $('#replace').onclick = () => commitImport(heroes, 'replace');
+  $('#copy').onclick = () => commitImport(heroes, 'copy');
+  $('#cancel').onclick = () => { sfx.tap(); screenReport(); };
+}
+
+function commitImport(heroes, mode) {
+  const names = [];
+  for (const hero of heroes) {
+    const at = data.profiles.findIndex(h => h.id === hero.id);
+    if (at === -1) { data.profiles.push(hero); names.push(hero.name); continue; }
+    if (mode === 'replace') { data.profiles[at] = hero; names.push(hero.name); }
+    else { const dup = store.asCopy(hero); data.profiles.push(dup); names.push(dup.name); }
+  }
+  persist();
+  sfx.win();
+  render(`
+    <div class="screen center">
+      <div class="panel win">
+        <h2>Brought in</h2>
+        <div class="big-art">\u2705</div>
+        <p class="center">${names.map(esc).join(', ')} ${names.length === 1 ? 'is' : 'are'} on this device now.</p>
+        <p class="muted tiny center">Progress from here is separate again. Back up whichever device they actually play on.</p>
+        <button class="btn primary" id="done">Done</button>
+      </div>
+    </div>`);
+  $('#done').onclick = () => { sfx.tap(); screenReport(); };
 }
 
 /* ============================================================ keyboard === */

@@ -341,6 +341,25 @@ p { margin: 0 0 10px; line-height: 1.45; }
 .spark { display: flex; align-items: flex-end; gap: 4px; height: 44px; }
 .sp { flex: 1; background: linear-gradient(180deg, var(--purple), #5a3fa8); border-radius: 3px 3px 0 0; min-height: 3px; }
 
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.head-actions .btn { margin: 0; width: auto; }
+.card-actions { margin-top: 16px; }
+.card-actions .btn { margin: 0; width: auto; }
+
+.backup-box {
+  width: 100%; min-height: 120px; margin: 10px 0; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .72rem; line-height: 1.4; resize: vertical;
+}
+.backup-box:focus { color: var(--ink); outline: 2px solid var(--purple); outline-offset: 1px; }
+
+input[type="file"] {
+  width: 100%; padding: 12px; margin-bottom: 8px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--ink); font: inherit; font-size: .85rem;
+}
+
 details.danger { margin-top: 14px; }
 details.danger summary { color: #ff9aa6; font-size: .82rem; cursor: pointer; }
 details.danger .btn { width: auto; }
