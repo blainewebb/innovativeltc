@@ -188,6 +188,89 @@ export function generateHand(rng, { mastery, runes, size = 5, depth = 1 }) {
   }));
 }
 
+/* --------------------------------------------------------------- drills --
+   On a built turn the player chooses the numbers, which means they can spend
+   a whole run never once making the fact they are worst at. Drill turns take
+   the choice away and hand them a problem, weighted toward exactly what they
+   have been dodging. This is the only part of the game that picks for them,
+   which is why it is also the only part with a clock. */
+
+/** Turn a stored fact key such as "7*8" back into a problem. */
+export function parseFactKey(key) {
+  const m = /^(\d+)([+\-*/])(\d+)$/.exec(key || '');
+  if (!m) return null;
+  const a = Number(m[1]), op = m[2], b = Number(m[3]);
+  if (!isLegal(a, op, b)) return null;
+  return { a, op, b };
+}
+
+/** A fresh problem in a given skill, sized to the player's current level. */
+export function problemForSkill(rng, skillId, level) {
+  const skill = SKILL_BY_ID[skillId];
+  if (!skill || !skill.op) return null;
+  const [lo, hi] = tileRangeFor(level);
+  const seed = seedFor(rng, skillId, lo, hi);
+  if (!seed) return null;
+  const [a, b] = seed;
+  if (!isLegal(a, skill.op, b)) return null;
+  return { a, op: skill.op, b };
+}
+
+/* Mostly what they avoid, with some they know mixed in. All-weak every time
+   reads as punishment, and a kid who only ever meets their worst fact stops
+   playing, which teaches nothing at all. */
+export const DRILL_WEAK_SHARE = 0.65;
+
+export function pickDrill(rng, mastery, runes, level) {
+  const usable = SKILLS.filter(s => s.op && runes.includes(s.op) && s.tier <= level + 1);
+  if (!usable.length) return null;
+
+  if (rng() < DRILL_WEAK_SHARE) {
+    const shaky = shakyFacts(mastery, 12)
+      .map(f => ({ f, parsed: parseFactKey(f.key) }))
+      .filter(x => x.parsed && runes.includes(x.parsed.op));
+    if (shaky.length) {
+      const pool = shaky.slice(0, 6);
+      const chosen = pool[Math.floor(rng() * pool.length)];
+      const { a, op, b } = chosen.parsed;
+      return { a, op, b, skill: classify(a, op, b), fact: factKey(a, op, b), weak: true };
+    }
+    // No fact history yet: aim at the weakest skill instead.
+    const target = usable.reduce((x, y) =>
+      (skillScore(mastery.skills[y.id], y.id) < skillScore(mastery.skills[x.id], x.id) ? y : x));
+    const prob = problemForSkill(rng, target.id, level);
+    if (prob) return { ...prob, skill: classify(prob.a, prob.op, prob.b), fact: factKey(prob.a, prob.op, prob.b), weak: true };
+  }
+
+  for (let tries = 0; tries < 8; tries++) {
+    const skill = usable[Math.floor(rng() * usable.length)];
+    const prob = problemForSkill(rng, skill.id, level);
+    if (prob) return { ...prob, skill: classify(prob.a, prob.op, prob.b), fact: factKey(prob.a, prob.op, prob.b), weak: false };
+  }
+  return null;
+}
+
+/* How long they get. Taken from how fast this child already answers this kind
+   of problem, not a number picked out of the air: a fixed countdown is
+   trivial for the quick kid and demoralising for the slower one, and it
+   punishes the slower one forever. The window tightens on its own as their
+   average comes down. */
+export const DRILL_MIN_MS = 4000;
+export const DRILL_MAX_MS = 20000;
+export const DRILL_DEFAULT_MS = 12000;
+
+export function drillAllowanceMs(mastery, { skill, fact }) {
+  const f = fact && mastery.facts[fact];
+  const s = skill && mastery.skills[skill];
+  let avg = null;
+  if (f && f.attempts >= 2) avg = f.totalMs / f.attempts;
+  else if (s && s.attempts >= 4) avg = s.totalMs / s.attempts;
+  if (avg === null) return DRILL_DEFAULT_MS;
+  // Their own pace plus a moment to read the problem.
+  const allowance = avg * 1.6 + 1500;
+  return Math.round(Math.max(DRILL_MIN_MS, Math.min(DRILL_MAX_MS, allowance)));
+}
+
 /* -------------------------------------------------------------- strikes --
    A strike is: tile a, operator, tile b, and the answer the player typed. */
 

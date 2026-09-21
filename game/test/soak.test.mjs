@@ -92,7 +92,13 @@ try {
     const floorTxt = await page.$eval('.depth-pill', e => e.textContent).catch(() => null);
     if (floorTxt) { current = Number((floorTxt.match(/\d+/) || [1])[0]); deepest = Math.max(deepest, current); }
 
-    if (await page.$('.hand')) {                       // battle
+    if (await page.$('.drill-problem')) {              // drill turn
+      seen.add('drill');
+      const parts = await page.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+      const answer = OPS[parts[1]](Number(parts[0]), Number(parts[2]));
+      if (!Number.isFinite(answer)) break;
+      await typeNum(answer, '#answer');
+    } else if (await page.$('.hand')) {                // built turn
       seen.add('battle');
       const play = await bestPlay();
       if (!play) { await page.click('#reshuffle'); continue; }
@@ -155,6 +161,7 @@ try {
   ok('an optimal player clears the run at least once in five', seen.has('cleared'),
      JSON.stringify(runDepths));
   ok('saw battles', seen.has('battle'));
+  ok('saw drill turns', seen.has('drill'));
   ok('saw the map', seen.has('map'));
   ok('saw a victory screen', seen.has('victory'));
   ok('saw a boss node', seen.has('node:boss'), [...seen].join(','));

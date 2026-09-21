@@ -58,6 +58,17 @@ async function buildLegalExpression(page) {
   return false;
 }
 
+/* Turns alternate, so a built turn is usually followed by a drill. Answer it
+   correctly and carry on, unless the caller wants to test the miss path. */
+async function clearDrill(page, { correct = true } = {}) {
+  if (!(await page.$('.drill-problem'))) return false;
+  const parts = await page.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+  const answer = OPS[parts[1]](Number(parts[0]), Number(parts[2]));
+  await typeNumber(page, correct ? answer : answer + 1, '#answer');
+  await page.waitForTimeout(120);
+  return true;
+}
+
 const b = await chromium.launch();
 const page = await b.newPage({ viewport: { width: 420, height: 880 } });
 const errors = [];
@@ -109,7 +120,21 @@ try {
   ok('the log reports the strike', /damage|shield|EXACT/i.test(log), log);
   ok('combo went up', (await page.$eval('.combo', e => e.textContent)).includes('1'));
 
+  /* ---- the drill turn ---- */
+  ok('a drill turn follows the built turn', !!(await page.$('.drill-problem')));
+  if (await page.$('.drill-problem')) {
+    ok('the drill shows a clock', !!(await page.$('#timerbar')));
+    ok('the drill says what it is parrying', /INCOMING/.test(await page.$eval('.incoming', e => e.textContent)));
+    const hpBeforeParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim()));
+    await clearDrill(page);
+    const afterParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim())).catch(() => 0);
+    ok('a correct parry counters for damage', afterParry < hpBeforeParry, `${hpBeforeParry} -> ${afterParry}`);
+    const parryLog = await page.$eval('.log', e => e.textContent).catch(() => '');
+    ok('the log says it was parried', /PARRIED/.test(parryLog), parryLog);
+  }
+
   /* ---- a wrong answer teaches, does not just punish ---- */
+  if (!(await page.$('.hand'))) await clearDrill(page);
   built = await buildLegalExpression(page);
   const expr2 = await readExpression(page);
   await typeNumber(page, expr2.answer + 1, '#strike');
@@ -122,6 +147,7 @@ try {
   }
 
   /* ---- keyboard input works too ---- */
+  if (!(await page.$('.hand'))) await clearDrill(page);
   if (await page.$('.hand')) {
     await buildLegalExpression(page);
     const expr3 = await readExpression(page);
@@ -132,6 +158,26 @@ try {
     await page.waitForTimeout(120);
   }
 
+  /* ---- a second hero, kept entirely separate ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#switchBtn');
+  ok('the hub says you can add a hero, not just switch', /add/i.test(await page.$eval('#switchBtn', e => e.textContent)));
+  await page.click('#switchBtn');
+  await page.waitForSelector('#createProfile');
+  ok('the picker offers to add another hero', /Add another hero/i.test(await page.$eval('.newprof', e => e.textContent)));
+  await page.fill('#newName', 'Second');
+  await page.click('#createProfile');
+  await page.waitForSelector('#startRun');
+  ok('the new hero starts fresh, not on the first one\'s progress',
+     /Deepest floor 0/.test(await page.$eval('.hero-row', e => e.textContent)),
+     await page.$eval('.hero-row', e => e.textContent));
+
+  await page.click('#switchBtn');
+  await page.waitForSelector('.profile-card');
+  const heroNames = await page.$$eval('.profile-card .pn', els => els.map(e => e.textContent.trim()));
+  ok('both heroes are listed', heroNames.includes('Tester') && heroNames.includes('Second'), heroNames.join(','));
+  await page.click('.profile-card');
+
   /* ---- grown-up report card ---- */
   await page.evaluate(() => localStorage.getItem('runebreaker.v1'));
   await page.goto(URL, { waitUntil: 'networkidle' });
@@ -141,13 +187,66 @@ try {
   ok('report card stays shut behind a wrong code', !(await page.$('.report-card')));
   await typeNumber(page, 391, '#go');
   await page.waitForSelector('.report-card');
-  const skillRows = await page.$$('.skill-row');
-  ok('report card lists every skill', skillRows.length >= 11, `${skillRows.length} rows`);
+  const cards = await page.$$('.report-card');
+  ok('the report card has a section per hero', cards.length === 2, `${cards.length} cards`);
+  const perCard = await page.$$eval('.report-card', els => els.map(e => e.querySelectorAll('.skill-row').length));
+  ok('report card lists every skill for each hero', perCard.every(n => n >= 11), perCard.join(','));
+  const played = await page.$$eval('.report-card', els => els.map(e => /0 problems/.test(e.textContent)));
+  ok('the two heroes have independent records', played.filter(Boolean).length === 1, JSON.stringify(played));
   const reportText = await page.$eval('.report-card', e => e.textContent);
   ok('report card shows attempts, not just zeros', /% right/.test(reportText), reportText.slice(0, 200));
 
   /* ---- progress survived a reload ---- */
   ok('progress persisted across the reload', /Tester/.test(reportText));
+
+  /* ---- backup and restore, the way a parent would do it ---- */
+  ok('two heroes unlock a whole-device backup', !!(await page.$('#exportAll')));
+  await page.click('[data-export]');
+  await page.waitForSelector('#payload');
+  const backup = await page.$eval('#payload', e => e.value);
+  ok('the backup contains the hero and their facts', /Tester/.test(backup) && /"facts"/.test(backup), backup.slice(0, 120));
+
+  await page.click('#back');
+  await page.waitForSelector('.report-card');
+  // Wipe the device, then bring the hero back from the text.
+  while (await page.$('[data-reset]')) {
+    await page.click('details.danger summary');
+    await page.click('[data-reset]');
+    await page.waitForTimeout(100);
+  }
+  ok('the heroes are gone after a reset', !(await page.$('[data-export]')));
+
+  await page.click('#importBtn');
+  await page.waitForSelector('#paste');
+  await page.fill('#paste', backup);
+  await page.click('#go');
+  await page.waitForSelector('#done, #err');
+  ok('importing a clean backup needs no further questions', !!(await page.$('#done')));
+  await page.click('#done');
+  await page.waitForSelector('.report-card');
+  const restored = await page.$eval('.report-card', e => e.textContent);
+  ok('the hero came back with their record intact', /Tester/.test(restored) && /% right/.test(restored), restored.slice(0, 160));
+
+  /* ---- importing the same hero twice must not silently overwrite ---- */
+  await page.click('#importBtn');
+  await page.fill('#paste', backup);
+  await page.click('#go');
+  await page.waitForSelector('#replace, #done');
+  ok('a clash asks before overwriting', !!(await page.$('#replace')));
+  await page.click('#copy');
+  await page.waitForSelector('#done');
+  await page.click('#done');
+  await page.waitForSelector('.report-card');
+  ok('keeping both leaves two heroes', (await page.$$('[data-export]')).length === 2);
+
+  /* ---- a junk paste fails politely instead of breaking ---- */
+  await page.click('#importBtn');
+  await page.fill('#paste', 'this is not a backup');
+  await page.click('#go');
+  await page.waitForSelector('#err:not([hidden])');
+  const errText = await page.$eval('#err', e => e.textContent);
+  ok('junk input explains itself', /Runebreaker backup/.test(errText), errText);
+  await page.click('#back');
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {

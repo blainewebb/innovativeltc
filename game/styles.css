@@ -112,7 +112,8 @@ p { margin: 0 0 10px; line-height: 1.45; }
 .pa.big { font-size: 2.6rem; }
 .pn { font-weight: 800; font-size: 1.05rem; }
 .pd { color: var(--muted); font-size: .78rem; }
-.newprof { border-top: 1px solid var(--line); padding-top: 12px; }
+.newprof { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
+.newprof h3 { font-size: .95rem; margin-bottom: 6px; }
 .newprof input {
   width: 100%; min-height: var(--tap); padding: 10px 14px; margin-bottom: 8px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
@@ -274,6 +275,38 @@ p { margin: 0 0 10px; line-height: 1.45; }
 }
 .key.strike:disabled { opacity: .35; }
 
+/* ---------------------------------------------------------- drill turn */
+.incoming {
+  text-align: center; font-weight: 800; font-size: .9rem; color: #ffcf8a;
+  background: #33261a; border: 1px solid #7a5a2a; border-radius: 10px; padding: 8px 10px;
+}
+
+.timer {
+  height: 14px; border-radius: 999px; overflow: hidden;
+  background: #191527; border: 1px solid var(--line);
+}
+.timer span {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, #4ade80, #59a5ff);
+  transition: width .08s linear;
+}
+.timer span.low { background: linear-gradient(90deg, #ff8a3d, var(--red)); }
+
+/* Clock and problem travel together, so the draining bar is in the same
+   glance as the numbers being solved. */
+.drill-group { margin-top: auto; display: grid; gap: 10px; }
+.drill-problem {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; padding: 2px 0;
+}
+.dp {
+  min-width: 62px; height: 64px; display: grid; place-items: center;
+  font-size: 1.8rem; font-weight: 900; border-radius: 12px;
+  background: #2a2340; border: 2px solid var(--gold-dk); color: var(--ink);
+}
+.dp.op { color: var(--gold); }
+.drill .answer { min-width: 62px; height: 64px; font-size: 1.8rem; }
+
 /* ------------------------------------------------------- ask / results */
 .panel.ask .prompt { font-size: 1.1rem; font-weight: 700; text-align: center; line-height: 1.4; }
 .big-art { font-size: 3.2rem; text-align: center; margin: 6px 0 10px; }
@@ -340,6 +373,25 @@ p { margin: 0 0 10px; line-height: 1.45; }
 
 .spark { display: flex; align-items: flex-end; gap: 4px; height: 44px; }
 .sp { flex: 1; background: linear-gradient(180deg, var(--purple), #5a3fa8); border-radius: 3px 3px 0 0; min-height: 3px; }
+
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.head-actions .btn { margin: 0; width: auto; }
+.card-actions { margin-top: 16px; }
+.card-actions .btn { margin: 0; width: auto; }
+
+.backup-box {
+  width: 100%; min-height: 120px; margin: 10px 0; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .72rem; line-height: 1.4; resize: vertical;
+}
+.backup-box:focus { color: var(--ink); outline: 2px solid var(--purple); outline-offset: 1px; }
+
+input[type="file"] {
+  width: 100%; padding: 12px; margin-bottom: 8px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--ink); font: inherit; font-size: .85rem;
+}
 
 details.danger { margin-top: 14px; }
 details.danger summary { color: #ff9aa6; font-size: .82rem; cursor: pointer; }

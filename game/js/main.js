@@ -6,6 +6,7 @@ import {
   spawnEnemy, enemyAct, describeIntent, isLegal, evaluate, computeDamage,
   recordAttempt, classify, factKey, skillScore, shakyFacts, difficultyLevel,
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
+  pickDrill, drillAllowanceMs,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS } from './data.js';
@@ -23,7 +24,7 @@ const $ = sel => app.querySelector(sel);
 const $$ = sel => Array.from(app.querySelectorAll(sel));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function render(html) { app.innerHTML = html; }
+function render(html) { stopDrillTimer(); app.innerHTML = html; }
 function persist() { store.save(data); }
 
 /* Count playing time honestly: a ticking clock only while a run is live. */
@@ -54,6 +55,7 @@ function screenProfiles() {
       <p class="tag">Numbers are your weapon.</p>
       <div class="panel">
         <h2>Who's playing?</h2>
+        ${data.profiles.length > 1 ? '<p class="muted tiny center">Tap a hero to play as them.</p>' : ''}
         <div class="profile-list">
           ${data.profiles.map(p => `
             <button class="profile-card" data-id="${p.id}">
@@ -63,9 +65,11 @@ function screenProfiles() {
             </button>`).join('')}
         </div>
         <div class="newprof">
-          <input id="newName" maxlength="12" placeholder="New hero name" autocomplete="off">
+          <h3>${data.profiles.length ? 'Add another hero' : 'Make your hero'}</h3>
+          ${data.profiles.length ? '<p class="muted tiny">Every hero keeps their own progress, their own difficulty and their own report card. Give each kid their own.</p>' : ''}
+          <input id="newName" maxlength="12" placeholder="${data.profiles.length ? 'Their name' : 'Hero name'}" autocomplete="off">
           <div class="avatars">${AVATARS.map((a, i) => `<button class="av ${i === 0 ? 'on' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
-          <button class="btn primary" id="createProfile">Create hero</button>
+          <button class="btn primary" id="createProfile">${data.profiles.length ? 'Add this hero' : 'Create hero'}</button>
         </div>
       </div>
       ${data.profiles.length ? '<button class="btn ghost small" id="parentBtn">Grown-ups</button>' : ''}
@@ -110,7 +114,7 @@ function screenHub() {
         ${profile.records.wins ? `<button class="btn big" id="startEndless">Endless run</button>
         <p class="muted tiny center">Cleared the Deep ${profile.records.wins} time${profile.records.wins === 1 ? '' : 's'}. Best endless floor: ${profile.records.bestEndless || 0}.</p>` : ''}
         <div class="row">
-          <button class="btn ghost" id="switchBtn">Switch hero</button>
+          <button class="btn ghost" id="switchBtn">Switch / add hero</button>
           <button class="btn ghost" id="soundBtn">Sound: ${isEnabled() ? 'on' : 'off'}</button>
         </div>
       </div>
@@ -228,6 +232,9 @@ function startBattle(enemy, reward) {
     typed: '',
     exprReadyAt: null,
     lastWrong: null,
+    turn: 1,
+    mode: 'build',
+    drill: null,
     log: [`A ${enemy.name} blocks your way!`],
   };
   dealHand();
@@ -260,11 +267,32 @@ function selectedExpression() {
   return { a, op, b, result: evaluate(a, op, b) };
 }
 
-function renderBattle() {
-  const e = battle.enemy, p = run.player;
-  const intent = describeIntent(e);
+/* Shared by the built turn and the drill turn: both need the player to see
+   armor, the ward, the resist and what is coming next. */
+function enemyCardHtml() {
+  const e = battle.enemy;
   const ward = WARDS[e.ward];
   const resist = RESISTS[e.resist] || RESISTS.none;
+  const intent = describeIntent(e);
+  return `
+    <div class="enemy-card ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
+      <div class="enemy-art">${e.art}</div>
+      <div class="enemy-info">
+        <div class="enemy-name">${esc(e.name)}</div>
+        <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
+        <div class="enemy-tags">
+          ${e.armor ? `<span class="tag armor">\u{1F6E1}\uFE0F Armor ${e.armor}</span>` : ''}
+          ${ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
+          ${resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
+          ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
+        </div>
+        <div class="intent">Next: ${intent.icon} ${intent.text}</div>
+      </div>
+    </div>`;
+}
+
+function renderBattle() {
+  const e = battle.enemy, p = run.player;
   const expr = selectedExpression();
   const { aIdx, op, bIdx } = battle.sel;
 
@@ -284,20 +312,7 @@ function renderBattle() {
   render(`
     <div class="screen battle">
       ${topBar()}
-      <div class="enemy-card ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
-        <div class="enemy-art">${e.art}</div>
-        <div class="enemy-info">
-          <div class="enemy-name">${esc(e.name)}</div>
-          <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
-          <div class="enemy-tags">
-            ${e.armor ? `<span class="tag armor">\u{1F6E1}️ Armor ${e.armor}</span>` : ''}
-            ${ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
-            ${resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
-            ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
-          </div>
-          <div class="intent">Next: ${intent.icon} ${intent.text}</div>
-        </div>
-      </div>
+      ${enemyCardHtml()}
 
       <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
 
@@ -456,7 +471,9 @@ function submitStrike() {
   enemyTurn();
 }
 
-function enemyTurn() {
+/* The enemy's telegraphed move actually happening. Skipped entirely when the
+   player parries it on a drill turn. */
+function enemyAction() {
   const e = battle.enemy, p = run.player;
   const { events } = enemyAct(e, p, run.rng);
   for (const ev of events) {
@@ -465,21 +482,176 @@ function enemyTurn() {
     if (ev.type === 'jam') battle.pendingJam = true;
     if (ev.type === 'shield') battle.shieldTurns = 3;
   }
+}
 
+/* Timers and locks tick down whether or not the move landed, so a parry does
+   not freeze a shield in place forever. */
+function endEnemyPhase() {
+  const e = battle.enemy;
   if (e.shield > 0) {
     battle.shieldTurns -= 1;
     if (battle.shieldTurns <= 0) { e.shield = 0; battle.log.push('The shield flickers out.'); }
   }
-
   battle.lockedId = null;
   if (battle.pendingJam) {
     const free = battle.tiles.filter(Boolean);
     if (free.length) battle.lockedId = free[Math.floor(run.rng() * free.length)].id;
     battle.pendingJam = false;
   }
+}
 
-  if (p.hp <= 0) return loseRun();
+function enemyTurn() {
+  enemyAction();
+  endEnemyPhase();
+  nextTurn();
+}
+
+/* Turns alternate: the player builds their own strike, then the game hands
+   them one. Building is where the thinking is; the drill is the only place
+   the game can insist on a fact they would otherwise never choose. */
+function drillsOn() {
+  return profile.prefs ? profile.prefs.drills !== false : true;
+}
+
+function nextTurn() {
+  if (run.player.hp <= 0) return loseRun();
+  if (battle.enemy.hp <= 0) return winBattle();
+  battle.turn += 1;
+  if (drillsOn() && battle.turn % 2 === 0) return beginDrill();
+  battle.mode = 'build';
   renderBattle();
+}
+
+/* ========================================================= drill turns === */
+let drillTimer = null;
+
+function stopDrillTimer() {
+  if (drillTimer) { clearInterval(drillTimer); drillTimer = null; }
+}
+
+function beginDrill() {
+  const level = difficultyLevel(profile.mastery);
+  const d = pickDrill(run.rng, profile.mastery, run.player.runes, level);
+  if (!d) { battle.mode = 'build'; return renderBattle(); } // nothing to drill yet
+  battle.mode = 'drill';
+  battle.drill = { ...d, answer: evaluate(d.a, d.op, d.b) };
+  battle.allowanceMs = drillAllowanceMs(profile.mastery, d);
+  battle.drillStart = performance.now();
+  battle.typed = '';
+  renderDrill();
+}
+
+function renderDrill() {
+  const d = battle.drill, p = run.player;
+  const intent = describeIntent(battle.enemy);
+  render(`
+    <div class="screen battle drill">
+      ${topBar()}
+      ${enemyCardHtml()}
+
+      <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
+
+      <div class="incoming">\u26A1 INCOMING: ${intent.text}. Answer to parry it.</div>
+
+      <div class="drill-group">
+        <div class="timer" id="timerbar"><span style="width:100%"></span></div>
+        <div class="drill-problem">
+        <span class="dp">${d.a}</span>
+        <span class="dp op">${RUNES[d.op].glyph}</span>
+        <span class="dp">${d.b}</span>
+        <span class="eq">=</span>
+          <span class="answer ${battle.typed ? 'filled' : ''}">${battle.typed || '_'}</span>
+        </div>
+      </div>
+
+      <div class="keypad">
+        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
+        <button class="key" data-k="back">\u232B</button>
+        <button class="key" data-k="0">0</button>
+        <button class="key strike" id="answer" ${battle.typed ? '' : 'disabled'}>PARRY</button>
+      </div>
+
+      <div class="player-strip">
+        <span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>
+        <span class="combo ${p.combo ? 'on' : ''}">\u{1F525} Combo ${p.combo}</span>
+        <span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>
+      </div>
+    </div>`);
+
+  $$('.key').forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === 'back') battle.typed = battle.typed.slice(0, -1);
+    else if (battle.typed.length < 5) battle.typed += k;
+    sfx.tap();
+    renderDrill();
+  });
+  const go = $('#answer');
+  if (go) go.onclick = () => resolveDrill(parseInt(battle.typed, 10));
+
+  startDrillTimer();
+}
+
+function startDrillTimer() {
+  stopDrillTimer();
+  drillTimer = setInterval(() => {
+    if (!battle || battle.mode !== 'drill') return stopDrillTimer();
+    const bar = app.querySelector('#timerbar span');
+    if (!bar) return stopDrillTimer();
+    const left = battle.allowanceMs - (performance.now() - battle.drillStart);
+    const pct = Math.max(0, left / battle.allowanceMs * 100);
+    bar.style.width = `${pct}%`;
+    bar.classList.toggle('low', pct < 33);
+    if (left <= 0) { stopDrillTimer(); resolveDrill(null); }
+  }, 80);
+}
+
+function resolveDrill(given) {
+  stopDrillTimer();
+  const d = battle.drill, e = battle.enemy, p = run.player;
+  const ms = Math.round(performance.now() - battle.drillStart);
+  const timedOut = given === null || Number.isNaN(given);
+  const correct = !timedOut && given === d.answer;
+  const shown = `${d.a} ${RUNES[d.op].glyph} ${d.b}`;
+
+  recordAttempt(profile.mastery, { skill: d.skill, fact: d.fact, correct, ms });
+  const day = store.todayEntry(profile);
+  if (correct) { day.correct += 1; run.stats.correct += 1; } else { day.wrong += 1; run.stats.wrong += 1; }
+
+  // Mercy still means "free", so it parries without the counter.
+  const mercied = !correct && battle.mercyLeft > 0;
+  if (mercied) battle.mercyLeft -= 1;
+
+  if (correct) {
+    e.intentIndex += 1; // the telegraphed move never happens
+    /* The counter deliberately gets no ward or resist bonus. The player did
+       not choose this number, so the reward is for speed and accuracy, and
+       the built turn stays the one with the high ceiling. A riposte also
+       ignores shields, so a shielded enemy cannot make drills a dead turn. */
+    const { damage } = computeDamage({
+      result: d.answer, op: d.op, ward: 'none', resist: 'none', resistAt: 0,
+      armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
+    });
+    e.hp -= damage;
+    p.combo += 1;
+    battle.log.push(`\u{1F6E1}\uFE0F PARRIED! ${shown} = ${d.answer}, riposte for <b>${damage}</b>.`);
+    sfx.crit();
+  } else if (mercied) {
+    e.intentIndex += 1;
+    battle.log.push(`\u{1F54A}\uFE0F Mercy Rune parries it. ${shown} = <b>${d.answer}</b>.`);
+    sfx.wrong();
+  } else {
+    const tip = hintFor(d.a, d.op, d.b);
+    battle.log.push(timedOut
+      ? `\u23F1\uFE0F Too slow. ${shown} = <b>${d.answer}</b>.${tip ? ' ' + tip : ''}`
+      : `\u274C ${shown} = <b>${d.answer}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
+    p.combo = 0;
+    sfx.wrong();
+    enemyAction();
+  }
+
+  endEnemyPhase();
+  persist();
+  nextTurn();
 }
 
 function winBattle() {
@@ -895,6 +1067,12 @@ function screenReport() {
         <h4>Last 14 days</h4>
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
+        <div class="card-actions">
+          <button class="btn ghost small" data-drills="${p.id}">Timed drill turns: <b>${p.prefs?.drills === false ? 'off' : 'on'}</b></button>
+          <button class="btn ghost small" data-export="${p.id}">Back up / move ${esc(p.name)}</button>
+        </div>
+        <p class="muted tiny">Every second turn the game picks a problem, weighted to the facts they avoid, with a clock set from their own answering speed. Turn it off if the timer causes more stress than it is worth.</p>
+
         <details class="danger">
           <summary>Reset ${esc(p.name)}</summary>
           <p class="muted tiny">Wipes progress and the learning record for this hero. Cannot be undone.</p>
@@ -909,17 +1087,185 @@ function screenReport() {
         <h2>Report card</h2>
         <button class="btn ghost small" id="back">Done</button>
       </div>
+      <div class="head-actions">
+        <button class="btn ghost small" id="importBtn">Bring a hero in</button>
+        ${data.profiles.length > 1 ? '<button class="btn ghost small" id="exportAll">Back up everything</button>' : ''}
+      </div>
       <p class="muted tiny">Bars combine accuracy and speed, weighted toward recent answers, and stay low until there are enough attempts to judge. Word problems and place value are scored on accuracy alone, since reading and reasoning should take longer. Nothing here leaves this device.</p>
       ${rows || '<p class="muted">No heroes yet.</p>'}
     </div>`);
 
   $('#back').onclick = () => (profile ? screenHub() : screenProfiles());
+  $('#importBtn').onclick = () => { sfx.tap(); screenImport(); };
+  const exAll = $('#exportAll');
+  if (exAll) exAll.onclick = () => { sfx.tap(); screenBackup(data.profiles); };
+  $$('[data-drills]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.drills);
+    if (!hero) return;
+    hero.prefs = { ...hero.prefs, drills: hero.prefs?.drills === false };
+    persist(); sfx.tap(); screenReport();
+  });
+  $$('[data-export]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.export);
+    if (hero) { sfx.tap(); screenBackup([hero]); }
+  });
   $$('[data-reset]').forEach(b => b.onclick = () => {
     const id = b.dataset.reset;
     data.profiles = data.profiles.filter(x => x.id !== id);
     if (data.activeId === id) { data.activeId = null; profile = null; run = null; }
     persist(); screenReport();
   });
+}
+
+/* ===================================================== backup / restore ===
+   There is no account and no server, so a hero exists in exactly one browser
+   on one device. Both paths are offered on every screen below, because a
+   download and a file picker are not reliable inside an installed web app on
+   every phone, while copy and paste always is. */
+
+function screenBackup(profiles) {
+  const text = JSON.stringify(store.exportPayload(profiles), null, 2);
+  const filename = store.exportFilename(profiles);
+  const who = profiles.length === 1 ? esc(profiles[0].name) : `all ${profiles.length} heroes`;
+
+  render(`
+    <div class="screen report">
+      <div class="report-head">
+        <h2>Back up ${who}</h2>
+        <button class="btn ghost small" id="back">Done</button>
+      </div>
+      <div class="report-card">
+        <p class="muted tiny">This is the whole record: heroes, progress and everything the report card is built from. Save the file somewhere safe, or paste the text into the other device under "Bring a hero in". Importing does not remove it from this device, so you can keep playing here.</p>
+        <div class="head-actions">
+          <button class="btn primary small" id="download">Download the file</button>
+          <button class="btn ghost small" id="copy">Copy the text</button>
+        </div>
+        <p class="muted tiny" id="status"></p>
+        <textarea class="backup-box" id="payload" readonly spellcheck="false">${esc(text)}</textarea>
+      </div>
+    </div>`);
+
+  const status = $('#status');
+  $('#back').onclick = () => { sfx.tap(); screenReport(); };
+
+  $('#download').onclick = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      status.textContent = `Saved as ${filename}.`;
+      sfx.reward();
+    } catch {
+      status.textContent = 'This device would not download the file. Use "Copy the text" instead.';
+    }
+  };
+
+  $('#copy').onclick = async () => {
+    const box = $('#payload');
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = 'Copied. Paste it into the other device.';
+      sfx.reward();
+    } catch {
+      box.focus();
+      box.select();
+      status.textContent = 'Copying was blocked. The text is selected, copy it by hand.';
+    }
+  };
+}
+
+function screenImport() {
+  render(`
+    <div class="screen report">
+      <div class="report-head">
+        <h2>Bring a hero in</h2>
+        <button class="btn ghost small" id="back">Cancel</button>
+      </div>
+      <div class="report-card">
+        <p class="muted tiny">Load a backup made on another device. Either pick the file, or paste the text you copied.</p>
+        <input type="file" id="file" accept="application/json,.json">
+        <p class="muted tiny center">or</p>
+        <textarea class="backup-box" id="paste" placeholder="Paste the backup text here" spellcheck="false"></textarea>
+        <button class="btn primary small" id="go">Bring them in</button>
+        <p class="flag" id="err" hidden></p>
+      </div>
+    </div>`);
+
+  const fail = msg => { const e = $('#err'); e.hidden = false; e.textContent = msg; sfx.wrong(); };
+  $('#back').onclick = () => { sfx.tap(); screenReport(); };
+  $('#file').onchange = async ev => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    try { handleImport(await f.text()); } catch { fail('That file could not be read.'); }
+  };
+  $('#go').onclick = () => {
+    const text = $('#paste').value.trim();
+    if (!text) return fail('Paste the backup text first, or pick the file.');
+    handleImport(text);
+  };
+
+  function handleImport(text) {
+    let heroes;
+    try { heroes = store.parseImport(text); } catch (e) { return fail(e.message); }
+    const existing = new Set(data.profiles.map(h => h.id));
+    const clashes = heroes.filter(h => existing.has(h.id));
+    if (!clashes.length) return commitImport(heroes, 'add');
+    screenImportClash(heroes, clashes);
+  }
+}
+
+/* The same hero imported onto a device that already has them. Merging two
+   divergent learning records would invent data, so the parent picks. */
+function screenImportClash(heroes, clashes) {
+  render(`
+    <div class="screen center">
+      <div class="panel">
+        <h2>Already here</h2>
+        <p class="center">${clashes.map(h => esc(h.name)).join(', ')} ${clashes.length === 1 ? 'is' : 'are'} already on this device.</p>
+        <div class="choices vertical">
+          <button class="choice wide" id="replace">
+            <span class="ci">\u{1F504}</span><b>Use the backup</b>
+            <small>Overwrite what is on this device. Right when the backup is the newer one.</small>
+          </button>
+          <button class="choice wide" id="copy">
+            <span class="ci">\u{1F465}</span><b>Keep both</b>
+            <small>Add the backup alongside, as a second hero. Nothing is overwritten.</small>
+          </button>
+        </div>
+        <button class="btn ghost small" id="cancel">Cancel</button>
+      </div>
+    </div>`);
+  $('#replace').onclick = () => commitImport(heroes, 'replace');
+  $('#copy').onclick = () => commitImport(heroes, 'copy');
+  $('#cancel').onclick = () => { sfx.tap(); screenReport(); };
+}
+
+function commitImport(heroes, mode) {
+  const names = [];
+  for (const hero of heroes) {
+    const at = data.profiles.findIndex(h => h.id === hero.id);
+    if (at === -1) { data.profiles.push(hero); names.push(hero.name); continue; }
+    if (mode === 'replace') { data.profiles[at] = hero; names.push(hero.name); }
+    else { const dup = store.asCopy(hero); data.profiles.push(dup); names.push(dup.name); }
+  }
+  persist();
+  sfx.win();
+  render(`
+    <div class="screen center">
+      <div class="panel win">
+        <h2>Brought in</h2>
+        <div class="big-art">\u2705</div>
+        <p class="center">${names.map(esc).join(', ')} ${names.length === 1 ? 'is' : 'are'} on this device now.</p>
+        <p class="muted tiny center">Progress from here is separate again. Back up whichever device they actually play on.</p>
+        <button class="btn primary" id="done">Done</button>
+      </div>
+    </div>`);
+  $('#done').onclick = () => { sfx.tap(); screenReport(); };
 }
 
 /* ============================================================ keyboard === */
@@ -930,7 +1276,7 @@ document.addEventListener('keydown', ev => {
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);
   else if (ev.key === 'Backspace') btn = app.querySelector('.key[data-k="back"]');
-  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #go:not([disabled]), #next, #cont');
+  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #next, #cont');
   if (btn && !btn.disabled) { ev.preventDefault(); btn.click(); }
 });
 

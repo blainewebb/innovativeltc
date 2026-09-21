@@ -5,7 +5,8 @@ import {
   unlockedOps, generateHand, isLegal, evaluate, legalPlays, computeDamage,
   spawnEnemy, enemyAct, describeIntent, generateFloor, generateRiddle, offerRelics,
   newRun, handSize, reshuffles, classify, factKey, bestHitEstimate, turnsFor,
-  effectiveHit, tileRangeFor,
+  effectiveHit, tileRangeFor, parseFactKey, problemForSkill, pickDrill,
+  drillAllowanceMs, DRILL_MIN_MS, DRILL_MAX_MS, DRILL_DEFAULT_MS,
 } from '../js/engine.js';
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS } from '../js/data.js';
 
@@ -522,6 +523,109 @@ test('a floor never offers the same choice twice', () => {
       assert.equal(new Set(types).size, types.length, `floor ${depth} seed ${seed} repeated: ${types}`);
     }
   }
+});
+
+/* ------------------------------------------------------------ drills -- */
+test('a fact key round trips back into a solvable problem', () => {
+  assert.deepEqual(parseFactKey('7*8'), { a: 7, op: '*', b: 8 });
+  assert.deepEqual(parseFactKey('12-5'), { a: 12, op: '-', b: 5 });
+  assert.deepEqual(parseFactKey('24/6'), { a: 24, op: '/', b: 6 });
+  assert.equal(parseFactKey('5-12'), null, 'a negative result is not a legal problem');
+  assert.equal(parseFactKey('7/3'), null, 'a non-whole division is not a legal problem');
+  assert.equal(parseFactKey('rubbish'), null);
+  assert.equal(parseFactKey(''), null);
+  assert.equal(parseFactKey(undefined), null);
+});
+
+test('generated drill problems are always legal and whole', () => {
+  for (const id of ['add_small', 'sub_small', 'mult_easy', 'mult_hard', 'div_easy', 'div_hard', 'add_big', 'sub_big']) {
+    for (let level = 1; level <= 6; level++) {
+      for (let seed = 1; seed <= 60; seed++) {
+        const p = problemForSkill(makeRng(seed * 7 + level), id, level);
+        if (!p) continue; // the skill does not fit this tile range yet
+        assert.ok(isLegal(p.a, p.op, p.b), `${id} L${level}: ${p.a} ${p.op} ${p.b}`);
+        const r = evaluate(p.a, p.op, p.b);
+        assert.ok(Number.isInteger(r) && r >= 0, `${id} produced ${r}`);
+      }
+    }
+  }
+});
+
+test('drills mostly serve the facts the kid has been getting wrong', () => {
+  // The whole reason drills exist: on a built turn the player can simply
+  // never choose the fact they are worst at.
+  const m = blankMastery();
+  for (let i = 0; i < 25; i++) recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: true, ms: 1200 });
+  for (let i = 0; i < 10; i++) recordAttempt(m, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 11000 });
+  // Keys go through factKey in real play, which sorts the operands, so the
+  // test has to store them the same way or it measures its own typo.
+  const weakB = factKey(9, '*', 6);
+  for (let i = 0; i < 10; i++) recordAttempt(m, { skill: 'mult_hard', fact: weakB, correct: false, ms: 10000 });
+
+  let weakHits = 0, total = 0;
+  for (let seed = 1; seed <= 600; seed++) {
+    const d = pickDrill(makeRng(seed), m, ['+', '-', '*'], 3);
+    assert.ok(d, 'a drill should always be available once there is history');
+    assert.ok(isLegal(d.a, d.op, d.b));
+    assert.ok(['+', '-', '*'].includes(d.op), 'never drills an operator they do not have');
+    total++;
+    if (d.fact === '7*8' || d.fact === weakB) weakHits++;
+  }
+  const rate = weakHits / total;
+  assert.ok(rate > 0.4, `only ${(rate * 100).toFixed(0)}% of drills hit a dodged fact`);
+  assert.ok(rate < 0.9, `${(rate * 100).toFixed(0)}% is relentless; a kid who only ever meets their worst fact stops playing`);
+});
+
+test('drills work from a standing start, with no history at all', () => {
+  const m = blankMastery();
+  for (let seed = 1; seed <= 200; seed++) {
+    const d = pickDrill(makeRng(seed), m, ['+', '-'], 1);
+    assert.ok(d, 'a brand new hero must still get a drill');
+    assert.ok(isLegal(d.a, d.op, d.b));
+    assert.ok(['+', '-'].includes(d.op));
+  }
+});
+
+test('the clock is set from the child, not from a fixed number', () => {
+  const quick = blankMastery(), slow = blankMastery();
+  for (let i = 0; i < 12; i++) {
+    recordAttempt(quick, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 1800 });
+    recordAttempt(slow, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 9000 });
+  }
+  const target = { skill: 'mult_hard', fact: '7*8' };
+  const q = drillAllowanceMs(quick, target), s = drillAllowanceMs(slow, target);
+  assert.ok(s > q, 'the slower child must get the longer window, not be punished forever');
+  assert.ok(q >= DRILL_MIN_MS && s <= DRILL_MAX_MS);
+});
+
+test('the clock tightens on its own as a child speeds up', () => {
+  const m = blankMastery();
+  for (let i = 0; i < 12; i++) recordAttempt(m, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 9000 });
+  const before = drillAllowanceMs(m, { skill: 'mult_hard', fact: '7*8' });
+  for (let i = 0; i < 40; i++) recordAttempt(m, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 1500 });
+  const after = drillAllowanceMs(m, { skill: 'mult_hard', fact: '7*8' });
+  assert.ok(after < before, `window should shrink: ${before} -> ${after}`);
+});
+
+test('the clock stays inside humane bounds whatever the history', () => {
+  assert.equal(drillAllowanceMs(blankMastery(), { skill: 'mult_hard', fact: '7*8' }), DRILL_DEFAULT_MS);
+  const glacial = blankMastery();
+  for (let i = 0; i < 12; i++) recordAttempt(glacial, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 120000 });
+  assert.equal(drillAllowanceMs(glacial, { skill: 'mult_hard', fact: '7*8' }), DRILL_MAX_MS);
+  const instant = blankMastery();
+  for (let i = 0; i < 12; i++) recordAttempt(instant, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 200 });
+  assert.equal(drillAllowanceMs(instant, { skill: 'mult_hard', fact: '7*8' }), DRILL_MIN_MS);
+});
+
+test('a drill counter is worth less than a well-chosen built strike', () => {
+  /* The counter gets no ward or resist bonus, because the player did not
+     choose the number. If a drill ever out-damaged good thinking, the
+     thinking half of the game would become the boring half. */
+  const shared = { armor: 0, relics: [], combo: 0, ms: 2000, isFirstHit: false };
+  const counter = computeDamage({ ...shared, result: 48, op: '*', ward: 'five', resist: 'none', resistAt: 0 });
+  const chosen = computeDamage({ ...shared, result: 45, op: '*', ward: 'five', resist: 'none', resistAt: 0 });
+  assert.ok(chosen.warded && chosen.damage > counter.damage,
+    `a ward-matching built strike (${chosen.damage}) must beat a bigger drill counter (${counter.damage})`);
 });
 
 /* ------------------------------------------------- the design property -- */

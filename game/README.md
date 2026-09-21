@@ -58,6 +58,49 @@ The tiles stay in hand so the next turn is a chance to redo the same fact having
 just been told the answer. Getting it wrong costs you the fight, slowly, which is
 real pressure without a wall.
 
+### Drill turns
+
+Turns alternate. On a **built turn** the player picks the numbers, which is
+where the thinking is. On a **drill turn** the game picks, and it picks what
+they have been avoiding.
+
+That second half exists because the first half has a hole: when the kid chooses
+every play, a kid who hates `7 x 8` can go a whole run without ever making
+`7 x 8`. The hand generator stacks the deck toward their weak skills but cannot
+force the shot. Drill turns can.
+
+A drill shows the enemy's telegraphed move, a problem, and a draining clock.
+Answer in time and you **parry** the move and **counter** for damage equal to
+your answer. Miss, or run out of time, and the move lands, the combo resets,
+and you get the correct answer plus a strategy hint.
+
+Two deliberate limits:
+
+- **The counter gets no ward or resist bonus.** The player did not choose the
+  number, so the reward is for speed and accuracy alone. A well-chosen built
+  strike can triple its damage off a ward; a drill counter never can. That
+  keeps the thinking half of the game the half with the high ceiling.
+- **The clock comes from the child, not from a constant.** The allowance is
+  their own average time for that kind of problem, plus a moment to read it,
+  clamped to 4-20 seconds. A quicker kid gets real pressure, a slower one gets
+  a fair window, and the window tightens by itself as they improve. A fixed
+  countdown would be trivial for one and demoralising for the other.
+
+There is a real argument in maths education that timed drills feed maths
+anxiety, associated most publicly with Jo Boaler's work on timed testing. It is
+contested rather than settled. The design takes it seriously rather than
+dismissing it: the clock is personal rather than fixed, a miss costs damage in
+a fight rather than producing a failure screen, and **drills can be switched
+off per hero** from the grown-up screen, so one kid can have them and their
+brother can not.
+
+Turning drills on measurably helps a strong player: in the soak run a bot with
+perfect instant recall went from clearing roughly half its runs to about
+two thirds, because it parries nearly everything. That has been left alone
+rather than compensated for. The obvious lever, raising enemy damage, would
+punish the struggling kid hardest while barely touching the fluent one, which
+is backwards.
+
 ### Adaptation
 
 Every attempt is classified into a skill (`add_small`, `mult_hard`, `div_easy`
@@ -95,6 +138,45 @@ Tap "Grown-ups" and answer 23 x 17. Inside, per hero:
 
 Everything stays in `localStorage` on the device. Nothing is uploaded.
 
+## Heroes
+
+Several kids share one device through separate heroes. Each hero has its own
+learning record, its own difficulty level, its own unlocked operators, its own
+drill setting and its own section of the report card. Nothing is shared between
+them.
+
+Add one from the picker: on the hub, **Switch / add hero**, then **Add another
+hero** at the bottom of the list. Give each kid their own rather than sharing
+one, or the adaptation averages two children together and targets neither.
+
+## Where progress lives, and moving it
+
+There is no account and no server, which is what makes the game work offline
+with nothing to maintain. The cost is that a hero exists in exactly one browser
+on one device. Phone Safari, phone Chrome and a laptop are three separate sets
+of heroes, and on iOS a home-screen web app has its own storage container
+separate from the Safari tab, so even those two are different.
+
+**Install it to the home screen rather than bookmarking it.** Safari's tracking
+prevention deletes script-written storage for sites not visited in seven days,
+which would wipe a hero over a school holiday. Installed web apps are exempt.
+That is WebKit's documented ITP behaviour rather than something measured here,
+so treat it as a good reason to install rather than a guarantee.
+
+Because of all that, the grown-up screen has **Back up / move** per hero and
+**Bring a hero in**. A backup is a small JSON file holding the whole record:
+heroes, progress, and everything the report card is built from. Both a file
+download and a copyable text box are offered on every screen, because downloads
+and file pickers are not reliable inside an installed web app on every phone
+while copy and paste always is.
+
+Importing a hero who already exists on the device asks before doing anything:
+use the backup, or keep both as separate heroes. It never merges two divergent
+learning records, because combining them would invent attempts that never
+happened. `normalizeProfile` fills in anything missing from an older export, so
+a backup taken before a skill existed still loads with that skill blank rather
+than crashing the report card later.
+
 ## Running it
 
 It is a static folder. Open `index.html` through any web server:
@@ -117,6 +199,9 @@ connection after the first load.
 ./test/run.sh
 ```
 
+- `test/storage.test.mjs` — backup and restore: round trips, older exports,
+  hand-edited junk, and that a bad file fails with a message a parent can act
+  on rather than a stack trace.
 - `test/engine.test.mjs` — pure logic: skill classification, mastery maths, hand
   generation, the damage formula, the balance budget, riddle generators. No
   browser needed.
