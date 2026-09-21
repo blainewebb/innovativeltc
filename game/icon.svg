@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Runebreaker">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2450"/><stop offset="1" stop-color="#12101f"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7d377"/><stop offset="1" stop-color="#b88a20"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g fill="none" stroke="url(#gold)" stroke-width="30" stroke-linecap="round">
+    <path d="M150 190 h110"/>
+    <path d="M205 135 v110"/>
+  </g>
+  <g fill="none" stroke="#a678ff" stroke-width="30" stroke-linecap="round">
+    <path d="M300 330 h110"/>
+  </g>
+  <g fill="none" stroke="#ef4b5c" stroke-width="26" stroke-linecap="round">
+    <path d="M300 150 l90 90"/>
+    <path d="M390 150 l-90 90"/>
+  </g>
+  <circle cx="172" cy="352" r="16" fill="#4ade80"/>
+  <circle cx="232" cy="352" r="16" fill="#4ade80"/>
+  <circle cx="202" cy="400" r="16" fill="#4ade80"/>
+</svg>
