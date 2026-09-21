@@ -6,6 +6,7 @@ import {
   spawnEnemy, enemyAct, describeIntent, isLegal, evaluate, computeDamage,
   recordAttempt, classify, factKey, skillScore, shakyFacts, difficultyLevel,
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
+  pickDrill, drillAllowanceMs,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS } from './data.js';
@@ -23,7 +24,7 @@ const $ = sel => app.querySelector(sel);
 const $$ = sel => Array.from(app.querySelectorAll(sel));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function render(html) { app.innerHTML = html; }
+function render(html) { stopDrillTimer(); app.innerHTML = html; }
 function persist() { store.save(data); }
 
 /* Count playing time honestly: a ticking clock only while a run is live. */
@@ -228,6 +229,9 @@ function startBattle(enemy, reward) {
     typed: '',
     exprReadyAt: null,
     lastWrong: null,
+    turn: 1,
+    mode: 'build',
+    drill: null,
     log: [`A ${enemy.name} blocks your way!`],
   };
   dealHand();
@@ -260,11 +264,32 @@ function selectedExpression() {
   return { a, op, b, result: evaluate(a, op, b) };
 }
 
-function renderBattle() {
-  const e = battle.enemy, p = run.player;
-  const intent = describeIntent(e);
+/* Shared by the built turn and the drill turn: both need the player to see
+   armor, the ward, the resist and what is coming next. */
+function enemyCardHtml() {
+  const e = battle.enemy;
   const ward = WARDS[e.ward];
   const resist = RESISTS[e.resist] || RESISTS.none;
+  const intent = describeIntent(e);
+  return `
+    <div class="enemy-card ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
+      <div class="enemy-art">${e.art}</div>
+      <div class="enemy-info">
+        <div class="enemy-name">${esc(e.name)}</div>
+        <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
+        <div class="enemy-tags">
+          ${e.armor ? `<span class="tag armor">\u{1F6E1}\uFE0F Armor ${e.armor}</span>` : ''}
+          ${ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
+          ${resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
+          ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
+        </div>
+        <div class="intent">Next: ${intent.icon} ${intent.text}</div>
+      </div>
+    </div>`;
+}
+
+function renderBattle() {
+  const e = battle.enemy, p = run.player;
   const expr = selectedExpression();
   const { aIdx, op, bIdx } = battle.sel;
 
@@ -284,20 +309,7 @@ function renderBattle() {
   render(`
     <div class="screen battle">
       ${topBar()}
-      <div class="enemy-card ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
-        <div class="enemy-art">${e.art}</div>
-        <div class="enemy-info">
-          <div class="enemy-name">${esc(e.name)}</div>
-          <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
-          <div class="enemy-tags">
-            ${e.armor ? `<span class="tag armor">\u{1F6E1}️ Armor ${e.armor}</span>` : ''}
-            ${ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
-            ${resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
-            ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
-          </div>
-          <div class="intent">Next: ${intent.icon} ${intent.text}</div>
-        </div>
-      </div>
+      ${enemyCardHtml()}
 
       <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
 
@@ -456,7 +468,9 @@ function submitStrike() {
   enemyTurn();
 }
 
-function enemyTurn() {
+/* The enemy's telegraphed move actually happening. Skipped entirely when the
+   player parries it on a drill turn. */
+function enemyAction() {
   const e = battle.enemy, p = run.player;
   const { events } = enemyAct(e, p, run.rng);
   for (const ev of events) {
@@ -465,21 +479,176 @@ function enemyTurn() {
     if (ev.type === 'jam') battle.pendingJam = true;
     if (ev.type === 'shield') battle.shieldTurns = 3;
   }
+}
 
+/* Timers and locks tick down whether or not the move landed, so a parry does
+   not freeze a shield in place forever. */
+function endEnemyPhase() {
+  const e = battle.enemy;
   if (e.shield > 0) {
     battle.shieldTurns -= 1;
     if (battle.shieldTurns <= 0) { e.shield = 0; battle.log.push('The shield flickers out.'); }
   }
-
   battle.lockedId = null;
   if (battle.pendingJam) {
     const free = battle.tiles.filter(Boolean);
     if (free.length) battle.lockedId = free[Math.floor(run.rng() * free.length)].id;
     battle.pendingJam = false;
   }
+}
 
-  if (p.hp <= 0) return loseRun();
+function enemyTurn() {
+  enemyAction();
+  endEnemyPhase();
+  nextTurn();
+}
+
+/* Turns alternate: the player builds their own strike, then the game hands
+   them one. Building is where the thinking is; the drill is the only place
+   the game can insist on a fact they would otherwise never choose. */
+function drillsOn() {
+  return profile.prefs ? profile.prefs.drills !== false : true;
+}
+
+function nextTurn() {
+  if (run.player.hp <= 0) return loseRun();
+  if (battle.enemy.hp <= 0) return winBattle();
+  battle.turn += 1;
+  if (drillsOn() && battle.turn % 2 === 0) return beginDrill();
+  battle.mode = 'build';
   renderBattle();
+}
+
+/* ========================================================= drill turns === */
+let drillTimer = null;
+
+function stopDrillTimer() {
+  if (drillTimer) { clearInterval(drillTimer); drillTimer = null; }
+}
+
+function beginDrill() {
+  const level = difficultyLevel(profile.mastery);
+  const d = pickDrill(run.rng, profile.mastery, run.player.runes, level);
+  if (!d) { battle.mode = 'build'; return renderBattle(); } // nothing to drill yet
+  battle.mode = 'drill';
+  battle.drill = { ...d, answer: evaluate(d.a, d.op, d.b) };
+  battle.allowanceMs = drillAllowanceMs(profile.mastery, d);
+  battle.drillStart = performance.now();
+  battle.typed = '';
+  renderDrill();
+}
+
+function renderDrill() {
+  const d = battle.drill, p = run.player;
+  const intent = describeIntent(battle.enemy);
+  render(`
+    <div class="screen battle drill">
+      ${topBar()}
+      ${enemyCardHtml()}
+
+      <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
+
+      <div class="incoming">\u26A1 INCOMING: ${intent.text}. Answer to parry it.</div>
+
+      <div class="drill-group">
+        <div class="timer" id="timerbar"><span style="width:100%"></span></div>
+        <div class="drill-problem">
+        <span class="dp">${d.a}</span>
+        <span class="dp op">${RUNES[d.op].glyph}</span>
+        <span class="dp">${d.b}</span>
+        <span class="eq">=</span>
+          <span class="answer ${battle.typed ? 'filled' : ''}">${battle.typed || '_'}</span>
+        </div>
+      </div>
+
+      <div class="keypad">
+        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
+        <button class="key" data-k="back">\u232B</button>
+        <button class="key" data-k="0">0</button>
+        <button class="key strike" id="answer" ${battle.typed ? '' : 'disabled'}>PARRY</button>
+      </div>
+
+      <div class="player-strip">
+        <span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>
+        <span class="combo ${p.combo ? 'on' : ''}">\u{1F525} Combo ${p.combo}</span>
+        <span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>
+      </div>
+    </div>`);
+
+  $$('.key').forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === 'back') battle.typed = battle.typed.slice(0, -1);
+    else if (battle.typed.length < 5) battle.typed += k;
+    sfx.tap();
+    renderDrill();
+  });
+  const go = $('#answer');
+  if (go) go.onclick = () => resolveDrill(parseInt(battle.typed, 10));
+
+  startDrillTimer();
+}
+
+function startDrillTimer() {
+  stopDrillTimer();
+  drillTimer = setInterval(() => {
+    if (!battle || battle.mode !== 'drill') return stopDrillTimer();
+    const bar = app.querySelector('#timerbar span');
+    if (!bar) return stopDrillTimer();
+    const left = battle.allowanceMs - (performance.now() - battle.drillStart);
+    const pct = Math.max(0, left / battle.allowanceMs * 100);
+    bar.style.width = `${pct}%`;
+    bar.classList.toggle('low', pct < 33);
+    if (left <= 0) { stopDrillTimer(); resolveDrill(null); }
+  }, 80);
+}
+
+function resolveDrill(given) {
+  stopDrillTimer();
+  const d = battle.drill, e = battle.enemy, p = run.player;
+  const ms = Math.round(performance.now() - battle.drillStart);
+  const timedOut = given === null || Number.isNaN(given);
+  const correct = !timedOut && given === d.answer;
+  const shown = `${d.a} ${RUNES[d.op].glyph} ${d.b}`;
+
+  recordAttempt(profile.mastery, { skill: d.skill, fact: d.fact, correct, ms });
+  const day = store.todayEntry(profile);
+  if (correct) { day.correct += 1; run.stats.correct += 1; } else { day.wrong += 1; run.stats.wrong += 1; }
+
+  // Mercy still means "free", so it parries without the counter.
+  const mercied = !correct && battle.mercyLeft > 0;
+  if (mercied) battle.mercyLeft -= 1;
+
+  if (correct) {
+    e.intentIndex += 1; // the telegraphed move never happens
+    /* The counter deliberately gets no ward or resist bonus. The player did
+       not choose this number, so the reward is for speed and accuracy, and
+       the built turn stays the one with the high ceiling. A riposte also
+       ignores shields, so a shielded enemy cannot make drills a dead turn. */
+    const { damage } = computeDamage({
+      result: d.answer, op: d.op, ward: 'none', resist: 'none', resistAt: 0,
+      armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
+    });
+    e.hp -= damage;
+    p.combo += 1;
+    battle.log.push(`\u{1F6E1}\uFE0F PARRIED! ${shown} = ${d.answer}, riposte for <b>${damage}</b>.`);
+    sfx.crit();
+  } else if (mercied) {
+    e.intentIndex += 1;
+    battle.log.push(`\u{1F54A}\uFE0F Mercy Rune parries it. ${shown} = <b>${d.answer}</b>.`);
+    sfx.wrong();
+  } else {
+    const tip = hintFor(d.a, d.op, d.b);
+    battle.log.push(timedOut
+      ? `\u23F1\uFE0F Too slow. ${shown} = <b>${d.answer}</b>.${tip ? ' ' + tip : ''}`
+      : `\u274C ${shown} = <b>${d.answer}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
+    p.combo = 0;
+    sfx.wrong();
+    enemyAction();
+  }
+
+  endEnemyPhase();
+  persist();
+  nextTurn();
 }
 
 function winBattle() {
@@ -896,8 +1065,10 @@ function screenReport() {
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
         <div class="card-actions">
+          <button class="btn ghost small" data-drills="${p.id}">Timed drill turns: <b>${p.prefs?.drills === false ? 'off' : 'on'}</b></button>
           <button class="btn ghost small" data-export="${p.id}">Back up / move ${esc(p.name)}</button>
         </div>
+        <p class="muted tiny">Every second turn the game picks a problem, weighted to the facts they avoid, with a clock set from their own answering speed. Turn it off if the timer causes more stress than it is worth.</p>
 
         <details class="danger">
           <summary>Reset ${esc(p.name)}</summary>
@@ -925,6 +1096,12 @@ function screenReport() {
   $('#importBtn').onclick = () => { sfx.tap(); screenImport(); };
   const exAll = $('#exportAll');
   if (exAll) exAll.onclick = () => { sfx.tap(); screenBackup(data.profiles); };
+  $$('[data-drills]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.drills);
+    if (!hero) return;
+    hero.prefs = { ...hero.prefs, drills: hero.prefs?.drills === false };
+    persist(); sfx.tap(); screenReport();
+  });
   $$('[data-export]').forEach(b => b.onclick = () => {
     const hero = data.profiles.find(x => x.id === b.dataset.export);
     if (hero) { sfx.tap(); screenBackup([hero]); }
@@ -1096,7 +1273,7 @@ document.addEventListener('keydown', ev => {
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);
   else if (ev.key === 'Backspace') btn = app.querySelector('.key[data-k="back"]');
-  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #go:not([disabled]), #next, #cont');
+  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #next, #cont');
   if (btn && !btn.disabled) { ev.preventDefault(); btn.click(); }
 });
 

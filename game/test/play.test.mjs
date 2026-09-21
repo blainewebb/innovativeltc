@@ -58,6 +58,17 @@ async function buildLegalExpression(page) {
   return false;
 }
 
+/* Turns alternate, so a built turn is usually followed by a drill. Answer it
+   correctly and carry on, unless the caller wants to test the miss path. */
+async function clearDrill(page, { correct = true } = {}) {
+  if (!(await page.$('.drill-problem'))) return false;
+  const parts = await page.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+  const answer = OPS[parts[1]](Number(parts[0]), Number(parts[2]));
+  await typeNumber(page, correct ? answer : answer + 1, '#answer');
+  await page.waitForTimeout(120);
+  return true;
+}
+
 const b = await chromium.launch();
 const page = await b.newPage({ viewport: { width: 420, height: 880 } });
 const errors = [];
@@ -109,7 +120,21 @@ try {
   ok('the log reports the strike', /damage|shield|EXACT/i.test(log), log);
   ok('combo went up', (await page.$eval('.combo', e => e.textContent)).includes('1'));
 
+  /* ---- the drill turn ---- */
+  ok('a drill turn follows the built turn', !!(await page.$('.drill-problem')));
+  if (await page.$('.drill-problem')) {
+    ok('the drill shows a clock', !!(await page.$('#timerbar')));
+    ok('the drill says what it is parrying', /INCOMING/.test(await page.$eval('.incoming', e => e.textContent)));
+    const hpBeforeParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim()));
+    await clearDrill(page);
+    const afterParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim())).catch(() => 0);
+    ok('a correct parry counters for damage', afterParry < hpBeforeParry, `${hpBeforeParry} -> ${afterParry}`);
+    const parryLog = await page.$eval('.log', e => e.textContent).catch(() => '');
+    ok('the log says it was parried', /PARRIED/.test(parryLog), parryLog);
+  }
+
   /* ---- a wrong answer teaches, does not just punish ---- */
+  if (!(await page.$('.hand'))) await clearDrill(page);
   built = await buildLegalExpression(page);
   const expr2 = await readExpression(page);
   await typeNumber(page, expr2.answer + 1, '#strike');
@@ -122,6 +147,7 @@ try {
   }
 
   /* ---- keyboard input works too ---- */
+  if (!(await page.$('.hand'))) await clearDrill(page);
   if (await page.$('.hand')) {
     await buildLegalExpression(page);
     const expr3 = await readExpression(page);

@@ -274,6 +274,38 @@ p { margin: 0 0 10px; line-height: 1.45; }
 }
 .key.strike:disabled { opacity: .35; }
 
+/* ---------------------------------------------------------- drill turn */
+.incoming {
+  text-align: center; font-weight: 800; font-size: .9rem; color: #ffcf8a;
+  background: #33261a; border: 1px solid #7a5a2a; border-radius: 10px; padding: 8px 10px;
+}
+
+.timer {
+  height: 14px; border-radius: 999px; overflow: hidden;
+  background: #191527; border: 1px solid var(--line);
+}
+.timer span {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, #4ade80, #59a5ff);
+  transition: width .08s linear;
+}
+.timer span.low { background: linear-gradient(90deg, #ff8a3d, var(--red)); }
+
+/* Clock and problem travel together, so the draining bar is in the same
+   glance as the numbers being solved. */
+.drill-group { margin-top: auto; display: grid; gap: 10px; }
+.drill-problem {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; padding: 2px 0;
+}
+.dp {
+  min-width: 62px; height: 64px; display: grid; place-items: center;
+  font-size: 1.8rem; font-weight: 900; border-radius: 12px;
+  background: #2a2340; border: 2px solid var(--gold-dk); color: var(--ink);
+}
+.dp.op { color: var(--gold); }
+.drill .answer { min-width: 62px; height: 64px; font-size: 1.8rem; }
+
 /* ------------------------------------------------------- ask / results */
 .panel.ask .prompt { font-size: 1.1rem; font-weight: 700; text-align: center; line-height: 1.4; }
 .big-art { font-size: 3.2rem; text-align: center; margin: 6px 0 10px; }

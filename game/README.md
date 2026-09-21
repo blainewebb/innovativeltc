@@ -58,6 +58,49 @@ The tiles stay in hand so the next turn is a chance to redo the same fact having
 just been told the answer. Getting it wrong costs you the fight, slowly, which is
 real pressure without a wall.
 
+### Drill turns
+
+Turns alternate. On a **built turn** the player picks the numbers, which is
+where the thinking is. On a **drill turn** the game picks, and it picks what
+they have been avoiding.
+
+That second half exists because the first half has a hole: when the kid chooses
+every play, a kid who hates `7 x 8` can go a whole run without ever making
+`7 x 8`. The hand generator stacks the deck toward their weak skills but cannot
+force the shot. Drill turns can.
+
+A drill shows the enemy's telegraphed move, a problem, and a draining clock.
+Answer in time and you **parry** the move and **counter** for damage equal to
+your answer. Miss, or run out of time, and the move lands, the combo resets,
+and you get the correct answer plus a strategy hint.
+
+Two deliberate limits:
+
+- **The counter gets no ward or resist bonus.** The player did not choose the
+  number, so the reward is for speed and accuracy alone. A well-chosen built
+  strike can triple its damage off a ward; a drill counter never can. That
+  keeps the thinking half of the game the half with the high ceiling.
+- **The clock comes from the child, not from a constant.** The allowance is
+  their own average time for that kind of problem, plus a moment to read it,
+  clamped to 4-20 seconds. A quicker kid gets real pressure, a slower one gets
+  a fair window, and the window tightens by itself as they improve. A fixed
+  countdown would be trivial for one and demoralising for the other.
+
+There is a real argument in maths education that timed drills feed maths
+anxiety, associated most publicly with Jo Boaler's work on timed testing. It is
+contested rather than settled. The design takes it seriously rather than
+dismissing it: the clock is personal rather than fixed, a miss costs damage in
+a fight rather than producing a failure screen, and **drills can be switched
+off per hero** from the grown-up screen, so one kid can have them and their
+brother can not.
+
+Turning drills on measurably helps a strong player: in the soak run a bot with
+perfect instant recall went from clearing roughly half its runs to about
+two thirds, because it parries nearly everything. That has been left alone
+rather than compensated for. The obvious lever, raising enemy damage, would
+punish the struggling kid hardest while barely touching the fluent one, which
+is backwards.
+
 ### Adaptation
 
 Every attempt is classified into a skill (`add_small`, `mult_hard`, `div_easy`

@@ -30,6 +30,9 @@ export function newProfile(name, avatar) {
     created: Date.now(),
     mastery: blankMastery(),
     meta: { startRunes: [], bonusHp: 0, xp: 0, unlockedRelics: [] },
+    /* Per hero, so a kid who freezes under a clock can have drills off
+       without changing anything for their brother. */
+    prefs: { drills: true },
     records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0 },
     /* One entry per day the kid played: { date:'YYYY-MM-DD', ms, correct, wrong } */
     days: [],
@@ -48,6 +51,7 @@ export function normalizeProfile(raw) {
     id: typeof raw.id === 'string' && raw.id ? raw.id : base.id,
     created: Number(raw.created) || base.created,
     meta: { ...base.meta, ...(raw.meta || {}) },
+    prefs: { ...base.prefs, ...(raw.prefs || {}) },
     records: { ...base.records, ...(raw.records || {}) },
     days: Array.isArray(raw.days) ? raw.days.filter(d => d && typeof d.date === 'string').map(d => ({
       date: d.date, ms: Number(d.ms) || 0, correct: Number(d.correct) || 0, wrong: Number(d.wrong) || 0,
