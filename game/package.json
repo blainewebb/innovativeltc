@@ -1,0 +1,6 @@
+{
+  "name": "runebreaker",
+  "private": true,
+  "type": "module",
+  "description": "Runebreaker — a math roguelike. Static PWA, no build step. package.json exists only so Node treats the js/ files as ES modules when running tests."
+}
