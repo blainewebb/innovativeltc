@@ -1,6 +1,6 @@
 /* Runebreaker service worker. Scoped to /game/ so it never touches the
    other apps in this repo. Bump CACHE whenever the shell changes. */
-const CACHE = 'runebreaker-v1';
+const CACHE = 'runebreaker-v2';
 const SHELL = [
   './',
   './index.html',
@@ -47,13 +47,19 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  /* Scripts and styles are network-first too, not cache-first.
+     Cache-first here was a real bug: index.html was fetched fresh every load
+     while js/main.js was served from cache forever, so the page was current
+     and the code behind it was months old. The app is a couple of hundred
+     kilobytes of text, so the round trip costs nothing worth having, and the
+     cache still covers the whole app the moment the network is gone. */
   e.respondWith(
-    caches.match(req).then(hit => hit || fetch(req).then(res => {
+    fetch(req).then(res => {
       if (res && res.status === 200) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
       }
       return res;
-    }))
+    }).catch(() => caches.match(req))
   );
 });

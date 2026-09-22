@@ -1418,6 +1418,17 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => { /* offline install optional */ });
   });
+
+  /* When a new worker takes over, the page is still running the old code.
+     Reload once so a deploy actually reaches the device instead of waiting
+     for someone to guess that they need to refresh twice. The flag stops it
+     looping if a worker ever activates repeatedly. */
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
 }
 
 boot();
