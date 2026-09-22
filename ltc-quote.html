@@ -754,6 +754,7 @@
 <!-- client quote sheet -->
 <div class="qsheet" id="qsheet">
   <div class="qs-toolbar">
+    <label class="qs-proj" id="qsNameWrap" title="Optional — the name shown on the printout and the shared-care page">👤<input id="qsName" placeholder="Client name (optional)" oninput="setSheetName(this.value)" style="width:172px"></label>
     <div class="seg" id="qsSeg">
       <button data-l="essentials" onclick="setSheetLayout('essentials')">Essentials</button>
       <button data-l="recommended" onclick="setSheetLayout('recommended')">Recommended</button>
@@ -5187,6 +5188,9 @@ function sharedRiderPage(items){
   return out;
 }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
+// Optional client name (toolbar box). Re-renders so the printout header and the shared-care
+// page pick it up immediately; the box lives outside #sheet, so typing keeps focus.
+function setSheetName(v){ if(QSHEET.client) QSHEET.client.name=v; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
 function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add at least one quote to the comparison first.'); return; }
@@ -5271,6 +5275,9 @@ function renderSheet(){
   if($('qsGrowth')) $('qsGrowth').checked = !!QSHEET.growth;
   if($('qsGrowthToggle')) $('qsGrowthToggle').classList.toggle('show', (cl.items||[]).length>0);
   if($('qsSharedPage')) $('qsSharedPage').checked = !!QSHEET.sharedPage;
+  // Optional client-name box: shown for ad-hoc (tray) quotes; kept in sync without clobbering typing.
+  if($('qsNameWrap')) $('qsNameWrap').classList.toggle('show', !!QSHEET.adhoc);
+  if($('qsName') && document.activeElement!==$('qsName')) $('qsName').value = (cl.name||'');
   if($('qsSharedToggle')) $('qsSharedToggle').classList.toggle('show', hasSharedVisual(cl.items||[]) || (cl.items||[]).some(o=>isNglItem(o)));
   const quotes = items.map(o=>{ try{ return anyQuote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
@@ -5315,9 +5322,9 @@ function renderSheet(){
     ? (applicant?applicant+' &middot; ':'')+(cl.savedAt||'')
     : ((uniform && items.length ? 'Prepared for '+esc(cl.name)+' &middot; '+applicant : 'Prepared for '+esc(cl.name))
        + (cl.savedAt?' &middot; '+cl.savedAt:'') + (cl.note?'<br>'+esc(cl.note):''));
-  const nameHtml = QSHEET.adhoc
-    ? '<input class="sh-for sh-for-edit" placeholder="Client name (optional)" value="'+esc(cl.name||'')+'" oninput="QSHEET.client.name=this.value">'
-    : '<div class="sh-for">'+esc(cl.name)+'</div>';
+  // Name is entered in the toolbar box (see setSheetName) so it drives the printout and the
+  // shared-care page live; here it's just displayed. Omitted entirely when there's no name.
+  const nameHtml = cl.name ? '<div class="sh-for">'+esc(cl.name)+'</div>' : '';
   $('sheet').innerHTML =
     (custom ? customizerHtml() : '')
     + '<div class="sh-top"><div><div class="sh-brand">Innovative <span>LTC</span></div>'
