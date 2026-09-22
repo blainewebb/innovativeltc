@@ -80,6 +80,9 @@ try {
 
   /* ---- profile creation, with a school year ---- */
   ok('the picker asks for a school year', (await page.$$('.grade')).length === 5);
+  // A readable build stamp, so "is this the new version?" stops being guesswork.
+  const stamp = await page.$eval('.version', e => e.textContent).catch(() => '');
+  ok('the picker shows which build is loaded', /^v\d{4}-\d{2}-\d{2}\.\d+$/.test(stamp), stamp);
   await page.fill('#newName', 'Tester');
   await page.click('.grade[data-grade="4"]');
   await page.click('#createProfile');

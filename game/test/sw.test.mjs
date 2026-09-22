@@ -137,5 +137,12 @@ await (async () => {
     assert.match(src, /const CACHE = 'runebreaker-v\d+';/);
   });
 
+  test('the worker version and the app version are both bumped together', () => {
+    const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+    const data = readFileSync(new URL('../js/data.js', import.meta.url), 'utf8');
+    assert.match(sw, /const CACHE = 'runebreaker-v(\d+)';/);
+    assert.match(data, /export const VERSION = '\d{4}-\d{2}-\d{2}\.\d+';/);
+  });
+
   console.log(`${passed} service worker tests passed`);
 })();
