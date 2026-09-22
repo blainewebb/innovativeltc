@@ -271,6 +271,16 @@ p { margin: 0 0 10px; line-height: 1.45; }
 /* Everything the thumb touches clusters at the bottom of the screen. */
 .battle .expr-area { margin-top: auto; }
 .keypad.wide { margin-top: 12px; }
+.keypad.four { grid-template-columns: repeat(4, 1fr); }
+.key.sym { color: var(--gold); }
+.key.strike.wide { grid-column: span 2; }
+
+/* A written question needs room to read, unlike three number boxes. */
+.asked {
+  text-align: center; font-size: 1.05rem; font-weight: 700; line-height: 1.4;
+  margin: 0 0 4px; padding: 10px 12px;
+  background: #171326; border: 1px solid var(--line); border-radius: 12px;
+}
 .key {
   min-height: 54px; border-radius: 12px; cursor: pointer;
   font: inherit; font-size: 1.35rem; font-weight: 800;

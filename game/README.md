@@ -94,13 +94,41 @@ a fight rather than producing a failure screen, and **drills can be switched
 off per hero** from the grown-up screen, so one kid can have them and their
 brother can not.
 
-Balance is measured rather than guessed. A bot with perfect instant recall
-currently clears about 38% of its runs, with deaths spread across the back half
-rather than walling early. Getting there took several wrong turns worth
-recording: parrying for free made the bot clear every run; budgeting duels like
-ordinary fights made them twice as long and killed it on floor 3; and one
-apparent difficulty spike turned out to be the test harness being slower than
-the in-game clock, which is why the soak now asserts its own answer latency.
+Balance is measured rather than guessed, by bots that play full runs. There are
+two personas, because a hero with no declared grade never climbs past fifth
+grade content and would leave everything above it untested. Each clears roughly
+70% of runs, with deaths in the back half rather than walling early.
+
+That is easier than the 38% measured before the middle school work, and mostly
+because the game used to be accidentally hard. Enemy health is budgeted against
+what the player can hit for, and turns alternate, so it has to account for both
+kinds: a built strike at eighth grade level hits for a few hundred while a
+handed-out percentage question hits for tens. Budgeting on the built ceiling
+alone made every fight run about twice its intended length. Armor had the same
+problem in a sharper form: scaled to the average of the two, a level-eight
+drill turn delivering 80 ran into 70 armor and did nothing at all, so armor was
+deleting a whole turn type. Both are now sized correctly and the fights are the
+length they were always meant to be.
+
+Getting here took a string of wrong turns worth recording, because each one
+produced a real fix:
+
+- Parrying for free made the bot clear every run, so a parry now leaks 40%.
+- Budgeting a duel like an ordinary fight made it twice as long and killed the
+  bot on floor 3.
+- One apparent difficulty spike was the test harness being slower than the
+  in-game clock, which is why the soak asserts its own answer latency.
+- `expectedDrillDamage` averaged in written problems, which have no calculation
+  to evaluate, so it returned NaN. Boss health became NaN, the duel could never
+  be won, and every run ended on floor 3.
+- The drill screen recomputed each answer from a-op-b, which a written problem
+  does not have, so its expected answer was NaN and the child could not get it
+  right however hard they tried. The bot's accuracy collapsing to 22% is what
+  exposed it.
+
+The last two are why the soak bot now solves the written problems itself and
+reports how many it had to guess: a clear rate measured with a bot that cannot
+read the questions is measuring the bot.
 
 ### Boss duels
 
@@ -167,9 +195,34 @@ Tap "Grown-ups" and answer 23 x 17. Inside, per hero:
 
 Everything stays in `localStorage` on the device. Nothing is uploaded.
 
+## Grades 6 to 8
+
+The tile mechanic is integer arithmetic: pick two numbers, combine them, type
+the result. That extends naturally to **negative tiles** and a **power rune**
+for squares and cubes, both of which just work once a strike is defined as
+"any whole result of at least one" rather than as per-operator rules.
+
+It does not extend to fractions, percentages, ratios or solving for x, because
+there is nothing to pick in "what is 15% of 60". Those are **asked** on drill
+turns and at riddle shrines, where the game sets the problem and the player
+types a reply. Percentages and ratios carry the most variants, being the most
+used both in school and out of it.
+
+Answers are parsed rather than compared as integers, so a fraction, a decimal
+or a negative all work, and the keypad grows a slash, a point and a minus when
+the answer could need them. An **equivalent fraction is accepted**: refusing
+6/8 from a child who has correctly worked out three quarters teaches nothing
+except that the game is fussy, so it is marked right and told what simplest
+form is.
+
+Middle school topics need the level to have **actually arrived**, with none of
+the one-level stretch arithmetic gets. Serving percentages to a fourth grader
+is not a stretch, it is a different subject, and a boss duel made of them is a
+wall they cannot climb.
+
 ## Heroes
 
-Making a hero asks for a **school year**, 1st through 5th. It is asked as a US
+Making a hero asks for a **school year**, 1st through 8th. It is asked as a US
 grade rather than an age because age predicts very little: two eight year olds
 can be two years apart on times tables. The grade only sets where they start,
 opening the operators that year is taught and lifting the first few runs off

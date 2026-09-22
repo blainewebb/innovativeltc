@@ -8,9 +8,23 @@ import {
   effectiveHit, tileRangeFor, parseFactKey, problemForSkill, pickDrill,
   drillAllowanceMs, DRILL_MIN_MS, DRILL_MAX_MS, DRILL_DEFAULT_MS,
   isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
-  GRADE_DECAY_ATTEMPTS,
+  GRADE_DECAY_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
+  parseAnswer, checkAnswer, answerValue, formatAnswer, typeInto,
+  expectedDrillDamage,
 } from '../js/engine.js';
-import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID } from '../js/data.js';
+import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
+         ASKED, ASKED_SKILLS, simplifyFraction, RUNES } from '../js/data.js';
+
+/** A drill is either a calculation off the tiles or a written question. */
+function drillIsUsable(d) {
+  if (!d) return false;
+  if (d.kind === 'text') {
+    return typeof d.prompt === 'string' && d.prompt.length > 2
+      && Number.isFinite(answerValue(d.answer))
+      && !/undefined|NaN|Infinity/.test(d.prompt);
+  }
+  return isLegal(d.a, d.op, d.b) && Number.isFinite(d.answer);
+}
 
 let passed = 0;
 const test = (name, fn) => {
@@ -640,7 +654,7 @@ test('every grade is playable from the very first hand', () => {
       const hand = generateHand(makeRng(seed), { mastery: m, runes, size: 5, depth: 1, grade: g.id });
       assert.ok(legalPlays(hand, runes).length > 0, `${g.label} dealt a dead hand`);
       const d = pickDrill(makeRng(seed), m, runes, difficultyLevel(m, g.id));
-      assert.ok(d && isLegal(d.a, d.op, d.b), `${g.label} produced an unusable drill`);
+      assert.ok(d && drillIsUsable(d), `${g.label} produced an unusable drill: ${JSON.stringify(d)}`);
     }
   }
 });
@@ -686,8 +700,8 @@ test('drills mostly serve the facts the kid has been getting wrong', () => {
   for (let seed = 1; seed <= 600; seed++) {
     const d = pickDrill(makeRng(seed), m, ['+', '-', '*'], 3);
     assert.ok(d, 'a drill should always be available once there is history');
-    assert.ok(isLegal(d.a, d.op, d.b));
-    assert.ok(['+', '-', '*'].includes(d.op), 'never drills an operator they do not have');
+    assert.ok(drillIsUsable(d), JSON.stringify(d));
+    if (d.kind === 'arith') assert.ok(['+', '-', '*'].includes(d.op), 'never drills an operator they do not have');
     total++;
     if (d.fact === '7*8' || d.fact === weakB) weakHits++;
   }
@@ -701,8 +715,8 @@ test('drills work from a standing start, with no history at all', () => {
   for (let seed = 1; seed <= 200; seed++) {
     const d = pickDrill(makeRng(seed), m, ['+', '-'], 1);
     assert.ok(d, 'a brand new hero must still get a drill');
-    assert.ok(isLegal(d.a, d.op, d.b));
-    assert.ok(['+', '-'].includes(d.op));
+    assert.ok(drillIsUsable(d), JSON.stringify(d));
+    if (d.kind === 'arith') assert.ok(['+', '-'].includes(d.op));
   }
 });
 
@@ -746,6 +760,286 @@ test('a drill counter is worth less than a well-chosen built strike', () => {
   const chosen = computeDamage({ ...shared, result: 45, op: '*', ward: 'five', resist: 'none', resistAt: 0 });
   assert.ok(chosen.warded && chosen.damage > counter.damage,
     `a ward-matching built strike (${chosen.damage}) must beat a bigger drill counter (${counter.damage})`);
+});
+
+/* ------------------------------------------------- middle school -- */
+test('every asked-problem generator produces something answerable', () => {
+  // These carry all of grades 6 to 8, so a broken generator is a dead turn.
+  for (const [skill, gens] of Object.entries(ASKED)) {
+    assert.ok(SKILLS.some(s => s.id === skill), `${skill} has no skill entry, so nothing tracks it`);
+    for (let g = 0; g < gens.length; g++) {
+      for (let seed = 1; seed <= 250; seed++) {
+        const made = gens[g](makeRng(seed * 31 + g));
+        const where = `${skill}[${g}] seed ${seed}`;
+        assert.ok(made && made.prompt, `${where} produced no prompt`);
+        assert.ok(!/undefined|NaN|Infinity|\[object/.test(made.prompt), `${where}: ${made.prompt}`);
+        const v = answerValue(made.answer);
+        assert.ok(Number.isFinite(v), `${where} answer not finite: ${JSON.stringify(made.answer)}`);
+        if (typeof made.answer === 'number') {
+          // A plain answer must be typeable, not 0.30000000000000004.
+          assert.ok(String(v).replace('-', '').replace('.', '').length <= 8,
+            `${where} answer is not typeable: ${v}`);
+        } else {
+          const { n, d } = made.answer;
+          assert.ok(Number.isInteger(n) && Number.isInteger(d) && d > 1,
+            `${where} bad fraction: ${JSON.stringify(made.answer)}`);
+        }
+      }
+    }
+  }
+});
+
+test('ratios are always written in simplest form', () => {
+  // 3:12 is arithmetically fine and reads like a mistake.
+  const g = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a || 1; };
+  for (let seed = 1; seed <= 400; seed++) {
+    for (const gen of ASKED.ratio) {
+      const made = gen(makeRng(seed * 7 + 1));
+      const m = /(\d+):(\d+)/.exec(made.prompt);
+      if (!m) continue;
+      const [, a, b] = m.map(Number);
+      assert.equal(g(a, b), 1, `ratio ${a}:${b} is not in simplest form`);
+      assert.notEqual(a, b, `ratio ${a}:${b} is not a ratio`);
+      assert.ok(Number.isInteger(made.answer), `${made.prompt} answers ${made.answer}`);
+    }
+  }
+});
+
+test('percentages and ratios are the richest topics, as asked for', () => {
+  assert.ok(ASKED.percent.length >= 5);
+  assert.ok(ASKED.ratio.length >= 5);
+});
+
+test('a simplify question never asks for a fraction already simplified', () => {
+  const gen = ASKED.fractions.find((_, i) => i === 2);
+  for (let seed = 1; seed <= 300; seed++) {
+    const made = gen(makeRng(seed));
+    const m = /Simplify (\d+)\/(\d+)/.exec(made.prompt);
+    assert.ok(m, made.prompt);
+    const [, n, d] = m.map(Number);
+    const simplest = simplifyFraction(n, d);
+    assert.notEqual(`${n}/${d}`, typeof simplest === 'number' ? String(simplest) : `${simplest.n}/${simplest.d}`,
+      `nothing to simplify in ${made.prompt}`);
+    assert.deepEqual(made.answer, simplest);
+  }
+});
+
+test('answers parse as whole numbers, decimals, negatives and fractions', () => {
+  assert.deepEqual(parseAnswer('42'), { value: 42 });
+  assert.deepEqual(parseAnswer('-7'), { value: -7 });
+  assert.deepEqual(parseAnswer('0.75'), { value: 0.75 });
+  assert.deepEqual(parseAnswer('3/4'), { value: 0.75, n: 3, d: 4 });
+  assert.deepEqual(parseAnswer('  3 / 4 '), { value: 0.75, n: 3, d: 4 });
+  assert.deepEqual(parseAnswer('\u22125'), { value: -5 }, 'a typed minus sign should work');
+  for (const junk of ['', ' ', 'abc', '3/', '/4', '3/0', '1.2.3', '--4', '3//4']) {
+    assert.equal(parseAnswer(junk), null, `accepted junk: "${junk}"`);
+  }
+});
+
+test('an equivalent fraction is accepted, with the simplest form mentioned', () => {
+  // Refusing 6/8 when the child has correctly worked out three quarters
+  // teaches nothing except that the game is fussy.
+  const exact = checkAnswer('3/4', { n: 3, d: 4 });
+  assert.ok(exact.ok && !exact.note);
+  const equivalent = checkAnswer('6/8', { n: 3, d: 4 });
+  assert.ok(equivalent.ok, 'an equivalent fraction is still the right answer');
+  assert.match(equivalent.note, /3\/4/, 'but it should say what simplest form is');
+  assert.ok(checkAnswer('0.75', { n: 3, d: 4 }).ok, 'the decimal is also right');
+  assert.ok(!checkAnswer('4/3', { n: 3, d: 4 }).ok);
+  assert.ok(!checkAnswer('', { n: 3, d: 4 }).ok);
+});
+
+test('decimal answers are compared with tolerance, not exact equality', () => {
+  assert.ok(checkAnswer('0.8', 0.1 + 0.7).ok, 'floating point must not fail a correct answer');
+  assert.ok(checkAnswer('-13', -13).ok);
+  assert.ok(!checkAnswer('0.81', 0.8).ok);
+});
+
+test('the keypad cannot be typed into an unparseable state', () => {
+  const type = keys => keys.split('').reduce((acc, k) => typeInto(acc, k), '');
+  assert.equal(type('375'), '375');
+  assert.equal(type('3/4'), '3/4');
+  assert.equal(typeInto('.', 'x'), '.');
+  assert.equal(type('.5'), '0.5', 'a leading point means nought point something');
+  assert.equal(type('3..5'), '3.5', 'only one decimal point');
+  assert.equal(type('3//4'), '3/4', 'only one slash');
+  assert.equal(typeInto('3.5', '/'), '3.5', 'never a slash after a decimal');
+  assert.equal(typeInto('3/4', '.'), '3/4', 'nor a decimal inside a fraction');
+  assert.equal(typeInto('3/', '0'), '3/', 'a denominator cannot start with nought');
+  assert.equal(type('3/10'), '3/10', 'but nought inside a denominator is fine');
+  assert.equal(type('-7'), '-7');
+  assert.equal(type('7-'), '7', 'a minus only makes sense at the front');
+  assert.equal(type('-'), '-');
+  assert.equal(typeInto('42', 'back'), '4');
+  assert.equal(typeInto('', 'back'), '');
+  assert.equal(typeInto('12345678', '9'), '12345678', 'length is capped');
+  // Whatever is typed either parses or is still being typed, never garbage.
+  const keys = ['0','1','2','3','4','5','6','7','8','9','.','/','-','back'];
+  const rng = makeRng(99);
+  for (let trial = 0; trial < 4000; trial++) {
+    let cur = '';
+    for (let i = 0; i < 10; i++) cur = typeInto(cur, keys[Math.floor(rng() * keys.length)]);
+    const partial = cur === '' || cur === '-' || cur.endsWith('.') || cur.endsWith('/');
+    assert.ok(partial || parseAnswer(cur), `typed into an unparseable state: "${cur}"`);
+  }
+});
+
+test('formatAnswer writes a fraction as a fraction', () => {
+  assert.equal(formatAnswer(12), '12');
+  assert.equal(formatAnswer({ n: 3, d: 4 }), '3/4');
+  assert.equal(formatAnswer(-5), '-5');
+});
+
+test('every operator a grade can unlock has a rune to draw', () => {
+  /* This is not hypothetical. Adding the power rune to the grade tables but
+     not to RUNES handed out an operator with no glyph, and the whole run
+     crashed on the first floor. */
+  const seen = new Set();
+  for (const g of GRADES) for (const op of unlockedOps(blankMastery(), g.id)) seen.add(op);
+  for (const op of seen) {
+    assert.ok(RUNES[op], `grade tables can unlock "${op}" but RUNES has no entry, which crashes on render`);
+    assert.ok(RUNES[op].glyph, `rune "${op}" has no glyph`);
+    assert.ok(RUNES[op].name, `rune "${op}" has no name`);
+  }
+  // And every skill that claims an operator must be one the runes cover.
+  for (const s of SKILLS) if (s.op) assert.ok(RUNES[s.op], `skill ${s.id} uses unknown operator "${s.op}"`);
+});
+
+test('every operator in play can actually be evaluated', () => {
+  for (const op of Object.keys(RUNES)) {
+    let found = false;
+    for (let a = 1; a <= 12 && !found; a++) {
+      for (let b = 1; b <= 12 && !found; b++) {
+        if (!isLegal(a, op, b)) continue;
+        const r = evaluate(a, op, b);
+        assert.ok(Number.isFinite(r), `${a} ${op} ${b} is legal but evaluates to ${r}`);
+        found = true;
+      }
+    }
+    assert.ok(found, `no legal play exists for operator "${op}" at all`);
+  }
+});
+
+test('levels now run to ninth, and grades reach eighth', () => {
+  assert.equal(MAX_LEVEL, 9);
+  assert.equal(GRADES.length, 8);
+  assert.equal(GRADE_BY_ID[8].level, 8);
+  const fresh = blankMastery();
+  assert.equal(difficultyLevel(fresh, 8), 8, 'an 8th grader must not start on level 1');
+  assert.ok(unlockedOps(fresh, 7).includes('^'), 'powers unlock with 7th grade');
+  assert.ok(!unlockedOps(fresh, 5).includes('^'));
+});
+
+test('a 7th or 8th grade hero is served middle school work immediately', () => {
+  const m = blankMastery();
+  const level = difficultyLevel(m, 8);
+  const runes = unlockedOps(m, 8);
+  const seen = new Set();
+  for (let seed = 1; seed <= 600; seed++) {
+    const d = pickDrill(makeRng(seed), m, runes, level);
+    assert.ok(drillIsUsable(d), JSON.stringify(d));
+    seen.add(d.skill);
+  }
+  const middle = ASKED_SKILLS.filter(s => seen.has(s));
+  assert.ok(middle.length >= 5,
+    `an 8th grader should meet most middle school topics, saw: ${[...seen].join(',')}`);
+  assert.ok(seen.has('percent') && seen.has('ratio'), 'percentages and ratios are the priority');
+});
+
+test('negative tiles appear only once integers are on the syllabus', () => {
+  assert.equal(negativeTilesFor(1), 0);
+  assert.equal(negativeTilesFor(5), 0);
+  assert.ok(negativeTilesFor(6) >= 1);
+  assert.ok(negativeTilesFor(9) >= 1);
+});
+
+test('a hand with negative tiles still always has a legal strike', () => {
+  const m = blankMastery();
+  for (let i = 0; i < 20; i++) recordAttempt(m, { skill: 'exponents', fact: '5^2', correct: true, ms: 1500 });
+  for (const grade of [6, 7, 8]) {
+    const runes = unlockedOps(m, grade);
+    let sawNegative = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const hand = generateHand(makeRng(seed), { mastery: m, runes, size: 5, depth: 5, grade });
+      assert.ok(legalPlays(hand, runes).length > 0, `grade ${grade} seed ${seed} dealt a dead hand`);
+      if (hand.some(t => t.value < 0)) sawNegative++;
+    }
+    assert.ok(sawNegative > 0, `grade ${grade} never dealt a negative tile`);
+  }
+});
+
+test('powers are limited to squares and cubes, with a sane ceiling', () => {
+  assert.ok(isLegal(7, '^', 2) && isLegal(5, '^', 3));
+  assert.ok(!isLegal(7, '^', 1), 'a first power is not practice');
+  assert.ok(!isLegal(7, '^', 4));
+  assert.ok(!isLegal(30, '^', 3), '27000 damage is not a number a kid should see');
+  assert.equal(evaluate(7, '^', 2), 49);
+  assert.ok(isLegal(-3, '^', 2), 'a negative squared is positive and worth teaching');
+});
+
+test('a strike must still make a whole number of at least one', () => {
+  assert.ok(isLegal(5, '+', -3), '5 + -3 = 2');
+  assert.ok(isLegal(5, '-', -3), '5 - -3 = 8');
+  assert.ok(isLegal(-4, '*', -3), 'two negatives make a positive');
+  assert.ok(!isLegal(-3, '-', 5), 'a negative result is not a strike');
+  assert.ok(!isLegal(4, '-', 4), 'zero damage is not a strike');
+  assert.ok(!isLegal(-12, '/', 3), 'nor is a negative quotient');
+  assert.ok(isLegal(-12, '/', -3), 'but -12 / -3 = 4');
+});
+
+test('every drill carries its own answer, and it is always answerable', () => {
+  /* The bug: the drill screen recomputed the answer from a-op-b, which a
+     written problem does not have, so the expected answer became NaN and the
+     child could not get it right however hard they tried. */
+  for (const g of GRADES) {
+    const m = blankMastery();
+    const level = difficultyLevel(m, g.id);
+    const runes = unlockedOps(m, g.id);
+    for (let seed = 1; seed <= 400; seed++) {
+      const d = pickDrill(makeRng(seed), m, runes, level);
+      assert.ok(d, `${g.label} produced no drill`);
+      const v = answerValue(d.answer);
+      assert.ok(Number.isFinite(v), `${g.label}: answer is ${JSON.stringify(d.answer)} for ${JSON.stringify(d)}`);
+      // And the answer must be typeable on the keypad the screen shows.
+      const text = formatAnswer(d.answer);
+      assert.ok(checkAnswer(text, d.answer).ok, `${g.label}: "${text}" does not match its own answer`);
+      assert.ok(text.split('').every(ch => /[0-9./-]/.test(ch)), `${g.label}: "${text}" cannot be typed`);
+    }
+  }
+});
+
+test('a fight can always be won, at every grade', () => {
+  /* The bug this guards: expectedDrillDamage averaged in written problems,
+     which have no calculation to evaluate, so it returned NaN. That made a
+     boss's health NaN, so its health never reached zero and the duel could
+     not be won at all. Every run ended on floor 3. */
+  for (const g of GRADES) {
+    const m = blankMastery();
+    const level = difficultyLevel(m, g.id);
+    const runes = unlockedOps(m, g.id);
+    for (let seed = 1; seed <= 40; seed++) {
+      const ceiling = expectedDrillDamage(makeRng(seed), m, runes, level);
+      assert.ok(Number.isFinite(ceiling) && ceiling > 0,
+        `${g.label}: drill damage estimate is ${ceiling}`);
+      for (const opts of [{}, { elite: true }, { boss: true }, { boss: true, duel: true, ceiling }]) {
+        const e = spawnEnemy(makeRng(seed * 13), 3, { runes, level, playerMaxHp: 50, ...opts });
+        assert.ok(Number.isFinite(e.maxHp) && e.maxHp > 0, `${g.label}: enemy health is ${e.maxHp}`);
+        assert.ok(Number.isFinite(e.armor) && e.armor >= 0, `${g.label}: armor is ${e.armor}`);
+        for (const it of e.intents) {
+          for (const v of [it.dmg, it.amount, it.value]) {
+            if (v !== undefined) assert.ok(Number.isFinite(v), `${g.label}: intent value is ${v}`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('a bad ceiling never reaches the health budget', () => {
+  for (const bad of [NaN, 0, -5, undefined, null, Infinity]) {
+    const e = spawnEnemy(makeRng(7), 6, { runes: ['+', '-', '*'], level: 3, playerMaxHp: 50, boss: true, ceiling: bad });
+    assert.ok(Number.isFinite(e.maxHp) && e.maxHp > 0, `ceiling ${bad} gave health ${e.maxHp}`);
+  }
 });
 
 /* ------------------------------------------------- the design property -- */
