@@ -17,7 +17,7 @@ function heroWithHistory(name = 'Leo') {
   const p = newProfile(name, '\u{1F409}');
   for (let i = 0; i < 20; i++) recordAttempt(p.mastery, { skill: 'add_small', fact: '7+8', correct: true, ms: 1600 });
   for (let i = 0; i < 9; i++) recordAttempt(p.mastery, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 11000 });
-  p.records = { deepest: 14, runs: 6, bossesFelled: 2, wins: 1, bestEndless: 3 };
+  p.records = { ...p.records, deepest: 14, runs: 6, bossesFelled: 2, wins: 1, bestEndless: 3, floorsBeaten: 47 };
   p.days = [{ date: '2026-09-20', ms: 900000, correct: 40, wrong: 7 }];
   return p;
 }
@@ -174,6 +174,31 @@ test('a hero with a garbled record is repaired, not discarded', () => {
   ] });
   assert.deepEqual(data.profiles.map(p => p.name), ['Keep'], 'the real hero is kept');
   assert.equal(data.profiles[0].mastery.skills.add_small.attempts, 0);
+});
+
+test('a hero from before earned avatars is credited, not reset to zero', () => {
+  const old = {
+    profiles: [{
+      id: 'p1', name: 'Hudson', avatar: '\u{1F409}',
+      mastery: { skills: {}, facts: {} },
+      records: { deepest: 8, runs: 3, bossesFelled: 1 },
+      days: [],
+    }],
+    activeId: 'p1',
+  };
+  const hero = hydrate(old).profiles[0];
+  assert.equal(hero.records.floorsBeaten, 8,
+    'their deepest floor is the most we can honestly infer, and beats showing zero');
+});
+
+test('a hero who really has beaten nothing keeps a zero', () => {
+  const hero = hydrate({ profiles: [{ id: 'p', name: 'New', mastery: {}, records: { deepest: 0 } }] }).profiles[0];
+  assert.equal(hero.records.floorsBeaten, 0);
+});
+
+test('an existing floor count is never overwritten by the fallback', () => {
+  const hero = hydrate({ profiles: [{ id: 'p', name: 'X', mastery: {}, records: { deepest: 8, floorsBeaten: 40 } }] }).profiles[0];
+  assert.equal(hero.records.floorsBeaten, 40);
 });
 
 console.log(`${passed} storage tests passed`);

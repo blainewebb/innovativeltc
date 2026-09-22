@@ -456,6 +456,24 @@ input[type="file"] {
 
 .version { text-align: center; font-size: .68rem; color: var(--line); margin: 10px 0 0; }
 
+.pa.as-button {
+  background: none; border: 2px solid var(--line); border-radius: 14px;
+  padding: 4px 8px; cursor: pointer; line-height: 1;
+}
+.pa.as-button:active { transform: translateY(2px); }
+.big-art.huge { font-size: 4.4rem; }
+
+.looks { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+.look {
+  display: grid; gap: 2px; place-items: center; padding: 8px 2px; min-height: 62px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 10px;
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.look .lk { font-size: 1.6rem; line-height: 1; }
+.look small { color: var(--muted); font-size: .58rem; text-align: center; line-height: 1.1; }
+.look.on { border-color: var(--gold); background: #3a3050; }
+.look.locked { opacity: .45; cursor: default; }
+
 details.danger { margin-top: 14px; }
 details.danger summary { color: #ff9aa6; font-size: .82rem; cursor: pointer; }
 details.danger .btn { width: auto; }

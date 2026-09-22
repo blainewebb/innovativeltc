@@ -7,7 +7,7 @@
 /* Shown on the picker so "is this the new version?" is a thing you read
    rather than infer from which buttons exist. Bump it with any change worth
    telling a device about, alongside CACHE in sw.js. */
-export const VERSION = '2026-09-22.4';
+export const VERSION = '2026-09-22.5';
 
 export const SKILLS = [
   { id: 'add_small',  label: 'Adding to 20',        op: '+', tier: 1 },
@@ -47,6 +47,58 @@ export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
    rather than an age on purpose: two eight year olds can be two years apart
    on times tables, so age predicts very little. Its influence decays as real
    answers arrive, so a wrong guess corrects itself. */
+/* --------------------------------------------------------------- looks --
+   Twenty heroes. Eight to choose from on day one, so picking still feels like
+   a choice and two brothers need not look identical, and twelve earned one
+   every five floors beaten.
+
+   Floors count cumulatively and across every run, so a death never takes
+   progress away. A kid who dies on floor four after a good run has still
+   moved four floors closer to the next one, which is exactly the moment the
+   encouragement is worth something. */
+export const FLOORS_PER_AVATAR = 5;
+
+export const AVATARS = [
+  { id: 'mage',    char: '\u{1F9D9}', name: 'Mage',      at: 0 },
+  { id: 'elf',     char: '\u{1F9DD}', name: 'Elf',       at: 0 },
+  { id: 'vampire', char: '\u{1F9DB}', name: 'Vampire',   at: 0 },
+  { id: 'robot',   char: '\u{1F916}', name: 'Robot',     at: 0 },
+  { id: 'fox',     char: '\u{1F98A}', name: 'Fox',       at: 0 },
+  { id: 'tiger',   char: '\u{1F42F}', name: 'Tiger',     at: 0 },
+  { id: 'dragon',  char: '\u{1F409}', name: 'Dragon',    at: 0 },
+  { id: 'unicorn', char: '\u{1F984}', name: 'Unicorn',   at: 0 },
+
+  { id: 'wolf',    char: '\u{1F43A}', name: 'Wolf',      at: 5 },
+  { id: 'owl',     char: '\u{1F989}', name: 'Owl',       at: 10 },
+  { id: 'bear',    char: '\u{1F43B}', name: 'Bear',      at: 15 },
+  { id: 'eagle',   char: '\u{1F985}', name: 'Eagle',     at: 20 },
+  { id: 'shark',   char: '\u{1F988}', name: 'Shark',     at: 25 },
+  { id: 'kraken',  char: '\u{1F419}', name: 'Kraken',    at: 30 },
+  { id: 'ghost',   char: '\u{1F47B}', name: 'Ghost',     at: 35 },
+  { id: 'raptor',  char: '\u{1F996}', name: 'Raptor',    at: 40 },
+  { id: 'revenant',char: '\u{1F9DF}', name: 'Revenant',  at: 45 },
+  { id: 'wyrm',    char: '\u{1F432}', name: 'Wyrm',      at: 50 },
+  { id: 'visitor', char: '\u{1F47D}', name: 'Visitor',   at: 55 },
+  { id: 'lion',    char: '\u{1F981}', name: 'Lion',      at: 60 },
+];
+
+export const AVATAR_BY_CHAR = Object.fromEntries(AVATARS.map(a => [a.char, a]));
+
+export function unlockedAvatars(floorsBeaten = 0) {
+  return AVATARS.filter(a => a.at <= floorsBeaten);
+}
+
+/** The next one to earn, and how far off it is. Null once they are all out. */
+export function nextAvatar(floorsBeaten = 0) {
+  const next = AVATARS.find(a => a.at > floorsBeaten);
+  return next ? { ...next, away: next.at - floorsBeaten } : null;
+}
+
+/** Anything newly earned by crossing from one floor count to another. */
+export function avatarsEarnedBetween(before, after) {
+  return AVATARS.filter(a => a.at > before && a.at <= after);
+}
+
 export const GRADES = [
   { id: 1, label: '1st grade', hint: 'Adding and taking away small numbers', level: 1, ops: ['+', '-'] },
   { id: 2, label: '2nd grade', hint: 'Adding and subtracting to 100', level: 2, ops: ['+', '-'] },

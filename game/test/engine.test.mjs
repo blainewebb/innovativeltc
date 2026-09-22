@@ -13,7 +13,9 @@ import {
   expectedDrillDamage,
 } from '../js/engine.js';
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
-         ASKED, ASKED_SKILLS, simplifyFraction, RUNES } from '../js/data.js';
+         ASKED, ASKED_SKILLS, simplifyFraction, RUNES,
+         AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
+         FLOORS_PER_AVATAR } from '../js/data.js';
 
 /** A drill is either a calculation off the tiles or a written question. */
 function drillIsUsable(d) {
@@ -1120,6 +1122,65 @@ test('a bad ceiling never reaches the health budget', () => {
     const e = spawnEnemy(makeRng(7), 6, { runes: ['+', '-', '*'], level: 3, playerMaxHp: 50, boss: true, ceiling: bad });
     assert.ok(Number.isFinite(e.maxHp) && e.maxHp > 0, `ceiling ${bad} gave health ${e.maxHp}`);
   }
+});
+
+/* ------------------------------------------------------------ heroes -- */
+test('twenty heroes, eight of them free to start', () => {
+  assert.equal(AVATARS.length, 20);
+  assert.equal(unlockedAvatars(0).length, 8, 'picking a hero on day one should still be a choice');
+  assert.equal(unlockedAvatars(1e6).length, 20);
+});
+
+test('every hero is distinct, named, and earned on a five floor step', () => {
+  assert.equal(new Set(AVATARS.map(a => a.char)).size, 20, 'two heroes look the same');
+  assert.equal(new Set(AVATARS.map(a => a.id)).size, 20);
+  for (const a of AVATARS) {
+    assert.ok(a.name && a.name.length > 1, `${a.id} has no name`);
+    assert.ok(Number.isInteger(a.at) && a.at >= 0, `${a.id} unlocks at ${a.at}`);
+    assert.equal(a.at % FLOORS_PER_AVATAR, 0, `${a.id} unlocks at ${a.at}, off the five floor step`);
+  }
+  // Ordered, so "next" is always the nearest one.
+  for (let i = 1; i < AVATARS.length; i++) {
+    assert.ok(AVATARS[i].at >= AVATARS[i - 1].at, 'the list must be in unlock order');
+  }
+});
+
+test('one hero arrives every five floors, with none skipped or repeated', () => {
+  const seen = new Set();
+  for (let floors = 1; floors <= 200; floors++) {
+    for (const a of avatarsEarnedBetween(floors - 1, floors)) {
+      assert.ok(!seen.has(a.id), `${a.id} was earned twice`);
+      seen.add(a.id);
+      assert.equal(floors % FLOORS_PER_AVATAR, 0, `${a.id} arrived on floor ${floors}`);
+    }
+  }
+  assert.equal(seen.size, 12, 'all twelve earnable heroes should arrive within 200 floors');
+  assert.equal(unlockedAvatars(200).length, 20);
+});
+
+test('nothing is earned twice, and nothing is missed on a jump', () => {
+  assert.deepEqual(avatarsEarnedBetween(5, 5), []);
+  assert.deepEqual(avatarsEarnedBetween(4, 5).map(a => a.name), ['Wolf']);
+  assert.deepEqual(avatarsEarnedBetween(5, 6), []);
+  // A jump of several floors must not lose the ones in between.
+  assert.deepEqual(avatarsEarnedBetween(0, 15).map(a => a.name), ['Wolf', 'Owl', 'Bear']);
+});
+
+test('the next hero is always the nearest one still locked', () => {
+  assert.equal(nextAvatar(0).name, 'Wolf');
+  assert.equal(nextAvatar(0).away, 5);
+  assert.equal(nextAvatar(12).name, 'Bear');
+  assert.equal(nextAvatar(12).away, 3);
+  assert.equal(nextAvatar(14).away, 1);
+  assert.equal(nextAvatar(15).name, 'Eagle', 'the one just earned is no longer next');
+  assert.equal(nextAvatar(1e6), null, 'once they are all out, there is no next');
+});
+
+test('a starter hero is available to a brand new profile', () => {
+  // Hero creation offers unlockedAvatars(0); an empty list would be a dead end.
+  const starters = unlockedAvatars(0);
+  assert.ok(starters.length > 0);
+  assert.ok(starters.every(a => a.at === 0));
 });
 
 /* ------------------------------------------------- the design property -- */
