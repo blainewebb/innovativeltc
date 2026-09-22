@@ -4,6 +4,11 @@
 /* ---------------------------------------------------------------- skills --
    Every arithmetic attempt the player makes is classified into one of these.
    The report card and the adaptive hand generator both read off this list. */
+/* Shown on the picker so "is this the new version?" is a thing you read
+   rather than infer from which buttons exist. Bump it with any change worth
+   telling a device about, alongside CACHE in sw.js. */
+export const VERSION = '2026-09-22.1';
+
 export const SKILLS = [
   { id: 'add_small',  label: 'Adding to 20',        op: '+', tier: 1 },
   { id: 'sub_small',  label: 'Subtracting within 20', op: '-', tier: 1 },

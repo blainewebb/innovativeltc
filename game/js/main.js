@@ -10,7 +10,7 @@ import {
   makeRng as engineRng,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
-import { RUNES, RELICS, GRADES, GRADE_BY_ID } from './data.js';
+import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION } from './data.js';
 import * as store from './storage.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
@@ -84,6 +84,7 @@ function screenProfiles() {
         </div>
       </div>
       ${data.profiles.length ? '<button class="btn ghost small" id="parentBtn">Grown-ups</button>' : ''}
+      <p class="version">v${VERSION}</p>
     </div>`);
 
   $$('.profile-card').forEach(b => b.onclick = () => {
@@ -1416,7 +1417,9 @@ document.addEventListener('keydown', ev => {
 /* ====================================================== service worker === */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => { /* offline install optional */ });
+    navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+      .then(reg => reg.update())
+      .catch(() => { /* offline install optional */ });
   });
 
   /* When a new worker takes over, the page is still running the old code.
