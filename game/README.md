@@ -192,6 +192,35 @@ Add one from the picker: on the hub, **Switch / add hero**, then **Add another
 hero** at the bottom of the list. Give each kid their own rather than sharing
 one, or the adaptation averages two children together and targets neither.
 
+## Heroes surviving an update
+
+Heroes live in `localStorage`, which is a different thing entirely from the
+code cache. Nothing in a release touches it, and no code anywhere clears it.
+Shipping a new version does not cost anyone their progress.
+
+The one way it could have was a schema change. `load()` used to hand the saved
+object straight to the app, so any release that added a field left every
+existing hero without it. Saves now go through `hydrate()`, which fills in
+anything missing and repairs garbled values without ever deleting. A save that
+cannot be parsed at all is left on disk untouched rather than overwritten, so
+there is still something to recover by hand.
+
+`test/storage.test.mjs` loads a save shaped the way an older build wrote it,
+before grades, drill settings, wins or endless mode existed, and asserts the
+hero comes back complete and playable. The browser run does the same end to
+end: it plants an old-shaped save, reloads, and plays a run with it.
+
+**What does lose you a hero is a different browser, not an update.** Storage is
+per browser and per origin. Safari and Chrome on the same phone are two
+separate sets of heroes, and on iOS a home-screen web app has its own container
+separate from the Safari tab it was installed from. Pick one browser per kid's
+device and stay there. On iPhone that should be Safari: it is the only one that
+runs the service worker, which is what makes the app installable and offline,
+and installed web apps are exempt from the seven-day storage eviction that
+ordinary Safari browsing is subject to.
+
+To move a hero between browsers, use the backup below rather than hoping.
+
 ## Where progress lives, and moving it
 
 There is no account and no server, which is what makes the game work offline

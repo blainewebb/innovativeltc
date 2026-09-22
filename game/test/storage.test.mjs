@@ -3,7 +3,7 @@
    import and normalising helpers are testable in plain Node. */
 import assert from 'node:assert/strict';
 import { newProfile, normalizeProfile, exportPayload, exportFilename,
-         parseImport, asCopy, EXPORT_FORMAT } from '../js/storage.js';
+         parseImport, asCopy, hydrate, EXPORT_FORMAT } from '../js/storage.js';
 import { blankMastery, recordAttempt, skillScore, shakyFacts } from '../js/engine.js';
 import { SKILLS } from '../js/data.js';
 
@@ -106,6 +106,74 @@ test('importing does not mutate the exported hero', () => {
   const snapshot = JSON.stringify(before);
   parseImport(JSON.stringify(exportPayload([before])));
   assert.equal(JSON.stringify(before), snapshot);
+});
+
+/* ------------------------------------------- surviving an update -- */
+/* The promise being kept here: shipping a new version never costs a family
+   their heroes. Every one of these is a save written by an older build. */
+
+test('a hero saved before grades and drill settings existed still loads', () => {
+  const ancient = {
+    profiles: [{
+      id: 'p1', name: 'Hudson', avatar: '\u{1F409}', created: 1700000000000,
+      mastery: { skills: { add_small: { attempts: 40, correct: 38, ema: 0.95, totalMs: 60000 } }, facts: { '7+8': { attempts: 9, correct: 7, ema: 0.8, totalMs: 18000 } } },
+      records: { deepest: 8, runs: 3, bossesFelled: 1 },
+      days: [{ date: '2026-09-20', ms: 600000, correct: 30, wrong: 5 }],
+    }],
+    activeId: 'p1',
+    settings: { sound: true },
+  };
+  const data = hydrate(ancient);
+  assert.equal(data.profiles.length, 1);
+  const h = data.profiles[0];
+  assert.equal(h.name, 'Hudson');
+  assert.equal(h.records.deepest, 8, 'their record must survive');
+  assert.equal(h.mastery.facts['7+8'].attempts, 9, 'their learning record must survive');
+  assert.equal(data.activeId, 'p1');
+  // Fields added by later releases are filled in rather than left undefined.
+  assert.equal(h.grade, 0);
+  assert.equal(h.prefs.drills, true);
+  assert.equal(h.records.wins, 0);
+  assert.equal(h.records.bestEndless, 0);
+  for (const s of SKILLS) assert.ok(h.mastery.skills[s.id], `missing skill ${s.id}`);
+});
+
+test('hydrating never drops or empties a hero', () => {
+  const before = newProfile('Leo', '\u{1F409}', 3);
+  for (let i = 0; i < 12; i++) recordAttempt(before.mastery, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 9000 });
+  const data = hydrate({ profiles: [before], activeId: before.id, settings: {} });
+  assert.equal(data.profiles.length, 1);
+  assert.deepEqual(data.profiles[0].mastery.facts, before.mastery.facts);
+  assert.equal(data.profiles[0].grade, 3);
+});
+
+test('a pointer to a hero who is gone does not leave an empty hub', () => {
+  const data = hydrate({ profiles: [newProfile('A', 'x', 1)], activeId: 'someone-deleted' });
+  assert.equal(data.activeId, null, 'should fall back to the picker, not a blank hub');
+});
+
+test('a corrupt or empty store returns something usable rather than throwing', () => {
+  for (const input of [null, undefined, 'nonsense', 42, {}, { profiles: 'not an array' }]) {
+    const data = hydrate(input);
+    assert.deepEqual(data.profiles, []);
+    assert.equal(data.activeId, null);
+    assert.equal(data.settings.sound, true);
+  }
+});
+
+test('sound preference survives, and an unknown setting does not wipe the rest', () => {
+  assert.equal(hydrate({ settings: { sound: false } }).settings.sound, false);
+  assert.equal(hydrate({ settings: { somethingNew: 1 } }).settings.sound, true);
+});
+
+test('a hero with a garbled record is repaired, not discarded', () => {
+  const data = hydrate({ profiles: [
+    { id: 'p1', name: 'Keep', mastery: { skills: { add_small: { attempts: 'lots' } } } },
+    null,
+    'nonsense',
+  ] });
+  assert.deepEqual(data.profiles.map(p => p.name), ['Keep'], 'the real hero is kept');
+  assert.equal(data.profiles[0].mastery.skills.add_small.attempts, 0);
 });
 
 console.log(`${passed} storage tests passed`);
