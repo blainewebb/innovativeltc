@@ -34,7 +34,11 @@ echo "== browser playthrough =="
 PORT="$PORT" node test/play.test.mjs || fail=1
 
 echo
-echo "== soak run =="
+echo "== soak run: primary school hero =="
 PORT="$PORT" node test/soak.test.mjs || fail=1
+
+echo
+echo "== soak run: 8th grade hero =="
+PORT="$PORT" GRADE=8 node test/soak.test.mjs || fail=1
 
 exit $fail

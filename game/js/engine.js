@@ -2,7 +2,8 @@
    Everything here is deterministic given a seed, so it can be unit tested. */
 
 import { SKILLS, SKILL_BY_ID, classify, factKey, WARDS, RESISTS, ENEMIES, BOSSES,
-         RELICS, RELIC_BY_ID, RIDDLES, GRADES, GRADE_BY_ID } from './data.js';
+         RELICS, RELIC_BY_ID, RIDDLES, GRADES, GRADE_BY_ID, ASKED, ASKED_SKILLS,
+         simplifyFraction } from './data.js';
 
 /* ------------------------------------------------------------------ rng --
    Small seeded PRNG (mulberry32) so a run can be replayed from its seed. */
@@ -114,7 +115,7 @@ function evidenceLevel(mastery) {
   const reach = Math.max(...active.map(s => s.tier));
   // Level tracks the highest tier the player is working in, nudged by how well.
   const level = reach + (avg > 0.72 ? 1 : avg < 0.45 ? -1 : 0);
-  return Math.max(1, Math.min(6, level));
+  return Math.max(1, Math.min(MAX_LEVEL, level));
 }
 
 /* The declared grade acts as a floor that erodes as real answers arrive: one
@@ -123,13 +124,18 @@ function evidenceLevel(mastery) {
    sensible first run without letting a parent's guess outlive the evidence,
    in either direction. */
 export const GRADE_DECAY_ATTEMPTS = 30;
+/* Roughly one run of grace first. Without it the floor dropped a level while
+   the child's own record was still too thin to replace it, and the game
+   visibly got easier thirty problems in. */
+export const GRADE_GRACE_ATTEMPTS = 60;
 
 export function difficultyLevel(mastery, grade = 0) {
   const evidence = evidenceLevel(mastery);
   const seeded = GRADE_BY_ID[grade]?.level || 0;
   if (!seeded) return evidence;
-  const floor = seeded - Math.floor(totalAttempts(mastery) / GRADE_DECAY_ATTEMPTS);
-  return Math.max(1, Math.min(6, Math.max(evidence, floor)));
+  const past = Math.max(0, totalAttempts(mastery) - GRADE_GRACE_ATTEMPTS);
+  const floor = seeded - Math.floor(past / GRADE_DECAY_ATTEMPTS);
+  return Math.max(1, Math.min(MAX_LEVEL, Math.max(evidence, floor)));
 }
 
 /** Which operator runes the profile is allowed to find, given where they are. */
@@ -139,10 +145,16 @@ export function unlockedOps(mastery, grade = 0) {
   if (addOk) ops.push('*');
   const multOk = skillScore(mastery.skills.mult_easy, 'mult_easy') > 0.5 || (mastery.skills.mult_easy?.attempts || 0) > 20;
   if (multOk) ops.push('/');
+  /* Powers need an earned route too. Declaring 7th grade was the only way in,
+     so a child who climbed there on their own never saw the rune. */
+  const hardMultOk = skillScore(mastery.skills.mult_hard, 'mult_hard') > 0.6 && (mastery.skills.mult_hard?.attempts || 0) >= 12;
+  if (hardMultOk) ops.push('^');
   // A third grader is being taught multiplication whether or not they are
   // good at it yet, so the grade adds operators it never takes away.
   for (const op of GRADE_BY_ID[grade]?.ops || []) if (!ops.includes(op)) ops.push(op);
-  return ['+', '-', '*', '/'].filter(o => ops.includes(o));
+  // Fixed order so the rune row never reshuffles between renders. The power
+  // rune has to be in this list or the grade that unlocks it gets filtered out.
+  return ['+', '-', '*', '/', '^'].filter(o => ops.includes(o));
 }
 
 /* --------------------------------------------------------------- tiles ---
@@ -150,10 +162,21 @@ export function unlockedOps(mastery, grade = 0) {
    weakest skill the player has the runes for, so the tiles in front of them
    make that skill the attractive play. */
 const TILE_RANGE = {
-  1: [1, 9], 2: [1, 10], 3: [2, 12], 4: [2, 15], 5: [3, 20], 6: [4, 25],
+  1: [1, 9], 2: [1, 10], 3: [2, 12], 4: [2, 15], 5: [3, 20],
+  6: [3, 20], 7: [4, 25], 8: [4, 25], 9: [5, 30],
 };
 
-export function tileRangeFor(level) { return TILE_RANGE[level] || TILE_RANGE[6]; }
+export const MAX_LEVEL = 9;
+
+/* Negative tiles start appearing once integers are on the syllabus. Capped at
+   two per hand: a hand that is mostly negative has very few legal strikes and
+   reads as a puzzle with no answer. */
+export function negativeTilesFor(level) {
+  if (level < 6) return 0;
+  return level >= 8 ? 2 : 1;
+}
+
+export function tileRangeFor(level) { return TILE_RANGE[level] || TILE_RANGE[MAX_LEVEL]; }
 
 /* Which skill should this hand be built around?
    An untouched skill scores 0, so simply taking the minimum would always aim
@@ -205,10 +228,24 @@ export function generateHand(rng, { mastery, runes, size = 5, depth = 1, grade =
   }
   while (tiles.length < size) tiles.push(ri(rng, lo, hi));
 
-  return tiles.slice(0, size).map((v, i) => ({
+  const out = tiles.slice(0, size).map((v, i) => ({
     id: `t${i}_${Math.floor(rng() * 1e6)}`,
     value: Math.max(lo, Math.min(hi, v)),
   }));
+
+  /* Flip a tile or two negative once integers are on the syllabus. Each flip
+     is undone if it would leave the hand with no legal strike at all, which
+     is the one thing a hand must never be. */
+  for (let k = 0; k < negativeTilesFor(level); k++) {
+    if (rng() > 0.5) continue;
+    const idx = Math.floor(rng() * out.length);
+    if (out[idx].value < 0) continue;
+    const before = out[idx].value;
+    out[idx].value = -before;
+    if (legalPlays(out, runes).length === 0) out[idx].value = before;
+  }
+
+  return out;
 }
 
 /* --------------------------------------------------------------- drills --
@@ -220,7 +257,7 @@ export function generateHand(rng, { mastery, runes, size = 5, depth = 1, grade =
 
 /** Turn a stored fact key such as "7*8" back into a problem. */
 export function parseFactKey(key) {
-  const m = /^(\d+)([+\-*/])(\d+)$/.exec(key || '');
+  const m = /^(\d+)([+\-*/^])(\d+)$/.exec(key || '');
   if (!m) return null;
   const a = Number(m[1]), op = m[2], b = Number(m[3]);
   if (!isLegal(a, op, b)) return null;
@@ -244,31 +281,77 @@ export function problemForSkill(rng, skillId, level) {
    playing, which teaches nothing at all. */
 export const DRILL_WEAK_SHARE = 0.65;
 
+/** A middle school problem the tile mechanic cannot express. */
+function askedProblem(rng, skillId) {
+  const gens = ASKED[skillId];
+  if (!gens || !gens.length) return null;
+  const made = pick(rng, gens)(rng);
+  if (!made || !made.prompt || made.answer === undefined || made.answer === null) return null;
+  const value = typeof made.answer === 'number' ? made.answer : made.answer.n / made.answer.d;
+  if (!Number.isFinite(value)) return null;
+  return { kind: 'text', skill: skillId, fact: null, prompt: made.prompt, answer: made.answer };
+}
+
+function arithProblem(rng, skillId, level) {
+  const prob = problemForSkill(rng, skillId, level);
+  if (!prob) return null;
+  return {
+    kind: 'arith',
+    ...prob,
+    answer: evaluate(prob.a, prob.op, prob.b),
+    skill: classify(prob.a, prob.op, prob.b),
+    fact: factKey(prob.a, prob.op, prob.b),
+  };
+}
+
 export function pickDrill(rng, mastery, runes, level) {
-  const usable = SKILLS.filter(s => s.op && runes.includes(s.op) && s.tier <= level + 1);
-  if (!usable.length) return null;
+  /* Arithmetic gets a level of stretch, because a harder times table is the
+     same skill one step on. A middle school topic is not: serving percentages
+     to a fourth grader is not a stretch, it is a different subject, and a
+     boss duel made of them is a wall they cannot climb. So those need the
+     level to have actually arrived. */
+  const arith = SKILLS.filter(s => s.op && runes.includes(s.op) && s.tier <= level + 1);
+  const asked = SKILLS.filter(s => ASKED[s.id] && s.tier <= level);
+  const all = [...new Set([...arith, ...asked])];
+  if (!all.length) return null;
+
+  /* A skill can be both: exponents has an operator AND written problems like
+     roots, so which form comes up is a coin toss. */
+  const fromSkill = skill => {
+    const canAsk = !!ASKED[skill.id];
+    const canBuild = !!(skill.op && runes.includes(skill.op));
+    if (canAsk && (!canBuild || rng() < 0.6)) {
+      const p = askedProblem(rng, skill.id);
+      if (p) return p;
+    }
+    if (canBuild) {
+      const p = arithProblem(rng, skill.id, level);
+      if (p) return p;
+    }
+    return canAsk ? askedProblem(rng, skill.id) : null;
+  };
 
   if (rng() < DRILL_WEAK_SHARE) {
     const shaky = shakyFacts(mastery, 12)
       .map(f => ({ f, parsed: parseFactKey(f.key) }))
       .filter(x => x.parsed && runes.includes(x.parsed.op));
-    if (shaky.length) {
+    if (shaky.length && rng() < 0.6) {
       const pool = shaky.slice(0, 6);
-      const chosen = pool[Math.floor(rng() * pool.length)];
-      const { a, op, b } = chosen.parsed;
-      return { a, op, b, skill: classify(a, op, b), fact: factKey(a, op, b), weak: true };
+      const { a, op, b } = pool[Math.floor(rng() * pool.length)].parsed;
+      return { kind: 'arith', a, op, b, answer: evaluate(a, op, b),
+               skill: classify(a, op, b), fact: factKey(a, op, b), weak: true };
     }
-    // No fact history yet: aim at the weakest skill instead.
-    const target = usable.reduce((x, y) =>
+    const tried = all.filter(s => (mastery.skills[s.id]?.attempts || 0) >= 3);
+    const pool = tried.length ? tried : all;
+    const target = pool.reduce((x, y) =>
       (skillScore(mastery.skills[y.id], y.id) < skillScore(mastery.skills[x.id], x.id) ? y : x));
-    const prob = problemForSkill(rng, target.id, level);
-    if (prob) return { ...prob, skill: classify(prob.a, prob.op, prob.b), fact: factKey(prob.a, prob.op, prob.b), weak: true };
+    const p = fromSkill(target);
+    if (p) return { ...p, weak: true };
   }
 
-  for (let tries = 0; tries < 8; tries++) {
-    const skill = usable[Math.floor(rng() * usable.length)];
-    const prob = problemForSkill(rng, skill.id, level);
-    if (prob) return { ...prob, skill: classify(prob.a, prob.op, prob.b), fact: factKey(prob.a, prob.op, prob.b), weak: false };
+  for (let tries = 0; tries < 12; tries++) {
+    const p = fromSkill(all[Math.floor(rng() * all.length)]);
+    if (p) return { ...p, weak: false };
   }
   return null;
 }
@@ -312,14 +395,87 @@ export function bossFightMs(mastery, depth) {
   return Math.round(turns * per * 1.35);
 }
 
+/* -------------------------------------------------------------- answers --
+   Up to fifth grade every answer is a whole number. Percentages, fractions
+   and negatives break that, so answers are parsed rather than compared as
+   integers. Equivalent fractions are accepted, because refusing 6/8 when the
+   child has correctly worked out three quarters teaches nothing except that
+   the game is fussy; the simplest form is mentioned instead. */
+export function parseAnswer(text) {
+  const t = String(text ?? '').trim().replace(/\u2212/g, '-');
+  if (!t) return null;
+  const frac = /^(-?\d+)\s*\/\s*(\d+)$/.exec(t);
+  if (frac) {
+    const n = Number(frac[1]), d = Number(frac[2]);
+    if (!d) return null;
+    return { value: n / d, n, d };
+  }
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
+  return { value: Number(t) };
+}
+
+/* Keypad input, kept here so the rules are testable: one decimal point, one
+   slash, never both, and a minus only at the front. Typing ".5" quietly
+   becomes "0.5" because that is what a child means by it. */
+export function typeInto(current, key) {
+  const cur = String(current ?? '');
+  if (key === 'back') return cur.slice(0, -1);
+  if (cur.length >= 8) return cur;
+  if (key === '.') {
+    if (cur.includes('.') || cur.includes('/')) return cur;
+    return (cur === '' || cur === '-') ? `${cur}0.` : `${cur}.`;
+  }
+  if (key === '/') {
+    if (cur === '' || cur === '-' || cur.includes('/') || cur.includes('.')) return cur;
+    return `${cur}/`;
+  }
+  if (key === '-') return cur === '' ? '-' : cur;
+  if (!/^[0-9]$/.test(key)) return cur;
+  // A denominator cannot start with nought, or "3/0" becomes typeable and
+  // there is no number at the end of it.
+  if (key === '0' && cur.endsWith('/')) return cur;
+  return cur + key;
+}
+
+export function answerValue(expected) {
+  return typeof expected === 'number' ? expected : expected.n / expected.d;
+}
+
+/** How an expected answer should be written on screen. */
+export function formatAnswer(expected) {
+  return typeof expected === 'number' ? String(expected) : `${expected.n}/${expected.d}`;
+}
+
+export function checkAnswer(text, expected) {
+  const given = parseAnswer(text);
+  if (!given) return { ok: false, given: null };
+  const target = answerValue(expected);
+  const ok = Math.abs(given.value - target) < 1e-9;
+  let note = null;
+  if (ok && given.d) {
+    const simplest = simplifyFraction(given.n, given.d);
+    const asText = typeof simplest === 'number' ? String(simplest) : `${simplest.n}/${simplest.d}`;
+    if (asText !== `${given.n}/${given.d}`) note = `Simplest form is ${asText}.`;
+  }
+  return { ok, given, note };
+}
+
 /* -------------------------------------------------------------- strikes --
    A strike is: tile a, operator, tile b, and the answer the player typed. */
 
 /** Is this pair legal for this operator? Illegal pairs are greyed out in the UI. */
+/* A strike has to produce a whole number of at least 1. Stating it that way
+   rather than as per-operator rules is what lets negative tiles work: 5 + -3
+   and -4 x -3 are fine, -3 - 5 is not, and nothing else had to change. */
 export function isLegal(a, op, b) {
-  if (op === '-') return a >= b;
-  if (op === '/') return b !== 0 && a % b === 0;
-  return true;
+  if (op === '^') {
+    if (b < 2 || b > 3) return false;            // squares and cubes only
+    const r = Math.pow(a, b);
+    return Number.isInteger(r) && r >= 1 && r <= 4000;
+  }
+  if (op === '/' && (b === 0 || a % b !== 0)) return false;
+  const r = evaluate(a, op, b);
+  return Number.isInteger(r) && r >= 1;
 }
 
 export function evaluate(a, op, b) {
@@ -328,6 +484,7 @@ export function evaluate(a, op, b) {
     case '-': return a - b;
     case '*': return a * b;
     case '/': return a / b;
+    case '^': return Math.pow(a, b);
     default: return NaN;
   }
 }
@@ -397,7 +554,7 @@ export function computeDamage({ result, op, ward, resist, resistAt, armor, relic
 
 /** Largest damage the player can plausibly reach on one strike right now. */
 export function bestHitEstimate(runes, level) {
-  const [, hi] = TILE_RANGE[level] || TILE_RANGE[6];
+  const [, hi] = tileRangeFor(level);
   if (runes.includes('*')) return Math.round(hi * (hi - 1) * 0.7);
   return hi * 2;
 }
@@ -422,7 +579,7 @@ function resolveIntent(it, budget) {
 /* A shield the player can never build is a wall, not a puzzle, so the target
    is always a number their own tile range can actually produce. */
 function reachableTarget(rng, runes, level) {
-  const [lo, hi] = TILE_RANGE[level] || TILE_RANGE[6];
+  const [lo, hi] = tileRangeFor(level);
   const a = ri(rng, Math.max(2, lo), hi);
   const b = ri(rng, Math.max(2, lo), hi);
   if (runes.includes('*')) return a * b;
@@ -442,27 +599,40 @@ export function effectiveHit(bestHit, resist, resistAt) {
    ceiling makes it run about twice its intended length, and those extra turns
    are extra damage taken. Sampling the actual drill picker is the honest
    answer, since that is precisely what they will be asked. */
-export function expectedDrillDamage(rng, mastery, runes, level, samples = 32) {
+export function expectedDrillDamage(rng, mastery, runes, level, samples = 48) {
+  /* Only calculations count. A written problem has no a-op-b to evaluate, and
+     averaging one in produced NaN, which made a boss's health NaN, which made
+     the duel impossible to ever win. The written-problem damage is taken FROM
+     this average, so including them here would be circular anyway. */
   let sum = 0, n = 0;
   for (let i = 0; i < samples; i++) {
     const d = pickDrill(rng, mastery, runes, level);
-    if (!d) continue;
-    sum += evaluate(d.a, d.op, d.b);
+    if (!d || d.kind !== 'arith') continue;
+    const r = evaluate(d.a, d.op, d.b);
+    if (!Number.isFinite(r)) continue;
+    sum += r;
     n++;
   }
-  return n ? Math.max(1, sum / n) : 10;
+  if (!n) return Math.max(1, Math.round(bestHitEstimate(runes, level) * 0.35));
+  return Math.max(1, sum / n);
 }
 
 export function spawnEnemy(rng, depth, opts = {}) {
   const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
-          ceiling = null, duel = false } = opts;
+          ceiling = null, armorBase = null, duel = false } = opts;
   const tier = Math.max(1, Math.min(3, Math.ceil(depth / 3)));
   const pool = boss ? BOSSES : ENEMIES.filter(e => e.tier <= tier + (elite ? 1 : 0));
   const tpl = pick(rng, pool.length ? pool : ENEMIES);
 
-  const bestHit = ceiling || bestHitEstimate(runes, level);
+  const fallback = bestHitEstimate(runes, level);
+  const bestHit = Number.isFinite(ceiling) && ceiling > 0 ? ceiling : fallback;
+  /* Armor scales off the player's WEAKEST turn, not their average. Scaled to
+     the average, a level-eight drill turn delivering 80 ran into 70 armor and
+     did nothing at all: armor stopped being a puzzle and started deleting a
+     whole turn type. */
+  const armorFrom = Number.isFinite(armorBase) && armorBase > 0 ? armorBase : bestHit;
   const turns = turnsFor(depth, { elite, boss });
-  const armor = Math.round(bestHit * tpl.armorFrac);
+  const armor = Math.round(armorFrom * tpl.armorFrac);
 
   /* Per-turn chip damage. A four-turn fight should cost a fifth of the
      player's health, not half: the run has to survive fifteen of them. */

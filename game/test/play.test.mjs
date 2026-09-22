@@ -21,7 +21,22 @@ const ok = (name, cond, extra = '') => {
   else { failed++; console.error(`  FAIL ${name} ${extra}`); }
 };
 
-const OPS = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
+const OPS = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b, '^': (a, b) => Math.pow(a, b) };
+
+/* The game's own rule: a strike must make a whole number of at least one.
+   Negative tiles and the power rune both fall out of this, so the bot checks
+   the result rather than keeping a list of per-operator special cases. */
+function legalPlay(a, op, b) {
+  if (op === '^') {
+    if (b < 2 || b > 3) return false;
+    const r = Math.pow(a, b);
+    return Number.isInteger(r) && r >= 1 && r <= 4000;
+  }
+  if (op === '/' && (b === 0 || a % b !== 0)) return false;
+  const r = op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : a / b;
+  return Number.isInteger(r) && r >= 1;
+}
+
 
 async function typeNumber(page, n, submitSel) {
   for (const ch of String(n)) await page.click(`.key[data-k="${ch}"]`);
@@ -46,8 +61,7 @@ async function buildLegalExpression(page) {
     for (const op of runes) {
       for (const t2 of live) {
         if (t1.i === t2.i) continue;
-        if (op === '-' && t1.v < t2.v) continue;
-        if (op === '/' && (t2.v === 0 || t1.v % t2.v !== 0)) continue;
+        if (!legalPlay(t1.v, op, t2.v)) continue;
         await page.click(`.tile[data-i="${t1.i}"]`, { timeout: 3000 });
         await page.click(`.rune[data-op="${op}"]`, { timeout: 3000 });
         await page.click(`.tile[data-i="${t2.i}"]`, { timeout: 3000 });
@@ -62,7 +76,14 @@ async function buildLegalExpression(page) {
    correctly and carry on, unless the caller wants to test the miss path. */
 async function clearDrill(page, { correct = true } = {}) {
   if (!(await page.$('.drill-problem'))) return false;
+  // A drill is either three number boxes or a written question. The bot can
+  // only do the arithmetic one, so it guesses at the rest.
   const parts = await page.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+  if (parts.length < 3) {
+    await typeNumber(page, 7, '#answer');
+    await page.waitForTimeout(120);
+    return true;
+  }
   const answer = OPS[parts[1]](Number(parts[0]), Number(parts[2]));
   await typeNumber(page, correct ? answer : answer + 1, '#answer');
   await page.waitForTimeout(120);
@@ -79,7 +100,8 @@ try {
   await page.goto(URL, { waitUntil: 'networkidle' });
 
   /* ---- profile creation, with a school year ---- */
-  ok('the picker asks for a school year', (await page.$$('.grade')).length === 5);
+  ok('the picker asks for a school year, 1st through 8th', (await page.$$('.grade')).length === 8);
+  ok('8th grade is offered', !!(await page.$('.grade[data-grade="8"]')));
   // A readable build stamp, so "is this the new version?" stops being guesswork.
   const stamp = await page.$eval('.version', e => e.textContent).catch(() => '');
   ok('the picker shows which build is loaded', /^v\d{4}-\d{2}-\d{2}\.\d+$/.test(stamp), stamp);
@@ -167,6 +189,64 @@ try {
     await page.waitForTimeout(120);
   }
 
+  /* ---- an 8th grader is served middle school work, typed as such ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  if (await page.$('#switchBtn')) await page.click('#switchBtn');
+  await page.waitForSelector('#newName');
+  await page.fill('#newName', 'Middle');
+  await page.click('.grade[data-grade="8"]');
+  await page.click('#createProfile');
+  await page.waitForSelector('#startRun');
+  const eighthHub = await page.$eval('.panel', e => e.textContent);
+  ok('an 8th grader starts well above level 1', /Challenge level [7-9]/.test(eighthHub), eighthHub.slice(0, 200));
+  await page.click('#startRun');
+
+  let askedSeen = null;
+  for (let step = 0; step < 140 && !askedSeen; step++) {
+    const asked = await page.$('.asked');
+    if (asked) { askedSeen = await asked.textContent(); break; }
+    if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
+    if (await page.$('.hand')) {
+      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      const ex = await readExpression(page);
+      if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
+      await typeNumber(page, ex.answer, '#strike');
+      continue;
+    }
+    if (await page.$('#cont')) { await page.click('#cont'); continue; }
+    if (await page.$('#next')) { await page.click('#next'); continue; }
+    if (await page.$('.choice')) { await page.click('.choice'); continue; }
+    if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
+    if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('.node')) {
+      const n = await page.$('.node.battle') || await page.$('.node');
+      await n.click();
+      continue;
+    }
+    break;
+  }
+  ok('a written middle-school question comes up', !!askedSeen, String(askedSeen).slice(0, 120));
+  if (askedSeen) {
+    ok('the question reads as real maths, not a template leak',
+       !/undefined|NaN|\[object/.test(askedSeen), askedSeen);
+    // Fractions, decimals and negatives need keys the old pad did not have.
+    const symbols = await page.$$eval('.key.sym', els => els.map(e => e.dataset.k).sort());
+    ok('the keypad gains slash, point and minus', symbols.join('') === '-./', symbols.join(''));
+    await page.click('.key[data-k="3"]');
+    await page.click('.key[data-k="/"]');
+    await page.click('.key[data-k="4"]');
+    ok('a fraction can be typed', (await page.$eval('.answer', e => e.textContent.trim())) === '3/4');
+    await page.click('.key[data-k="back"]');
+    await page.click('.key[data-k="back"]');
+    await page.click('.key[data-k="back"]');
+    await page.click('.key[data-k="-"]');
+    await page.click('.key[data-k="5"]');
+    ok('a negative can be typed', (await page.$eval('.answer', e => e.textContent.trim())) === '-5');
+    await page.click('#answer');
+    await page.waitForTimeout(150);
+    ok('a written answer resolves the turn', !!(await page.$('.hand, .drill-problem, #cont, #again')));
+  }
+
   /* ---- the boss duel on floor 3 ---- */
   // Walk to the first boss floor. Answering everything correctly is enough.
   let sawDuel = false;
@@ -232,7 +312,9 @@ try {
   await typeNumber(page, 391, '#go');
   await page.waitForSelector('.report-card');
   const cards = await page.$$('.report-card');
-  ok('the report card has a section per hero', cards.length === 2, `${cards.length} cards`);
+  const heroCount = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('runebreaker.v1')).profiles.length);
+  ok('the report card has a section per hero', cards.length === heroCount, `${cards.length} cards, ${heroCount} heroes`);
   const perCard = await page.$$eval('.report-card', els => els.map(e => e.querySelectorAll('.skill-row').length));
   ok('report card lists every skill for each hero', perCard.every(n => n >= 11), perCard.join(','));
   // Read the actual count: /0 problems/ also matches "40 problems".
@@ -240,8 +322,8 @@ try {
     const m = e.textContent.match(/(\d+) problems/);
     return m ? Number(m[1]) : -1;
   }));
-  ok('the two heroes have independent records',
-     counts.filter(n => n === 0).length === 1 && counts.some(n => n > 0),
+  ok('the heroes have independent records',
+     counts.some(n => n === 0) && counts.some(n => n > 0),
      JSON.stringify(counts));
   const reportText = await page.$eval('.report-card', e => e.textContent);
   ok('report card shows attempts, not just zeros', /% right/.test(reportText), reportText.slice(0, 200));
@@ -298,8 +380,36 @@ try {
   ok('junk input explains itself', /Runebreaker backup/.test(errText), errText);
   await page.click('#back');
 
+  /* ---- a hero saved by an older build survives an update ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.setItem('runebreaker.v1', JSON.stringify({
+    // Shaped like a save written before grades, drill prefs, wins or endless
+    // existed. This is what an update must never cost anyone.
+    profiles: [{
+      id: 'old1', name: 'Hudson', avatar: '\u{1F409}', created: 1700000000000,
+      mastery: {
+        skills: { add_small: { attempts: 40, correct: 38, ema: 0.95, totalMs: 64000 } },
+        facts: { '7+8': { attempts: 9, correct: 7, ema: 0.8, totalMs: 18000 } },
+      },
+      records: { deepest: 8, runs: 3, bossesFelled: 1 },
+      days: [{ date: '2026-09-20', ms: 600000, correct: 30, wrong: 5 }],
+    }],
+    activeId: 'old1',
+    settings: { sound: true },
+  })));
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#startRun');
+  const oldHero = await page.$eval('.hero-row', e => e.textContent);
+  ok('an older save still loads straight into its hub', /Hudson/.test(oldHero), oldHero);
+  ok('an older save keeps its deepest floor', /\b8\b/.test(oldHero), oldHero);
+  await page.click('#startRun');
+  await page.waitForSelector('.node');
+  ok('an older save is playable, not just visible', (await page.$$('.node')).length >= 1);
+
   /* ---- deleting a hero from the picker ---- */
   await page.goto(URL, { waitUntil: 'networkidle' });
+  // A save with an active hero boots into the hub, so step out to the picker.
+  if (await page.$('#switchBtn')) await page.click('#switchBtn');
   await page.waitForSelector('#newName');
   await page.fill('#newName', 'Doomed');
   await page.click('.grade[data-grade="2"]');
@@ -336,7 +446,7 @@ try {
   await page.waitForTimeout(150);
   const left = await page.$$eval('.profile-card .pn', els => els.map(e => e.textContent.trim()));
   ok('confirming removes that hero and no other',
-     !left.includes('Doomed') && left.some(n => n.startsWith('Tester')), left.join(','));
+     !left.includes('Doomed') && left.length >= 1, left.join(','));
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {

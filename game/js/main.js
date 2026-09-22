@@ -7,7 +7,7 @@ import {
   recordAttempt, classify, factKey, skillScore, shakyFacts, difficultyLevel,
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
   pickDrill, drillAllowanceMs, bossFightMs, isBossFloor, expectedDrillDamage,
-  makeRng as engineRng,
+  bestHitEstimate, makeRng as engineRng, typeInto, checkAnswer, formatAnswer, parseAnswer,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION } from './data.js';
@@ -161,7 +161,7 @@ function screenHub() {
           </div>
         </div>
         <div class="runes-owned">
-          ${['+', '-', '*', '/'].map(op => `<span class="rune-chip ${ops.includes(op) ? 'on' : 'off'}">${RUNES[op].glyph}</span>`).join('')}
+          ${['+', '-', '*', '/', '^'].map(op => `<span class="rune-chip ${ops.includes(op) ? 'on' : 'off'}">${RUNES[op].glyph}</span>`).join('')}
           <span class="muted tiny">Runes you can find &middot; Challenge level ${level}</span>
         </div>
         <button class="btn primary big" id="startRun">Start a run</button>
@@ -252,24 +252,41 @@ function nextFloor() {
 }
 
 function enterNode(node) {
-  // Enemy stats are budgeted against what this player can currently hit for.
   const level = difficultyLevel(profile.mastery, profile.grade);
   const ctx = {
     runes: run.player.runes,
     level,
     playerMaxHp: run.player.maxHp,
   };
-  /* A boss duel is answered, not built, so it is budgeted against what a
-     handed-out problem is actually worth. Sampled on a throwaway rng so the
-     run's own seeded stream stays in step. */
-  const duelCtx = drillsOn()
-    ? { ...ctx, duel: true,
-        ceiling: expectedDrillDamage(engineRng(Math.floor(run.rng() * 2 ** 31)),
-                                     profile.mastery, run.player.runes, level) * 1.3 }
+
+  /* Enemy health is budgeted against what this player can actually hit for,
+     and turns alternate, so BOTH kinds have to count. A built strike at
+     eighth grade level hits for a few hundred; a handed-out percentage
+     question hits for tens. Budgeting on the built ceiling alone made every
+     fight run about twice its intended length, and the extra turns were extra
+     damage taken. It only bit at the top grades, where the tile ceiling grows
+     quadratically while drill answers do not.
+
+     Sampled on a throwaway rng so the run's own seeded stream stays in step. */
+  const drillDamage = drillsOn()
+    ? expectedDrillDamage(engineRng(Math.floor(run.rng() * 2 ** 31)),
+                          profile.mastery, run.player.runes, level)
+    : 0;
+  const built = bestHitEstimate(run.player.runes, level);
+  /* An ordinary fight alternates, so health is budgeted on the average of the
+     two turn types, while armor is sized against the weaker one so it cannot
+     wipe out a drill turn entirely. */
+  const mixed = drillsOn()
+    ? { ...ctx, ceiling: (built + drillDamage) / 2, armorBase: drillDamage }
     : ctx;
+  // A duel is every turn a question, so both are sized against questions.
+  const duelCtx = drillsOn()
+    ? { ...ctx, duel: true, ceiling: drillDamage, armorBase: drillDamage }
+    : ctx;
+
   switch (node.type) {
-    case 'battle': return startBattle(spawnEnemy(run.rng, run.depth, ctx), { gold: 8 + run.depth * 2 });
-    case 'elite':  return startBattle(spawnEnemy(run.rng, run.depth, { ...ctx, elite: true }), { gold: 16 + run.depth * 3, relic: true });
+    case 'battle': return startBattle(spawnEnemy(run.rng, run.depth, mixed), { gold: 8 + run.depth * 2 });
+    case 'elite':  return startBattle(spawnEnemy(run.rng, run.depth, { ...mixed, elite: true }), { gold: 16 + run.depth * 3, relic: true });
     case 'boss':   return startBattle(spawnEnemy(run.rng, run.depth, { ...duelCtx, boss: true }), { gold: 30 + run.depth * 4, relic: true, boss: true });
     case 'riddle': return screenRiddle();
     case 'treasure': return screenTreasure();
@@ -305,6 +322,12 @@ function startBattle(enemy, reward) {
     fightStart: performance.now(),
     log: [`A ${enemy.name} blocks your way!`],
   };
+  /* What one written answer is worth as damage in this fight. Sampled from
+     the drill picker so a question hits for about what a calculation would. */
+  battle.askedDamage = Math.max(1, Math.round(expectedDrillDamage(
+    engineRng(Math.floor(run.rng() * 2 ** 31)),
+    profile.mastery, run.player.runes, difficultyLevel(profile.mastery, profile.grade))));
+
   if (battle.allDrills) {
     battle.fightMs = bossFightMs(profile.mastery, run.depth);
     battle.log = [`${enemy.name} challenges you to a duel. Answer, or be hit.`];
@@ -410,12 +433,7 @@ function renderBattle() {
         <button class="btn ghost tiny" id="reshuffle" ${battle.reshuffleLeft ? '' : 'disabled'}>Reshuffle (${battle.reshuffleLeft})</button>
       </div>
 
-      <div class="keypad">
-        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
-        <button class="key" data-k="back">⌫</button>
-        <button class="key" data-k="0">0</button>
-        <button class="key strike" id="strike" ${expr && battle.typed ? '' : 'disabled'}>STRIKE</button>
-      </div>
+      ${keypadHtml({ submitId: 'strike', submitLabel: 'STRIKE', ready: !!(expr && battle.typed), extras: false })}
 
       <div class="player-strip">
         <span class="hp-pill">❤️ ${Math.max(0, p.hp)}/${p.maxHp}</span>
@@ -615,7 +633,10 @@ function beginDrill() {
   const d = pickDrill(run.rng, profile.mastery, run.player.runes, level);
   if (!d) { battle.mode = 'build'; return renderBattle(); } // nothing to drill yet
   battle.mode = 'drill';
-  battle.drill = { ...d, answer: evaluate(d.a, d.op, d.b) };
+  /* The answer comes from the picker. Recomputing it here used to overwrite a
+     written problem's answer with evaluate(undefined, undefined, undefined),
+     which is NaN, so nothing the player typed could ever be right. */
+  battle.drill = d;
   battle.allowanceMs = drillAllowanceMs(profile.mastery, d);
   battle.drillStart = performance.now();
   battle.typed = '';
@@ -661,21 +682,21 @@ function renderDrill() {
 
       <div class="drill-group">
         <div class="timer" id="timerbar"><span style="width:100%"></span></div>
-        <div class="drill-problem">
-        <span class="dp">${d.a}</span>
-        <span class="dp op">${RUNES[d.op].glyph}</span>
-        <span class="dp">${d.b}</span>
-        <span class="eq">=</span>
-          <span class="answer ${battle.typed ? 'filled' : ''}">${battle.typed || '_'}</span>
-        </div>
+        ${d.kind === 'text' ? `
+          <p class="asked">${esc(d.prompt)}</p>
+          <div class="drill-problem">
+            <span class="answer ${battle.typed ? 'filled' : ''}">${battle.typed || '_'}</span>
+          </div>` : `
+          <div class="drill-problem">
+            <span class="dp">${d.a}</span>
+            <span class="dp op">${RUNES[d.op].glyph}</span>
+            <span class="dp">${d.b}</span>
+            <span class="eq">=</span>
+            <span class="answer ${battle.typed ? 'filled' : ''}">${battle.typed || '_'}</span>
+          </div>`}
       </div>
 
-      <div class="keypad">
-        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
-        <button class="key" data-k="back">\u232B</button>
-        <button class="key" data-k="0">0</button>
-        <button class="key strike" id="answer" ${battle.typed ? '' : 'disabled'}>PARRY</button>
-      </div>
+      ${keypadHtml({ submitId: 'answer', submitLabel: 'PARRY', ready: !!battle.typed, extras: d.kind === 'text' })}
 
       <div class="player-strip">
         <span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>
@@ -685,14 +706,12 @@ function renderDrill() {
     </div>`);
 
   $$('.key').forEach(b => b.onclick = () => {
-    const k = b.dataset.k;
-    if (k === 'back') battle.typed = battle.typed.slice(0, -1);
-    else if (battle.typed.length < 5) battle.typed += k;
+    battle.typed = typeInto(battle.typed, b.dataset.k);
     sfx.tap();
     renderDrill();
   });
   const go = $('#answer');
-  if (go) go.onclick = () => resolveDrill(parseInt(battle.typed, 10));
+  if (go) go.onclick = () => resolveDrill(battle.typed);
 
   startDrillTimer();
 }
@@ -728,13 +747,14 @@ function startDrillTimer() {
   }, 80);
 }
 
-function resolveDrill(given) {
+function resolveDrill(text) {
   stopDrillTimer();
   const d = battle.drill, e = battle.enemy, p = run.player;
   const ms = Math.round(performance.now() - battle.drillStart);
-  const timedOut = given === null || Number.isNaN(given);
-  const correct = !timedOut && given === d.answer;
-  const shown = `${d.a} ${RUNES[d.op].glyph} ${d.b}`;
+  const timedOut = text === null;
+  const { ok: correct, note } = timedOut ? { ok: false, note: null } : checkAnswer(text, d.answer);
+  const shown = d.kind === 'text' ? d.prompt : `${d.a} ${RUNES[d.op].glyph} ${d.b}`;
+  const expected = formatAnswer(d.answer);
 
   recordAttempt(profile.mastery, { skill: d.skill, fact: d.fact, correct, ms });
   const day = store.todayEntry(profile);
@@ -757,27 +777,36 @@ function resolveDrill(given) {
       battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
     }
     e.intentIndex += 1; // the telegraphed move never happens
-    /* The counter deliberately gets no ward or resist bonus. The player did
-       not choose this number, so the reward is for speed and accuracy, and
-       the built turn stays the one with the high ceiling. A riposte also
-       ignores shields, so a shielded enemy cannot make drills a dead turn. */
+
+    /* A written answer can be a fraction, a decimal or a negative, none of
+       which make sense as a damage number, so a written problem counters for
+       what an average drill answer is worth in this fight. A calculation
+       counters for its own result, as before.
+
+       Either way the counter gets no ward or resist bonus: the player did not
+       choose the number, so the reward is for speed and accuracy and the built
+       turn keeps the high ceiling. A riposte also ignores shields, so a
+       shielded enemy cannot make drills a dead turn. */
+    const result = d.kind === 'text' ? battle.askedDamage : d.answer;
     const { damage } = computeDamage({
-      result: d.answer, op: d.op, ward: 'none', resist: 'none', resistAt: 0,
+      result, op: d.op || '+', ward: 'none', resist: 'none', resistAt: 0,
       armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
     });
     e.hp -= damage;
     p.combo += 1;
-    battle.log.push(`\u{1F6E1}\uFE0F PARRIED! ${shown} = ${d.answer}, riposte for <b>${damage}</b>.`);
+    battle.log.push(d.kind === 'text'
+      ? `\u{1F6E1}\uFE0F PARRIED! ${expected} is right, riposte for <b>${damage}</b>.${note ? ' ' + note : ''}`
+      : `\u{1F6E1}\uFE0F PARRIED! ${shown} = ${expected}, riposte for <b>${damage}</b>.`);
     sfx.crit();
   } else if (mercied) {
     e.intentIndex += 1;
-    battle.log.push(`\u{1F54A}\uFE0F Mercy Rune parries it. ${shown} = <b>${d.answer}</b>.`);
+    battle.log.push(`\u{1F54A}\uFE0F Mercy Rune parries it. The answer was <b>${expected}</b>.`);
     sfx.wrong();
   } else {
-    const tip = hintFor(d.a, d.op, d.b);
+    const tip = d.kind === 'arith' ? hintFor(d.a, d.op, d.b) : null;
     battle.log.push(timedOut
-      ? `\u23F1\uFE0F Too slow. ${shown} = <b>${d.answer}</b>.${tip ? ' ' + tip : ''}`
-      : `\u274C ${shown} = <b>${d.answer}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
+      ? `\u23F1\uFE0F Too slow. The answer was <b>${expected}</b>.${tip ? ' ' + tip : ''}`
+      : `\u274C The answer was <b>${expected}</b>, not ${esc(text)}.${tip ? ' ' + tip : ''}`);
     p.combo = 0;
     sfx.wrong();
     enemyAction();
@@ -873,10 +902,35 @@ function loseRun() {
   $('#home').onclick = () => { sfx.tap(); screenHub(); };
 }
 
+/* A shared keypad. Middle school answers can be fractions, decimals or
+   negative, so those keys appear wherever a written answer is typed. Strike
+   answers are always whole numbers of at least one, so that keypad stays
+   digits only and keeps its big three-column targets. */
+function keypadHtml({ submitId, submitLabel, ready, extras = false }) {
+  const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  if (!extras) {
+    return `
+      <div class="keypad">
+        ${digits.map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
+        <button class="key" data-k="back">\u232B</button>
+        <button class="key" data-k="0">0</button>
+        <button class="key strike" id="${submitId}" ${ready ? '' : 'disabled'}>${submitLabel}</button>
+      </div>`;
+  }
+  const rows = [[1, 2, 3, '/'], [4, 5, 6, '.'], [7, 8, 9, '-']];
+  return `
+    <div class="keypad four">
+      ${rows.flat().map(k => `<button class="key ${typeof k === 'string' ? 'sym' : ''}" data-k="${k}">${k === '-' ? '\u2212' : k}</button>`).join('')}
+      <button class="key" data-k="back">\u232B</button>
+      <button class="key" data-k="0">0</button>
+      <button class="key strike wide" id="${submitId}" ${ready ? '' : 'disabled'}>${submitLabel}</button>
+    </div>`;
+}
+
 /* ======================================================== number entry === */
 /* Shared typed-answer panel. No multiple choice anywhere in this game:
    a guess has to be a number the kid actually produced. */
-function askNumber({ title, art, prompt, sub, onSubmit }) {
+function askNumber({ title, art, prompt, sub, onSubmit, extras = true }) {
   let typed = '';
   const startedAt = performance.now();
   const draw = () => {
@@ -889,22 +943,15 @@ function askNumber({ title, art, prompt, sub, onSubmit }) {
           <p class="prompt">${prompt}</p>
           ${sub ? `<p class="muted tiny">${sub}</p>` : ''}
           <div class="answer-box ${typed ? 'filled' : ''}">${typed || '_'}</div>
-          <div class="keypad wide">
-            ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
-            <button class="key" data-k="back">⌫</button>
-            <button class="key" data-k="0">0</button>
-            <button class="key strike" id="go" ${typed ? '' : 'disabled'}>ANSWER</button>
-          </div>
+          ${keypadHtml({ submitId: 'go', submitLabel: 'ANSWER', ready: !!typed, extras })}
         </div>
       </div>`);
     $$('.key').forEach(b => b.onclick = () => {
-      const k = b.dataset.k;
-      if (k === 'back') typed = typed.slice(0, -1);
-      else if (typed.length < 6) typed += k;
+      typed = typeInto(typed, b.dataset.k);
       sfx.tap(); draw();
     });
     const go = $('#go');
-    if (go) go.onclick = () => onSubmit(parseInt(typed, 10), Math.round(performance.now() - startedAt));
+    if (go) go.onclick = () => onSubmit(typed, Math.round(performance.now() - startedAt));
   };
   draw();
 }
@@ -916,7 +963,7 @@ function resultCard({ correct, answer, given, body, onNext }) {
       <div class="panel ${correct ? 'win' : 'lose'}">
         <h2>${correct ? 'Correct' : 'Not quite'}</h2>
         <div class="big-art">${correct ? '✅' : '❌'}</div>
-        ${correct ? '' : `<p>The answer was <b>${answer}</b>. You said ${Number.isNaN(given) ? '—' : given}.</p>`}
+        ${correct ? '' : `<p>The answer was <b>${answer}</b>. You said ${given ? esc(given) : '—'}.</p>`}
         <p>${body}</p>
         <button class="btn primary" id="next">Continue</button>
       </div>`);
@@ -932,8 +979,8 @@ function screenRiddle() {
     art: '\u{1F52E}',
     prompt: esc(r.text),
     sub: 'Solve it for a relic. Get it wrong and the shrine bites.',
-    onSubmit: (given, ms) => {
-      const correct = given === r.answer;
+    onSubmit: (text, ms) => {
+      const { ok: correct } = checkAnswer(text, r.answer);
       recordAttempt(profile.mastery, { skill: r.skill, fact: null, correct, ms });
       const day = store.todayEntry(profile);
       correct ? (day.correct += 1, run.stats.correct += 1) : (day.wrong += 1, run.stats.wrong += 1);
@@ -948,7 +995,7 @@ function screenRiddle() {
       persist();
       if (run.player.hp <= 0) return loseRun();
       resultCard({
-        correct, answer: r.answer, given,
+        correct, answer: formatAnswer(r.answer), given: text,
         body: correct ? `The shrine opens.${heal ? ` ❤️ +${heal}` : ''}` : 'You take 6 damage and the shrine seals.',
         onNext: () => correct ? screenRelicPick(() => nextFloor()) : nextFloor(),
       });
@@ -974,8 +1021,8 @@ function screenTreasure() {
   askNumber({
     title: 'Locked Chest', art: '\u{1F4E6}', prompt: q.text,
     sub: 'Crack the lock to take what is inside.',
-    onSubmit: (given, ms) => {
-      const correct = given === q.answer;
+    onSubmit: (text, ms) => {
+      const { ok: correct } = checkAnswer(text, q.answer);
       recordAttempt(profile.mastery, { skill: 'place_est', fact: null, correct, ms });
       const day = store.todayEntry(profile);
       correct ? (day.correct += 1, run.stats.correct += 1) : (day.wrong += 1, run.stats.wrong += 1);
@@ -994,7 +1041,7 @@ function screenTreasure() {
         sfx.reward();
       } else { sfx.wrong(); }
       persist();
-      resultCard({ correct, answer: q.answer, given, body, onNext: () => nextFloor() });
+      resultCard({ correct, answer: formatAnswer(q.answer), given: text, body, onNext: () => nextFloor() });
     },
   });
 }
@@ -1112,22 +1159,13 @@ function parentGate() {
           <h2>Grown-ups only</h2>
           <p class="prompt">What is 23 &times; 17?</p>
           <div class="answer-box ${typed ? 'filled' : ''}">${typed || '_'}</div>
-          <div class="keypad wide">
-            ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-k="${n}">${n}</button>`).join('')}
-            <button class="key" data-k="back">⌫</button>
-            <button class="key" data-k="0">0</button>
-            <button class="key strike" id="go">ENTER</button>
-          </div>
+          ${keypadHtml({ submitId: 'go', submitLabel: 'ENTER', ready: true, extras: false })}
           <button class="btn ghost small" id="back">Back</button>
         </div>
       </div>`);
-    $$('.key').forEach(b => b.onclick = () => {
-      const k = b.dataset.k;
-      if (k === 'back') typed = typed.slice(0, -1); else if (typed.length < 6) typed += k;
-      draw();
-    });
+    $$('.key').forEach(b => b.onclick = () => { typed = typeInto(typed, b.dataset.k); draw(); });
     $('#go').onclick = () => {
-      if (parseInt(typed, 10) === answer) screenReport();
+      if (parseAnswer(typed)?.value === answer) screenReport();
       else { typed = ''; draw(); }
     };
     $('#back').onclick = () => (profile ? screenHub() : screenProfiles());
@@ -1201,6 +1239,12 @@ function screenReport() {
         <h4>Last 14 days</h4>
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
+        <h4>School year</h4>
+        <p class="muted tiny">Only a starting point, and it fades as their own answers accumulate. Raise it if they are being served work below them; lower it if they are struggling. Changing it never touches their record.</p>
+        <div class="grades compact">
+          ${GRADES.map(g => `<button class="grade ${p.grade === g.id ? 'on' : ''}" data-grade-for="${p.id}" data-grade="${g.id}"><b>${g.label}</b></button>`).join('')}
+        </div>
+
         <div class="card-actions">
           <button class="btn ghost small" data-drills="${p.id}">Timed drill turns: <b>${p.prefs?.drills === false ? 'off' : 'on'}</b></button>
           <button class="btn ghost small" data-export="${p.id}">Back up / move ${esc(p.name)}</button>
@@ -1233,6 +1277,13 @@ function screenReport() {
   $('#importBtn').onclick = () => { sfx.tap(); screenImport(); };
   const exAll = $('#exportAll');
   if (exAll) exAll.onclick = () => { sfx.tap(); screenBackup(data.profiles); };
+  $$('[data-grade-for]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.gradeFor);
+    if (!hero) return;
+    const next = Number(b.dataset.grade);
+    hero.grade = hero.grade === next ? 0 : next;  // tapping the current one clears it
+    persist(); sfx.tap(); screenReport();
+  });
   $$('[data-drills]').forEach(b => b.onclick = () => {
     const hero = data.profiles.find(x => x.id === b.dataset.drills);
     if (!hero) return;

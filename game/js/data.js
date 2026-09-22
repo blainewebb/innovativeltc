@@ -7,7 +7,7 @@
 /* Shown on the picker so "is this the new version?" is a thing you read
    rather than infer from which buttons exist. Bump it with any change worth
    telling a device about, alongside CACHE in sw.js. */
-export const VERSION = '2026-09-22.1';
+export const VERSION = '2026-09-22.4';
 
 export const SKILLS = [
   { id: 'add_small',  label: 'Adding to 20',        op: '+', tier: 1 },
@@ -23,6 +23,19 @@ export const SKILLS = [
   { id: 'word_1step', label: 'One-step word problems', op: null, tier: 2, slow: true },
   { id: 'word_2step', label: 'Two-step word problems', op: null, tier: 3, slow: true },
   { id: 'place_est',  label: 'Place value & estimating', op: null, tier: 3, slow: true },
+
+  /* Middle school. These do not fit "pick two tiles and combine them": there
+     is nothing to pick in "what is 15% of 60". They are asked on drill turns
+     and at riddle shrines instead, where the game sets the problem. The two
+     that DO fit the tiles, integers and exponents, carry an operator. */
+  { id: 'fractions',  label: 'Fractions',                op: null, tier: 5, slow: true },
+  { id: 'decimals',   label: 'Decimals',                 op: null, tier: 5 },
+  { id: 'percent',    label: 'Percentages',              op: null, tier: 5, slow: true },
+  { id: 'ratio',      label: 'Ratios & proportions',     op: null, tier: 6, slow: true },
+  { id: 'integers',   label: 'Negative numbers',         op: null, tier: 5 },
+  { id: 'order_ops',  label: 'Order of operations',      op: null, tier: 6, slow: true },
+  { id: 'exponents',  label: 'Powers & roots',           op: '^',  tier: 6 },
+  { id: 'solve_x',    label: 'Solving for x',            op: null, tier: 7, slow: true },
 ];
 
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
@@ -39,7 +52,10 @@ export const GRADES = [
   { id: 2, label: '2nd grade', hint: 'Adding and subtracting to 100', level: 2, ops: ['+', '-'] },
   { id: 3, label: '3rd grade', hint: 'Starting times tables', level: 3, ops: ['+', '-', '*'] },
   { id: 4, label: '4th grade', hint: 'Times tables and division', level: 4, ops: ['+', '-', '*', '/'] },
-  { id: 5, label: '5th grade', hint: 'Bigger numbers, multi-step problems', level: 5, ops: ['+', '-', '*', '/'] },
+  { id: 5, label: '5th grade', hint: 'Fractions, decimals, multi-step', level: 5, ops: ['+', '-', '*', '/'] },
+  { id: 6, label: '6th grade', hint: 'Percentages, ratios, negatives', level: 6, ops: ['+', '-', '*', '/'] },
+  { id: 7, label: '7th grade', hint: 'Proportions, powers, order of operations', level: 7, ops: ['+', '-', '*', '/', '^'] },
+  { id: 8, label: '8th grade', hint: 'Solving for x, roots, harder ratios', level: 8, ops: ['+', '-', '*', '/', '^'] },
 ];
 
 export const GRADE_BY_ID = Object.fromEntries(GRADES.map(g => [g.id, g]));
@@ -50,6 +66,7 @@ export function classify(a, op, b) {
   if (op === '-') return (a <= 20 && b <= 10) ? 'sub_small' : 'sub_big';
   if (op === '*') return (Math.max(a, b) <= 5) ? 'mult_easy' : 'mult_hard';
   if (op === '/') return (b <= 5) ? 'div_easy' : 'div_hard';
+  if (op === '^') return 'exponents';
   return 'add_small';
 }
 
@@ -69,6 +86,7 @@ export const RUNES = {
   '-': { id: '-', name: 'Rune of Taking',  glyph: '−' },
   '*': { id: '*', name: 'Rune of Stacking', glyph: '×' },
   '/': { id: '/', name: 'Rune of Splitting', glyph: '÷' },
+  '^': { id: '^', name: 'Rune of Raising', glyph: '^' },
 };
 
 /* --------------------------------------------------------------- wards ----
@@ -183,6 +201,138 @@ const THINGS = ['dragon eggs', 'gold coins', 'arrows', 'apples', 'marbles', 'tra
 
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 const ri = (rng, lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
+
+function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a || 1; }
+
+/* A ratio is written in simplest form or it is not really a ratio. 3:12 is
+   arithmetically fine and reads like a mistake. */
+function coprimePair(rng, lo, hi) {
+  let a = ri(rng, lo, hi), b = ri(rng, lo, hi);
+  let guard = 0;
+  while ((gcd(a, b) !== 1 || a === b) && guard++ < 40) {
+    a = ri(rng, lo, hi);
+    b = ri(rng, lo, hi);
+  }
+  return gcd(a, b) === 1 && a !== b ? [a, b] : [2, 3];
+}
+
+/** A fraction in simplest form, or a plain number when it divides evenly. */
+export function simplifyFraction(n, d) {
+  const g = gcd(n, d);
+  const num = n / g, den = d / g;
+  return den === 1 ? num : { n: num, d: den };
+}
+
+/* ------------------------------------------------------ asked problems ----
+   Middle school topics that the tile mechanic cannot express: there is
+   nothing to pick in "what is 15% of 60". Each generator returns a prompt and
+   an answer, and the answer may be a fraction as { n, d }. These are served on
+   drill turns, where the game sets the problem and the player types a reply.
+   Percentages and ratios carry the most variants because they are the most
+   used, in school and out of it. */
+const NICE_PERCENTS = [5, 10, 20, 25, 40, 50, 60, 75, 80];
+
+export const ASKED = {
+  percent: [
+    rng => { const p = pick(rng, NICE_PERCENTS), base = ri(rng, 2, 20) * 10;
+      return { prompt: `What is ${p}% of ${base}?`, answer: base * p / 100 }; },
+    rng => { const p = pick(rng, [10, 20, 25, 50]), base = ri(rng, 2, 12) * 4;
+      return { prompt: `A sword costs ${base} gold and is ${p}% off. What do you pay?`, answer: base - base * p / 100 }; },
+    rng => { const part = ri(rng, 1, 9), whole = part * ri(rng, 2, 5);
+      return { prompt: `${part} out of ${whole}. What percent is that?`, answer: Math.round(part / whole * 100) }; },
+    rng => { const p = pick(rng, [10, 20, 25, 50]), base = ri(rng, 2, 12) * 10;
+      return { prompt: `A hoard of ${base} gold grows by ${p}%. How much is there now?`, answer: base + base * p / 100 }; },
+    rng => { const whole = ri(rng, 2, 9) * 10, p = pick(rng, [10, 20, 50]);
+      return { prompt: `${whole * p / 100} is ${p}% of what number?`, answer: whole }; },
+  ],
+
+  ratio: [
+    rng => { const n = ri(rng, 2, 6), cost = n * ri(rng, 2, 9), m = n + ri(rng, 1, 4);
+      return { prompt: `${n} potions cost ${cost} gold. How much do ${m} cost?`, answer: cost / n * m }; },
+    rng => { const [a, b] = coprimePair(rng, 2, 9), k = ri(rng, 2, 6);
+      return { prompt: `The ratio of orcs to goblins is ${a}:${b}. If there are ${a * k} orcs, how many goblins?`, answer: b * k }; },
+    rng => { const hours = ri(rng, 2, 8), rate = ri(rng, 10, 60);
+      return { prompt: `A dragon flies ${rate * hours} miles in ${hours} hours. How many miles per hour?`, answer: rate }; },
+    rng => { const per = ri(rng, 3, 9), packs = ri(rng, 3, 8);
+      return { prompt: `Arrows come ${per} to a bundle. How many bundles for ${per * packs} arrows?`, answer: packs }; },
+    rng => { const [a, b] = coprimePair(rng, 1, 6), total = (a + b) * ri(rng, 2, 6);
+      return { prompt: `Treasure is split ${a}:${b} between two heroes. If there are ${total} gems, how many does the FIRST hero get?`, answer: total * a / (a + b) }; },
+  ],
+
+  fractions: [
+    rng => { const d2 = pick(rng, [2, 4, 8]), n1 = 1, n2 = 1;
+      const lo = Math.max(2, d2 / 2);
+      return { prompt: `${n1}/${lo} + ${n2}/${d2} = ?`, answer: simplifyFraction(n1 * d2 + n2 * lo, lo * d2) }; },
+    rng => { const d2 = pick(rng, [2, 3, 4, 5]), each = ri(rng, 2, 9);
+      return { prompt: `What is 1/${d2} of ${d2 * each}?`, answer: each }; },
+    rng => { // Built from an already-simplest fraction, then scaled up.
+      let n = ri(rng, 1, 5), d2 = ri(rng, 2, 6);
+      while (gcd(n, d2) !== 1 || n >= d2) { n = ri(rng, 1, 5); d2 = ri(rng, 2, 6); }
+      const k = ri(rng, 2, 5);
+      return { prompt: `Simplify ${n * k}/${d2 * k}. Answer as a fraction.`, answer: { n, d: d2 } }; },
+    rng => { const d2 = pick(rng, [2, 4, 5, 10]), n = ri(rng, 1, d2 - 1);
+      return { prompt: `Write ${n}/${d2} as a decimal.`, answer: n / d2 }; },
+    rng => { const parts = pick(rng, [3, 4, 5, 6]), each = ri(rng, 2, 8), taken = ri(rng, 1, parts - 1);
+      return { prompt: `A bag holds ${parts * each} coins. You take ${taken}/${parts} of them. How many?`, answer: each * taken }; },
+  ],
+
+  decimals: [
+    rng => { const a = ri(rng, 1, 9) / 10, b = ri(rng, 1, 9) / 10;
+      return { prompt: `${a} + ${b} = ?`, answer: Math.round((a + b) * 10) / 10 }; },
+    rng => { const a = ri(rng, 11, 99) / 10, b = ri(rng, 2, 9);
+      return { prompt: `${a} \u00d7 ${b} = ?`, answer: Math.round(a * b * 10) / 10 }; },
+    rng => { const whole = ri(rng, 2, 9), tenths = ri(rng, 1, 9);
+      return { prompt: `${whole}.${tenths} \u2212 ${whole} = ?`, answer: tenths / 10 }; },
+    rng => { const a = ri(rng, 2, 9) * 10, b = ri(rng, 2, 8);
+      return { prompt: `${a} \u00f7 ${b * 10} = ?`, answer: Math.round(a / (b * 10) * 100) / 100 }; },
+  ],
+
+  integers: [
+    rng => { const a = ri(rng, 2, 15), b = ri(rng, a + 1, a + 15);
+      return { prompt: `${a} \u2212 ${b} = ?`, answer: a - b }; },
+    rng => { const a = ri(rng, 2, 15), b = ri(rng, 2, 20);
+      return { prompt: `\u2212${a} + ${b} = ?`, answer: b - a }; },
+    rng => { const a = ri(rng, 2, 9), b = ri(rng, 2, 9);
+      return { prompt: `\u2212${a} \u00d7 ${b} = ?`, answer: -a * b }; },
+    rng => { const a = ri(rng, 2, 9), b = ri(rng, 2, 9);
+      return { prompt: `\u2212${a} \u00d7 \u2212${b} = ?`, answer: a * b }; },
+    rng => { const a = ri(rng, 2, 12), b = ri(rng, 2, 12);
+      return { prompt: `\u2212${a} \u2212 ${b} = ?`, answer: -a - b }; },
+  ],
+
+  order_ops: [
+    rng => { const a = ri(rng, 2, 9), b = ri(rng, 2, 9), c = ri(rng, 2, 9);
+      return { prompt: `${a} + ${b} \u00d7 ${c} = ?`, answer: a + b * c }; },
+    rng => { const a = ri(rng, 2, 9), b = ri(rng, 2, 9), c = ri(rng, 2, 9);
+      return { prompt: `(${a} + ${b}) \u00d7 ${c} = ?`, answer: (a + b) * c }; },
+    rng => { const b = ri(rng, 2, 6), c = b * ri(rng, 2, 6), a = ri(rng, 20, 60);
+      return { prompt: `${a} \u2212 ${c} \u00f7 ${b} = ?`, answer: a - c / b }; },
+    rng => { const a = ri(rng, 2, 9), b = ri(rng, 2, 9), c = ri(rng, 2, 5);
+      return { prompt: `${a} \u00d7 ${b} \u2212 ${c} \u00d7 ${b} = ?`, answer: a * b - c * b }; },
+  ],
+
+  exponents: [
+    rng => { const a = ri(rng, 2, 12); return { prompt: `${a}\u00b2 = ?`, answer: a * a }; },
+    rng => { const a = ri(rng, 2, 7); return { prompt: `${a}\u00b3 = ?`, answer: a * a * a }; },
+    rng => { const a = ri(rng, 2, 15); return { prompt: `\u221a${a * a} = ?`, answer: a }; },
+    rng => { const a = ri(rng, 2, 9); return { prompt: `${a}\u00b2 + ${a} = ?`, answer: a * a + a }; },
+  ],
+
+  solve_x: [
+    rng => { const x = ri(rng, 2, 12), m = ri(rng, 2, 9), c = ri(rng, 1, 20);
+      return { prompt: `${m}x + ${c} = ${m * x + c}. What is x?`, answer: x }; },
+    rng => { const x = ri(rng, 2, 12), d2 = ri(rng, 2, 6);
+      return { prompt: `x \u00f7 ${d2} = ${x}. What is x?`, answer: x * d2 }; },
+    rng => { const x = ri(rng, 2, 15), m = ri(rng, 2, 9);
+      return { prompt: `${m}x = ${m * x}. What is x?`, answer: x }; },
+    rng => { const x = ri(rng, 3, 15), c = ri(rng, 1, 10);
+      return { prompt: `x \u2212 ${c} = ${x - c}. What is x?`, answer: x }; },
+    rng => { const x = ri(rng, 2, 10), m = ri(rng, 2, 6), c = ri(rng, 1, 9);
+      return { prompt: `${m}(x + ${c}) = ${m * (x + c)}. What is x?`, answer: x }; },
+  ],
+};
+
+export const ASKED_SKILLS = Object.keys(ASKED);
 
 export const RIDDLES = [
   { id: 'total_cost', skill: 'word_1step', tier: 2, make: rng => {

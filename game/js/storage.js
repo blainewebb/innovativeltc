@@ -7,13 +7,32 @@ const KEY = 'runebreaker.v1';
 
 const EMPTY = { profiles: [], activeId: null, settings: { sound: true } };
 
+/* Bring a saved store up to the current shape. Every release that adds a
+   field would otherwise leave every existing hero missing it, and a hero the
+   code cannot read is a hero the family has lost. Nothing here deletes: it
+   only fills in what is absent, so an update can never cost anyone progress.
+   Separated from load() so it can be tested without a browser. */
+export function hydrate(raw) {
+  const base = structuredClone(EMPTY);
+  if (!raw || typeof raw !== 'object') return base;
+  const data = { ...base, ...raw };
+  data.settings = { ...base.settings, ...(raw.settings || {}) };
+  data.profiles = (Array.isArray(raw.profiles) ? raw.profiles : [])
+    .map(normalizeProfile)
+    .filter(Boolean);
+  // A pointer to a hero that is no longer there would show an empty hub.
+  if (!data.profiles.some(p => p.id === data.activeId)) data.activeId = null;
+  return data;
+}
+
 export function load() {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return structuredClone(EMPTY);
-    const data = JSON.parse(raw);
-    return { ...structuredClone(EMPTY), ...data };
+    const stored = localStorage.getItem(KEY);
+    if (!stored) return structuredClone(EMPTY);
+    return hydrate(JSON.parse(stored));
   } catch {
+    // A save we cannot parse is left on disk untouched rather than overwritten,
+    // so there is still something to recover by hand.
     return structuredClone(EMPTY);
   }
 }
