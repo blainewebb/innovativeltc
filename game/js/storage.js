@@ -22,11 +22,14 @@ export function save(data) {
   try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { /* quota or private mode */ }
 }
 
-export function newProfile(name, avatar) {
+export function newProfile(name, avatar, grade = 0) {
   return {
     id: `p${Date.now()}${Math.floor(Math.random() * 1000)}`,
     name,
     avatar,
+    /* A starting point for difficulty, not a setting. Its influence fades as
+       the child's own answers accumulate. 0 means it was never asked. */
+    grade,
     created: Date.now(),
     mastery: blankMastery(),
     meta: { startRunes: [], bonusHp: 0, xp: 0, unlockedRelics: [] },
@@ -45,11 +48,12 @@ export function newProfile(name, avatar) {
    crash a screen much later, a long way from the cause. */
 export function normalizeProfile(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const base = newProfile(String(raw.name || 'Hero').slice(0, 12), raw.avatar || '\u{1F9D9}');
+  const base = newProfile(String(raw.name || 'Hero').slice(0, 12), raw.avatar || '\u{1F9D9}', Number(raw.grade) || 0);
   const p = {
     ...base,
     id: typeof raw.id === 'string' && raw.id ? raw.id : base.id,
     created: Number(raw.created) || base.created,
+    grade: Number(raw.grade) || 0,
     meta: { ...base.meta, ...(raw.meta || {}) },
     prefs: { ...base.prefs, ...(raw.prefs || {}) },
     records: { ...base.records, ...(raw.records || {}) },

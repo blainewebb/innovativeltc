@@ -7,8 +7,10 @@ import {
   newRun, handSize, reshuffles, classify, factKey, bestHitEstimate, turnsFor,
   effectiveHit, tileRangeFor, parseFactKey, problemForSkill, pickDrill,
   drillAllowanceMs, DRILL_MIN_MS, DRILL_MAX_MS, DRILL_DEFAULT_MS,
+  isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
+  GRADE_DECAY_ATTEMPTS,
 } from '../js/engine.js';
-import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS } from '../js/data.js';
+import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID } from '../js/data.js';
 
 let passed = 0;
 const test = (name, fn) => {
@@ -262,14 +264,46 @@ test('enemy attacks hurt the player and Iron Skin reduces it', () => {
 });
 
 /* --------------------------------------------------------------- map -- */
-test('every fifth floor is a boss and other floors always offer a fight', () => {
+test('a boss every third floor, and one on the last floor of a run', () => {
+  assert.equal(BOSS_EVERY, 3);
+  assert.ok(isBossFloor(3) && isBossFloor(6) && isBossFloor(FINAL_DEPTH));
+  assert.ok(!isBossFloor(1) && !isBossFloor(2) && !isBossFloor(4));
   for (let depth = 1; depth <= 40; depth++) {
     const nodes = generateFloor(makeRng(depth * 31), depth);
     assert.ok(nodes.length >= 1);
-    if (depth % 5 === 0) assert.deepEqual(nodes.map(n => n.type), ['boss']);
+    if (isBossFloor(depth)) assert.deepEqual(nodes.map(n => n.type), ['boss'], `floor ${depth}`);
     else assert.ok(nodes.some(n => n.type === 'battle' || n.type === 'elite'), `floor ${depth} had no fight`);
     if (depth < 3) assert.ok(!nodes.some(n => n.type === 'elite'), 'no elites in the first two floors');
   }
+});
+
+test('the boss fight clock leaves room to answer at the child\'s own pace', () => {
+  const quick = blankMastery(), slow = blankMastery();
+  for (let i = 0; i < 20; i++) {
+    recordAttempt(quick, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 2000 });
+    recordAttempt(slow, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 12000 });
+  }
+  for (const depth of [3, 9, 18]) {
+    const q = bossFightMs(quick, depth), s = bossFightMs(slow, depth);
+    assert.ok(s > q, 'the slower child gets the longer duel, not a shorter one');
+    // Enough time to answer every question at their own measured pace.
+    const turns = Math.ceil(turnsFor(depth, { boss: true }));
+    assert.ok(s > turns * 12000, `floor ${depth}: ${s}ms is not enough for ${turns} answers at 12s each`);
+    assert.ok(q < 1000 * 60 * 6, 'no duel should be able to run past six minutes');
+  }
+});
+
+test('enrage doubles the damage and says so before it lands', () => {
+  const e = spawnEnemy(makeRng(3), 9, { boss: true, runes: ['+', '-', '*'], level: 3, playerMaxHp: 50 });
+  e.intents = [{ type: 'attack', dmg: 10 }];
+  e.intentIndex = 0;
+  assert.match(describeIntent(e).text, /10/);
+  e.enraged = true;
+  assert.match(describeIntent(e).text, /20/, 'the warning must show the enraged number');
+  const p = { hp: 100, relics: [] };
+  e.intentIndex = 0;
+  enemyAct(e, p, makeRng(1));
+  assert.equal(p.hp, 80);
 });
 
 /* ----------------------------------------------------------- riddles -- */
@@ -444,14 +478,46 @@ test('enemy attacks hurt the player and Iron Skin reduces it', () => {
 });
 
 /* --------------------------------------------------------------- map -- */
-test('every fifth floor is a boss and other floors always offer a fight', () => {
+test('a boss every third floor, and one on the last floor of a run', () => {
+  assert.equal(BOSS_EVERY, 3);
+  assert.ok(isBossFloor(3) && isBossFloor(6) && isBossFloor(FINAL_DEPTH));
+  assert.ok(!isBossFloor(1) && !isBossFloor(2) && !isBossFloor(4));
   for (let depth = 1; depth <= 40; depth++) {
     const nodes = generateFloor(makeRng(depth * 31), depth);
     assert.ok(nodes.length >= 1);
-    if (depth % 5 === 0) assert.deepEqual(nodes.map(n => n.type), ['boss']);
+    if (isBossFloor(depth)) assert.deepEqual(nodes.map(n => n.type), ['boss'], `floor ${depth}`);
     else assert.ok(nodes.some(n => n.type === 'battle' || n.type === 'elite'), `floor ${depth} had no fight`);
     if (depth < 3) assert.ok(!nodes.some(n => n.type === 'elite'), 'no elites in the first two floors');
   }
+});
+
+test('the boss fight clock leaves room to answer at the child\'s own pace', () => {
+  const quick = blankMastery(), slow = blankMastery();
+  for (let i = 0; i < 20; i++) {
+    recordAttempt(quick, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 2000 });
+    recordAttempt(slow, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 12000 });
+  }
+  for (const depth of [3, 9, 18]) {
+    const q = bossFightMs(quick, depth), s = bossFightMs(slow, depth);
+    assert.ok(s > q, 'the slower child gets the longer duel, not a shorter one');
+    // Enough time to answer every question at their own measured pace.
+    const turns = Math.ceil(turnsFor(depth, { boss: true }));
+    assert.ok(s > turns * 12000, `floor ${depth}: ${s}ms is not enough for ${turns} answers at 12s each`);
+    assert.ok(q < 1000 * 60 * 6, 'no duel should be able to run past six minutes');
+  }
+});
+
+test('enrage doubles the damage and says so before it lands', () => {
+  const e = spawnEnemy(makeRng(3), 9, { boss: true, runes: ['+', '-', '*'], level: 3, playerMaxHp: 50 });
+  e.intents = [{ type: 'attack', dmg: 10 }];
+  e.intentIndex = 0;
+  assert.match(describeIntent(e).text, /10/);
+  e.enraged = true;
+  assert.match(describeIntent(e).text, /20/, 'the warning must show the enraged number');
+  const p = { hp: 100, relics: [] };
+  e.intentIndex = 0;
+  enemyAct(e, p, makeRng(1));
+  assert.equal(p.hp, 80);
 });
 
 /* ----------------------------------------------------------- riddles -- */
@@ -521,6 +587,60 @@ test('a floor never offers the same choice twice', () => {
       const nodes = generateFloor(makeRng(depth * 1000 + seed), depth);
       const types = nodes.map(n => n.type);
       assert.equal(new Set(types).size, types.length, `floor ${depth} seed ${seed} repeated: ${types}`);
+    }
+  }
+});
+
+/* ------------------------------------------------------------- grade -- */
+test('a declared grade sets where a brand new hero starts', () => {
+  const fresh = blankMastery();
+  assert.equal(difficultyLevel(fresh), 1, 'no grade and no evidence is level 1');
+  for (const g of GRADES) {
+    assert.equal(difficultyLevel(fresh, g.id), g.level, `${g.label} should start at level ${g.level}`);
+  }
+});
+
+test('a declared grade opens the operators that grade is taught', () => {
+  const fresh = blankMastery();
+  assert.deepEqual(unlockedOps(fresh, 1), ['+', '-']);
+  assert.deepEqual(unlockedOps(fresh, 3), ['+', '-', '*']);
+  assert.deepEqual(unlockedOps(fresh, 4), ['+', '-', '*', '/']);
+  // It only ever adds. A first grader who is quietly brilliant still earns x.
+  const able = blankMastery();
+  for (let i = 0; i < 20; i++) recordAttempt(able, { skill: 'add_small', fact: '3+4', correct: true, ms: 1200 });
+  assert.ok(unlockedOps(able, 1).includes('*'));
+});
+
+test('the grade fades out as real answers arrive', () => {
+  // A parent who guesses too high must not hold a struggling kid there.
+  const m = blankMastery();
+  const start = difficultyLevel(m, 5);
+  assert.equal(start, 5);
+  for (let i = 0; i < GRADE_DECAY_ATTEMPTS * 5; i++) {
+    recordAttempt(m, { skill: 'add_small', fact: '3+4', correct: false, ms: 14000 });
+  }
+  assert.ok(totalAttempts(m) >= 150);
+  assert.equal(difficultyLevel(m, 5), difficultyLevel(m),
+    'after enough evidence the declared grade should count for nothing');
+});
+
+test('a kid who races ahead is never held back by the grade', () => {
+  const m = blankMastery();
+  for (let i = 0; i < 20; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: true, ms: 1400 });
+  assert.ok(difficultyLevel(m, 1) >= difficultyLevel(m),
+    'a low declared grade must act as a floor, never a ceiling');
+  assert.equal(difficultyLevel(m, 1), difficultyLevel(m));
+});
+
+test('every grade is playable from the very first hand', () => {
+  for (const g of GRADES) {
+    const m = blankMastery();
+    const runes = unlockedOps(m, g.id);
+    for (let seed = 1; seed <= 150; seed++) {
+      const hand = generateHand(makeRng(seed), { mastery: m, runes, size: 5, depth: 1, grade: g.id });
+      assert.ok(legalPlays(hand, runes).length > 0, `${g.label} dealt a dead hand`);
+      const d = pickDrill(makeRng(seed), m, runes, difficultyLevel(m, g.id));
+      assert.ok(d && isLegal(d.a, d.op, d.b), `${g.label} produced an unusable drill`);
     }
   }
 });

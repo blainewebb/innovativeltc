@@ -21,9 +21,12 @@ const seen = new Set();
 let deepest = 1, actions = 0, deaths = 0, current = 1;
 const runDepths = [];
 
+let slowest = 0;
 async function typeNum(n, sel) {
+  const t0 = Date.now();
   for (const ch of String(n)) await page.click(`.key[data-k="${ch}"]`);
   await page.click(sel);
+  slowest = Math.max(slowest, Date.now() - t0);
 }
 
 /* Score a play the way a kid who READS the enemy card would. Everything below
@@ -59,12 +62,21 @@ function scorePlay(result, e) {
   return Math.max(1, Math.round(dmg) - e.armor);
 }
 
-async function bestPlay() {
-  const runes = await page.$$eval('.rune', els => els.map(e => e.dataset.op));
-  const tiles = await page.$$eval('.tile', els => els.map((e, i) => ({
-    i, v: Number(e.textContent.trim()), locked: e.classList.contains('locked'),
-  })));
-  const tags = await page.$$eval('.enemy-tags .tag', els => els.map(e => e.textContent.trim()));
+/** Everything a turn needs, in one round trip. */
+function readBoard() {
+  return page.evaluate(() => ({
+    runes: [...document.querySelectorAll('.rune')].map(e => e.dataset.op),
+    tiles: [...document.querySelectorAll('.tile')].map((e, i) => ({
+      i, v: Number(e.textContent.trim()), locked: e.classList.contains('locked'),
+    })),
+    tags: [...document.querySelectorAll('.enemy-tags .tag')].map(e => e.textContent.trim()),
+    drill: [...document.querySelectorAll('.drill-problem .dp')].map(e => e.textContent.trim()),
+    duel: !!document.querySelector('.duel-banner'),
+  }));
+}
+
+async function bestPlay(board) {
+  const { runes, tiles, tags } = board;
   const enemy = readEnemy(tags);
   const live = tiles.filter(t => !t.locked && Number.isFinite(t.v));
   let best = null;
@@ -88,19 +100,21 @@ try {
   await page.click('#createProfile');
   await page.click('#startRun');
 
-  for (actions = 0; actions < 1400; actions++) {
+  for (actions = 0; actions < 3000; actions++) {
     const floorTxt = await page.$eval('.depth-pill', e => e.textContent).catch(() => null);
     if (floorTxt) { current = Number((floorTxt.match(/\d+/) || [1])[0]); deepest = Math.max(deepest, current); }
 
-    if (await page.$('.drill-problem')) {              // drill turn
+    const board = (await page.$('.drill-problem')) || (await page.$('.hand')) ? await readBoard() : null;
+
+    if (board && board.drill.length) {                 // drill turn
       seen.add('drill');
-      const parts = await page.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
-      const answer = OPS[parts[1]](Number(parts[0]), Number(parts[2]));
+      if (board.duel) seen.add('boss-duel');
+      const answer = OPS[board.drill[1]](Number(board.drill[0]), Number(board.drill[2]));
       if (!Number.isFinite(answer)) break;
       await typeNum(answer, '#answer');
-    } else if (await page.$('.hand')) {                // built turn
+    } else if (board && board.tiles.length) {          // built turn
       seen.add('battle');
-      const play = await bestPlay();
+      const play = await bestPlay(board);
       if (!play) { await page.click('#reshuffle'); continue; }
       await page.click(`.tile[data-i="${play.i}"]`);
       await page.click(`.rune[data-op="${play.op}"]`);
@@ -131,6 +145,7 @@ try {
       seen.add('map');
       const nodes = await page.$$eval('.node', els => els.map(e => e.className));
       nodes.forEach(c => seen.add('node:' + c.split(' ')[1]));
+      if (await page.$('.node.boss')) seen.add('boss-floor');
       // The bot cannot read word problems, so it avoids them where it can and
       // the run length being measured stays a test of combat balance.
       const n = await page.$('.node.battle') || await page.$('.node.rest')
@@ -149,12 +164,15 @@ try {
     }
   }
 
-  const report = { deepest, actions, deaths, runDepths, seen: [...seen].sort(), errors };
+  const report = { deepest, actions, deaths, runDepths, slowestAnswerMs: slowest, seen: [...seen].sort(), errors };
   console.log(JSON.stringify(report, null, 2));
 
   let failed = 0;
   const ok = (name, cond, extra = '') => { if (!cond) { failed++; console.error(`FAIL ${name} ${extra}`); } };
   ok('no runtime errors', errors.length === 0, errors.join(' | '));
+  // If the harness itself is slower than the in-game minimum allowance, this
+  // stops being a balance measurement and starts measuring Playwright.
+  ok('the bot answers well inside the clock', slowest < 3000, `slowest answer took ${slowest}ms`);
   ok('a standard run ends at floor 20, not forever', deepest <= 20, `deepest ${deepest}`);
   // The bot plays the arithmetic perfectly but everything else naively, so it
   // should clear at least once in five attempts without clearing every time.
@@ -162,6 +180,7 @@ try {
      JSON.stringify(runDepths));
   ok('saw battles', seen.has('battle'));
   ok('saw drill turns', seen.has('drill'));
+  ok('saw a boss duel', seen.has('boss-duel'), [...seen].join(','));
   ok('saw the map', seen.has('map'));
   ok('saw a victory screen', seen.has('victory'));
   ok('saw a boss node', seen.has('node:boss'), [...seen].join(','));

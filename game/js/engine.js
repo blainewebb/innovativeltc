@@ -2,7 +2,7 @@
    Everything here is deterministic given a seed, so it can be unit tested. */
 
 import { SKILLS, SKILL_BY_ID, classify, factKey, WARDS, RESISTS, ENEMIES, BOSSES,
-         RELICS, RELIC_BY_ID, RIDDLES } from './data.js';
+         RELICS, RELIC_BY_ID, RIDDLES, GRADES, GRADE_BY_ID } from './data.js';
 
 /* ------------------------------------------------------------------ rng --
    Small seeded PRNG (mulberry32) so a run can be replayed from its seed. */
@@ -102,24 +102,47 @@ export function shakyFacts(mastery, limit = 10) {
    One number, 1..6, derived from how the skills the player has actually
    unlocked are going. It sets tile ranges and enemy scaling. It moves slowly
    on purpose: a couple of bad answers should not knock the game down a tier. */
-export function difficultyLevel(mastery) {
+export function totalAttempts(mastery) {
+  return SKILLS.reduce((n, s) => n + (mastery.skills[s.id]?.attempts || 0), 0);
+}
+
+/** Level from answers alone, ignoring whatever grade was declared. */
+function evidenceLevel(mastery) {
   const active = SKILLS.filter(s => (mastery.skills[s.id]?.attempts || 0) >= 4);
   if (active.length === 0) return 1;
   const avg = active.reduce((sum, s) => sum + skillScore(mastery.skills[s.id], s.id), 0) / active.length;
   const reach = Math.max(...active.map(s => s.tier));
   // Level tracks the highest tier the player is working in, nudged by how well.
-  let level = reach + (avg > 0.72 ? 1 : avg < 0.45 ? -1 : 0);
+  const level = reach + (avg > 0.72 ? 1 : avg < 0.45 ? -1 : 0);
   return Math.max(1, Math.min(6, level));
 }
 
+/* The declared grade acts as a floor that erodes as real answers arrive: one
+   level of it falls away every 30 attempts, so within roughly 150 problems
+   the child's own record is the only thing setting difficulty. That gives a
+   sensible first run without letting a parent's guess outlive the evidence,
+   in either direction. */
+export const GRADE_DECAY_ATTEMPTS = 30;
+
+export function difficultyLevel(mastery, grade = 0) {
+  const evidence = evidenceLevel(mastery);
+  const seeded = GRADE_BY_ID[grade]?.level || 0;
+  if (!seeded) return evidence;
+  const floor = seeded - Math.floor(totalAttempts(mastery) / GRADE_DECAY_ATTEMPTS);
+  return Math.max(1, Math.min(6, Math.max(evidence, floor)));
+}
+
 /** Which operator runes the profile is allowed to find, given where they are. */
-export function unlockedOps(mastery) {
+export function unlockedOps(mastery, grade = 0) {
   const ops = ['+', '-'];
   const addOk = skillScore(mastery.skills.add_small, 'add_small') > 0.5 || (mastery.skills.add_small?.attempts || 0) > 15;
   if (addOk) ops.push('*');
   const multOk = skillScore(mastery.skills.mult_easy, 'mult_easy') > 0.5 || (mastery.skills.mult_easy?.attempts || 0) > 20;
   if (multOk) ops.push('/');
-  return ops;
+  // A third grader is being taught multiplication whether or not they are
+  // good at it yet, so the grade adds operators it never takes away.
+  for (const op of GRADE_BY_ID[grade]?.ops || []) if (!ops.includes(op)) ops.push(op);
+  return ['+', '-', '*', '/'].filter(o => ops.includes(o));
 }
 
 /* --------------------------------------------------------------- tiles ---
@@ -170,8 +193,8 @@ function seedFor(rng, skillId, lo, hi) {
 }
 
 /** Draw a hand of number tiles, biased toward giving the target skill a home. */
-export function generateHand(rng, { mastery, runes, size = 5, depth = 1 }) {
-  const level = difficultyLevel(mastery);
+export function generateHand(rng, { mastery, runes, size = 5, depth = 1, grade = 0 }) {
+  const level = difficultyLevel(mastery, grade);
   const [lo, hi] = tileRangeFor(level);
   const tiles = [];
 
@@ -269,6 +292,24 @@ export function drillAllowanceMs(mastery, { skill, fact }) {
   // Their own pace plus a moment to read the problem.
   const allowance = avg * 1.6 + 1500;
   return Math.round(Math.max(DRILL_MIN_MS, Math.min(DRILL_MAX_MS, allowance)));
+}
+
+/* The whole-duel clock. Long enough to answer every question at this child's
+   own pace with room to spare, so running it out means they stalled rather
+   than that they are simply a slower thinker. */
+export function averageAnswerMs(mastery) {
+  let ms = 0, n = 0;
+  for (const s of SKILLS) {
+    const rec = mastery.skills[s.id];
+    if (rec?.attempts) { ms += rec.totalMs; n += rec.attempts; }
+  }
+  return n ? ms / n : 6000;
+}
+
+export function bossFightMs(mastery, depth) {
+  const turns = Math.ceil(turnsFor(depth, { boss: true }));
+  const per = Math.max(DRILL_MIN_MS, Math.min(DRILL_MAX_MS, averageAnswerMs(mastery) * 1.6 + 1500));
+  return Math.round(turns * per * 1.35);
 }
 
 /* -------------------------------------------------------------- strikes --
@@ -395,19 +436,46 @@ export function effectiveHit(bestHit, resist, resistAt) {
   return bestHit;
 }
 
+/* What one answer is worth in a boss duel. A duel has no tiles, so the player
+   cannot pick the big multiplication that bestHitEstimate assumes: they get
+   whatever problem the game hands them. Budgeting a duel against the building
+   ceiling makes it run about twice its intended length, and those extra turns
+   are extra damage taken. Sampling the actual drill picker is the honest
+   answer, since that is precisely what they will be asked. */
+export function expectedDrillDamage(rng, mastery, runes, level, samples = 32) {
+  let sum = 0, n = 0;
+  for (let i = 0; i < samples; i++) {
+    const d = pickDrill(rng, mastery, runes, level);
+    if (!d) continue;
+    sum += evaluate(d.a, d.op, d.b);
+    n++;
+  }
+  return n ? Math.max(1, sum / n) : 10;
+}
+
 export function spawnEnemy(rng, depth, opts = {}) {
-  const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50 } = opts;
+  const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
+          ceiling = null, duel = false } = opts;
   const tier = Math.max(1, Math.min(3, Math.ceil(depth / 3)));
   const pool = boss ? BOSSES : ENEMIES.filter(e => e.tier <= tier + (elite ? 1 : 0));
   const tpl = pick(rng, pool.length ? pool : ENEMIES);
 
-  const bestHit = bestHitEstimate(runes, level);
+  const bestHit = ceiling || bestHitEstimate(runes, level);
   const turns = turnsFor(depth, { elite, boss });
   const armor = Math.round(bestHit * tpl.armorFrac);
 
   /* Per-turn chip damage. A four-turn fight should cost a fifth of the
      player's health, not half: the run has to survive fifteen of them. */
-  const share = Math.min(0.07, 0.03 + depth * 0.002) * (boss ? 1.3 : elite ? 1.15 : 1);
+  /* A duel is nothing but telegraphed blows you are meant to parry, so those
+     blows are heavy. Parrying one is clearly worth the answer; missing one
+     hurts. Without this a duel is the safest floor in the run, because a
+     fluent player blunts every hit and the fight carries no threat at all. */
+  const share = Math.min(0.07, 0.03 + depth * 0.002)
+    * (boss ? 1.3 : elite ? 1.15 : 1)
+    /* Nearly every duel turn is an attack now that jam and shield are gone,
+       where an ordinary boss attacks on about half its turns. The multiplier
+       is sized for that, not for the raw per-hit number. */
+    * (duel ? 1.2 : 1);
   const hitDmg = Math.max(1, Math.round(playerMaxHp * share));
 
   let resist = pick(rng, tpl.resist || ['none']);
@@ -427,12 +495,24 @@ export function spawnEnemy(rng, depth, opts = {}) {
   const maxHp = Math.max(6, Math.round(perTurn * turns * tpl.hpW));
   const budget = { bestHit, maxHp, hitDmg, shieldValue: reachableTarget(rng, runes, level) };
 
+  /* In a duel the player answers what they are given, so two of the moves
+     have nothing to bite on: there are no tiles to jam, and a shield asking
+     for an exact number cannot be met by a number you did not choose. Both
+     would be free turns that read as threats, so a duelling boss does not
+     have them. */
+  const intents = duel
+    ? (tpl.intents.filter(i => i.type !== 'jam' && i.type !== 'shield').length
+        ? tpl.intents.filter(i => i.type !== 'jam' && i.type !== 'shield')
+        : [{ type: 'attack', w: 1 }])
+    : tpl.intents;
+
   return {
     id: tpl.id,
     name: (elite ? 'Elite ' : '') + tpl.name,
     art: tpl.art,
     boss: !!tpl.boss,
     elite,
+    duel,
     hp: maxHp,
     maxHp,
     armor,
@@ -440,7 +520,7 @@ export function spawnEnemy(rng, depth, opts = {}) {
     resist,
     resistAt,
     shield: 0,
-    intents: tpl.intents.map(it => resolveIntent(it, budget)),
+    intents: intents.map(it => resolveIntent(it, budget)),
     intentIndex: 0,
     depth,
   };
@@ -457,7 +537,8 @@ export function enemyAct(enemy, player, rng) {
     case 'bigAttack': {
       const block = player.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
-      const dmg = Math.max(1, intent.dmg - block);
+      const raw = enemy.enraged ? intent.dmg * 2 : intent.dmg;
+      const dmg = Math.max(1, raw - block);
       player.hp -= dmg;
       events.push({ type: 'damage', amount: dmg, text: `${enemy.name} hits you for ${dmg}.` });
       break;
@@ -488,9 +569,10 @@ export function enemyAct(enemy, player, rng) {
 /** The one-turn warning the player plans against. */
 export function describeIntent(enemy) {
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
+  const hit = n => (enemy.enraged ? n * 2 : n);
   switch (intent.type) {
-    case 'attack': return { icon: '\u{1F5E1}\uFE0F', text: `Attack for ${intent.dmg}` };
-    case 'bigAttack': return { icon: '\u{1F4A5}', text: `BIG attack for ${intent.dmg}` };
+    case 'attack': return { icon: '\u{1F5E1}\uFE0F', text: `Attack for ${hit(intent.dmg)}` };
+    case 'bigAttack': return { icon: '\u{1F4A5}', text: `BIG attack for ${hit(intent.dmg)}` };
     case 'armorUp': return { icon: '\u{1F6E1}\uFE0F', text: `Armor +${intent.amount}` };
     case 'heal': return { icon: '\u2764\uFE0F', text: `Heal ${intent.amount}` };
     case 'shield': return { icon: '\u{1F512}', text: `Raise a ${intent.value} shield` };
@@ -500,7 +582,7 @@ export function describeIntent(enemy) {
 }
 
 /* ----------------------------------------------------------------- map ---
-   A run is a column of floors, 2-3 node choices each, a boss every fifth.
+   A run is a column of floors, 2-3 node choices each, a boss every third.
    A standard run ENDS at floor 20 with a win. Kids need a finish line, not a
    treadmill: a session you can actually complete is worth more than one that
    only ever ends in death. Endless mode unlocks after the first clear. */
@@ -509,8 +591,16 @@ export const NODE_TYPES = ['battle', 'elite', 'riddle', 'treasure', 'shop', 'res
 
 /* Two identical choices is not a choice, so a floor never repeats a node type
    and always contains exactly one fight to anchor it. */
+/* A boss every third floor, and always one on the last floor of a standard
+   run so it ends on a duel rather than a slime. */
+export const BOSS_EVERY = 3;
+
+export function isBossFloor(depth) {
+  return depth % BOSS_EVERY === 0 || depth === FINAL_DEPTH;
+}
+
 export function generateFloor(rng, depth) {
-  if (depth % 5 === 0) return [{ type: 'boss', depth }];
+  if (isBossFloor(depth)) return [{ type: 'boss', depth }];
 
   const fight = depth >= 3 && rng() < 0.28 ? 'elite' : 'battle';
   const others = ['riddle', 'treasure', 'rest'];
@@ -534,8 +624,8 @@ export function generateFloor(rng, depth) {
 
 /* -------------------------------------------------------------- riddles --
    Pick a riddle aimed at the player's level, avoiding immediate repeats. */
-export function generateRiddle(rng, mastery, recentIds = []) {
-  const level = difficultyLevel(mastery);
+export function generateRiddle(rng, mastery, recentIds = [], grade = 0) {
+  const level = difficultyLevel(mastery, grade);
   let pool = RIDDLES.filter(r => r.tier <= level + 1 && !recentIds.includes(r.id));
   if (pool.length === 0) pool = RIDDLES.filter(r => !recentIds.includes(r.id));
   if (pool.length === 0) pool = RIDDLES;
@@ -560,7 +650,7 @@ export function offerRelics(rng, owned, count = 3) {
    The run object the UI drives. Held in memory; only mastery + meta persist. */
 export function newRun(seed, profile, endless = false) {
   const rng = makeRng(seed);
-  const ops = profile.mastery ? unlockedOps(profile.mastery) : ['+', '-'];
+  const ops = profile.mastery ? unlockedOps(profile.mastery, profile.grade) : ['+', '-'];
   for (const op of profile.meta?.startRunes || []) if (!ops.includes(op)) ops.push(op);
   return {
     seed,
@@ -596,4 +686,4 @@ export function reshuffles(player) {
 
 export function hasRelic(player, id) { return player.relics.includes(id); }
 
-export { classify, factKey, SKILLS, SKILL_BY_ID, WARDS, RESISTS, RELICS, RELIC_BY_ID };
+export { classify, factKey, SKILLS, SKILL_BY_ID, WARDS, RESISTS, RELICS, RELIC_BY_ID, GRADES, GRADE_BY_ID };

@@ -22,6 +22,23 @@ export const SKILLS = [
 
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 
+/* ---------------------------------------------------------------- grade --
+   A starting point only. Asked once when a hero is made, because a brand new
+   profile has no evidence and would otherwise put a fourth grader through
+   single-digit addition for their first three runs. It is asked as a US grade
+   rather than an age on purpose: two eight year olds can be two years apart
+   on times tables, so age predicts very little. Its influence decays as real
+   answers arrive, so a wrong guess corrects itself. */
+export const GRADES = [
+  { id: 1, label: '1st grade', hint: 'Adding and taking away small numbers', level: 1, ops: ['+', '-'] },
+  { id: 2, label: '2nd grade', hint: 'Adding and subtracting to 100', level: 2, ops: ['+', '-'] },
+  { id: 3, label: '3rd grade', hint: 'Starting times tables', level: 3, ops: ['+', '-', '*'] },
+  { id: 4, label: '4th grade', hint: 'Times tables and division', level: 4, ops: ['+', '-', '*', '/'] },
+  { id: 5, label: '5th grade', hint: 'Bigger numbers, multi-step problems', level: 5, ops: ['+', '-', '*', '/'] },
+];
+
+export const GRADE_BY_ID = Object.fromEntries(GRADES.map(g => [g.id, g]));
+
 /** Which skill does this concrete calculation exercise? */
 export function classify(a, op, b) {
   if (op === '+') return (a <= 10 && b <= 10) ? 'add_small' : 'add_big';

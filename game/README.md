@@ -94,12 +94,41 @@ a fight rather than producing a failure screen, and **drills can be switched
 off per hero** from the grown-up screen, so one kid can have them and their
 brother can not.
 
-Turning drills on measurably helps a strong player: in the soak run a bot with
-perfect instant recall went from clearing roughly half its runs to about
-two thirds, because it parries nearly everything. That has been left alone
-rather than compensated for. The obvious lever, raising enemy damage, would
-punish the struggling kid hardest while barely touching the fluent one, which
-is backwards.
+Balance is measured rather than guessed. A bot with perfect instant recall
+currently clears about 38% of its runs, with deaths spread across the back half
+rather than walling early. Getting there took several wrong turns worth
+recording: parrying for free made the bot clear every run; budgeting duels like
+ordinary fights made them twice as long and killed it on floor 3; and one
+apparent difficulty spike turned out to be the test harness being slower than
+the in-game clock, which is why the soak now asserts its own answer latency.
+
+### Boss duels
+
+A boss every third floor, plus one on the final floor. A duel is nothing but
+asked questions: no tile building at all, the whole fight is the drill turn.
+
+Two clocks run. Each question has the personal clock drill turns already use,
+and the duel as a whole has one. Running the duel clock out does not end
+anything: the boss **enrages** and hits twice as hard, so a slow fight gets
+dangerous rather than lost.
+
+Three things a duel does differently, all for the same reason, that the player
+is answering rather than choosing:
+
+- **No ward and no resist.** Both reward aiming for a particular number, which
+  is impossible when the number is handed to you. They are hidden rather than
+  shown and quietly ignored.
+- **No jam and no shield.** There are no tiles to jam, and a shield demanding
+  an exact number cannot be met by a number you did not pick. Both would be
+  free turns dressed up as threats.
+- **Health budgeted against what an answer is worth**, by sampling the drill
+  picker, rather than against the much higher ceiling of a well-chosen built
+  strike. Budgeting a duel the normal way made it run about twice its intended
+  length, and those extra turns were extra damage taken.
+
+A parry blunts a blow rather than stopping it: 40% still lands. That costs only
+a player who is parrying everything, since a kid who misses takes the full hit
+either way. It raises the ceiling without touching the floor.
 
 ### Adaptation
 
@@ -139,6 +168,20 @@ Tap "Grown-ups" and answer 23 x 17. Inside, per hero:
 Everything stays in `localStorage` on the device. Nothing is uploaded.
 
 ## Heroes
+
+Making a hero asks for a **school year**, 1st through 5th. It is asked as a US
+grade rather than an age because age predicts very little: two eight year olds
+can be two years apart on times tables. The grade only sets where they start,
+opening the operators that year is taught and lifting the first few runs off
+level 1. Its influence then erodes by one level every 30 answers, so within
+roughly 150 problems the child's own record is the only thing setting
+difficulty. A wrong guess corrects itself in either direction, and it is a
+floor rather than a ceiling, so a kid who races ahead is never held back by
+what was ticked in September.
+
+Heroes are deleted from the picker: **Manage heroes**, then the cross beside
+one. It says how many problems and minutes are about to be lost and offers to
+back the hero up first, because it is the one irreversible action in the game.
 
 Several kids share one device through separate heroes. Each hero has its own
 learning record, its own difficulty level, its own unlocked operators, its own

@@ -6,10 +6,11 @@ import {
   spawnEnemy, enemyAct, describeIntent, isLegal, evaluate, computeDamage,
   recordAttempt, classify, factKey, skillScore, shakyFacts, difficultyLevel,
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
-  pickDrill, drillAllowanceMs,
+  pickDrill, drillAllowanceMs, bossFightMs, isBossFloor, expectedDrillDamage,
+  makeRng as engineRng,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
-import { RUNES, RELICS } from './data.js';
+import { RUNES, RELICS, GRADES, GRADE_BY_ID } from './data.js';
 import * as store from './storage.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
@@ -18,6 +19,7 @@ let profile = null;
 let run = null;
 let battle = null;
 let playClock = null;
+let manageHeroes = false;
 
 const app = document.getElementById('app');
 const $ = sel => app.querySelector(sel);
@@ -58,17 +60,26 @@ function screenProfiles() {
         ${data.profiles.length > 1 ? '<p class="muted tiny center">Tap a hero to play as them.</p>' : ''}
         <div class="profile-list">
           ${data.profiles.map(p => `
-            <button class="profile-card" data-id="${p.id}">
-              <span class="pa">${p.avatar}</span>
-              <span class="pn">${esc(p.name)}</span>
-              <span class="pd">Deepest floor ${p.records.deepest}</span>
-            </button>`).join('')}
+            <div class="profile-row">
+              <button class="profile-card" data-id="${p.id}" ${manageHeroes ? 'disabled' : ''}>
+                <span class="pa">${p.avatar}</span>
+                <span class="pn">${esc(p.name)}</span>
+                <span class="pd">${p.grade ? GRADE_BY_ID[p.grade].label + ' &middot; ' : ''}deepest floor ${p.records.deepest}</span>
+              </button>
+              ${manageHeroes ? `<button class="hero-del" data-del="${p.id}" aria-label="Delete ${esc(p.name)}">\u2715</button>` : ''}
+            </div>`).join('')}
         </div>
+        ${data.profiles.length ? `<button class="btn ghost small manage" id="manageBtn">${manageHeroes ? 'Done' : 'Manage heroes'}</button>` : ''}
         <div class="newprof">
           <h3>${data.profiles.length ? 'Add another hero' : 'Make your hero'}</h3>
           ${data.profiles.length ? '<p class="muted tiny">Every hero keeps their own progress, their own difficulty and their own report card. Give each kid their own.</p>' : ''}
           <input id="newName" maxlength="12" placeholder="${data.profiles.length ? 'Their name' : 'Hero name'}" autocomplete="off">
           <div class="avatars">${AVATARS.map((a, i) => `<button class="av ${i === 0 ? 'on' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+          <label class="field-label">School year</label>
+          <div class="grades">
+            ${GRADES.map(g => `<button class="grade" data-grade="${g.id}"><b>${g.label}</b><small>${g.hint}</small></button>`).join('')}
+          </div>
+          <p class="muted tiny">Only a starting point. The game works out their real level from how they answer and adjusts within a run or two, so a wrong guess fixes itself.</p>
           <button class="btn primary" id="createProfile">${data.profiles.length ? 'Add this hero' : 'Create hero'}</button>
         </div>
       </div>
@@ -76,25 +87,67 @@ function screenProfiles() {
     </div>`);
 
   $$('.profile-card').forEach(b => b.onclick = () => {
-    data.activeId = b.dataset.id; persist(); profile = store.activeProfile(data); sfx.tap(); screenHub();
+    data.activeId = b.dataset.id; persist(); profile = store.activeProfile(data); sfx.tap();
+    manageHeroes = false;
+    screenHub();
+  });
+  const manageBtn = $('#manageBtn');
+  if (manageBtn) manageBtn.onclick = () => { manageHeroes = !manageHeroes; sfx.tap(); screenProfiles(); };
+  $$('[data-del]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.del);
+    if (hero) { sfx.tap(); screenConfirmDelete(hero); }
   });
   let chosen = AVATARS[0];
+  let grade = 0;
   $$('.av').forEach(b => b.onclick = () => {
     chosen = b.dataset.av; $$('.av').forEach(x => x.classList.remove('on')); b.classList.add('on'); sfx.tap();
   });
+  $$('.grade').forEach(b => b.onclick = () => {
+    grade = Number(b.dataset.grade);
+    $$('.grade').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    sfx.tap();
+  });
   $('#createProfile').onclick = () => {
     const name = ($('#newName').value || '').trim() || 'Hero';
-    const p = store.newProfile(name, chosen);
+    const p = store.newProfile(name, chosen, grade);
     data.profiles.push(p); data.activeId = p.id; persist(); profile = p; sfx.reward(); screenHub();
   };
   const pb = $('#parentBtn');
   if (pb) pb.onclick = parentGate;
 }
 
+function screenConfirmDelete(hero) {
+  const answered = hero.days.reduce((n, d) => n + d.correct + d.wrong, 0);
+  const minutes = Math.round(hero.days.reduce((n, d) => n + d.ms, 0) / 60000);
+  render(`
+    <div class="screen center">
+      <div class="panel lose">
+        <h2>Delete ${esc(hero.name)}?</h2>
+        <div class="big-art">${hero.avatar}</div>
+        <p class="center">This removes <b>${answered}</b> answered problems and <b>${minutes}</b> minutes of playing, including everything the report card is built from.</p>
+        <p class="muted tiny center">There is no undo and no copy on a server. If you might want them back, back them up first.</p>
+        <button class="btn primary" id="backup">Back them up first</button>
+        <div class="row">
+          <button class="btn ghost" id="cancel">Keep them</button>
+          <button class="btn danger" id="confirm">Delete for good</button>
+        </div>
+      </div>
+    </div>`);
+  $('#backup').onclick = () => { sfx.tap(); screenBackup([hero], () => screenConfirmDelete(hero)); };
+  $('#cancel').onclick = () => { sfx.tap(); screenProfiles(); };
+  $('#confirm').onclick = () => {
+    data.profiles = data.profiles.filter(x => x.id !== hero.id);
+    if (data.activeId === hero.id) { data.activeId = null; profile = null; run = null; }
+    if (!data.profiles.length) manageHeroes = false;
+    persist(); sfx.lose(); screenProfiles();
+  };
+}
+
 /* ================================================================= hub === */
 function screenHub() {
-  const level = difficultyLevel(profile.mastery);
-  const ops = unlockedOps(profile.mastery);
+  const level = difficultyLevel(profile.mastery, profile.grade);
+  const ops = unlockedOps(profile.mastery, profile.grade);
   render(`
     <div class="screen center">
       <h1 class="logo small">RUNE<span>BREAKER</span></h1>
@@ -199,15 +252,24 @@ function nextFloor() {
 
 function enterNode(node) {
   // Enemy stats are budgeted against what this player can currently hit for.
+  const level = difficultyLevel(profile.mastery, profile.grade);
   const ctx = {
     runes: run.player.runes,
-    level: difficultyLevel(profile.mastery),
+    level,
     playerMaxHp: run.player.maxHp,
   };
+  /* A boss duel is answered, not built, so it is budgeted against what a
+     handed-out problem is actually worth. Sampled on a throwaway rng so the
+     run's own seeded stream stays in step. */
+  const duelCtx = drillsOn()
+    ? { ...ctx, duel: true,
+        ceiling: expectedDrillDamage(engineRng(Math.floor(run.rng() * 2 ** 31)),
+                                     profile.mastery, run.player.runes, level) * 1.3 }
+    : ctx;
   switch (node.type) {
     case 'battle': return startBattle(spawnEnemy(run.rng, run.depth, ctx), { gold: 8 + run.depth * 2 });
     case 'elite':  return startBattle(spawnEnemy(run.rng, run.depth, { ...ctx, elite: true }), { gold: 16 + run.depth * 3, relic: true });
-    case 'boss':   return startBattle(spawnEnemy(run.rng, run.depth, { ...ctx, boss: true }), { gold: 30 + run.depth * 4, relic: true, boss: true });
+    case 'boss':   return startBattle(spawnEnemy(run.rng, run.depth, { ...duelCtx, boss: true }), { gold: 30 + run.depth * 4, relic: true, boss: true });
     case 'riddle': return screenRiddle();
     case 'treasure': return screenTreasure();
     case 'shop':   return screenShop();
@@ -235,9 +297,19 @@ function startBattle(enemy, reward) {
     turn: 1,
     mode: 'build',
     drill: null,
+    /* A boss duel is nothing but asked questions: no tile building, and one
+       clock over the whole fight on top of the per-question one. */
+    allDrills: !!reward.boss && drillsOn(),
+    fightMs: 0,
+    fightStart: performance.now(),
     log: [`A ${enemy.name} blocks your way!`],
   };
+  if (battle.allDrills) {
+    battle.fightMs = bossFightMs(profile.mastery, run.depth);
+    battle.log = [`${enemy.name} challenges you to a duel. Answer, or be hit.`];
+  }
   dealHand();
+  if (battle.allDrills) { battle.turn = 0; return nextTurn(); }
   renderBattle();
 }
 
@@ -247,6 +319,7 @@ function dealHand() {
     runes: run.player.runes,
     size: handSize(run.player),
     depth: run.depth,
+    grade: profile.grade,
   });
 }
 
@@ -254,7 +327,7 @@ function dealHand() {
 function replaceTiles(idxs) {
   const fresh = generateHand(run.rng, {
     mastery: profile.mastery, runes: run.player.runes,
-    size: handSize(run.player), depth: run.depth,
+    size: handSize(run.player), depth: run.depth, grade: profile.grade,
   });
   idxs.forEach((idx, k) => { battle.tiles[idx] = fresh[k % fresh.length]; });
 }
@@ -280,10 +353,10 @@ function enemyCardHtml() {
       <div class="enemy-info">
         <div class="enemy-name">${esc(e.name)}</div>
         <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
-        <div class="enemy-tags">
+<div class="enemy-tags">
           ${e.armor ? `<span class="tag armor">\u{1F6E1}\uFE0F Armor ${e.armor}</span>` : ''}
-          ${ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
-          ${resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
+          ${!e.duel && ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
+          ${!e.duel && resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
           ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
         </div>
         <div class="intent">Next: ${intent.icon} ${intent.text}</div>
@@ -517,12 +590,19 @@ function nextTurn() {
   if (run.player.hp <= 0) return loseRun();
   if (battle.enemy.hp <= 0) return winBattle();
   battle.turn += 1;
-  if (drillsOn() && battle.turn % 2 === 0) return beginDrill();
+  if (battle.allDrills || (drillsOn() && battle.turn % 2 === 0)) return beginDrill();
   battle.mode = 'build';
   renderBattle();
 }
 
 /* ========================================================= drill turns === */
+/* Share of a hit that still lands on a clean parry. Applies to every drill
+   parry, not just duels: parrying is what a fluent player does on half of all
+   turns, so a free parry removes most of the run's danger for them alone.
+   A kid who misses takes the full hit either way, so this raises the ceiling
+   without touching the floor. */
+const PARRY_LEAK = 0.4;
+
 let drillTimer = null;
 
 function stopDrillTimer() {
@@ -530,7 +610,7 @@ function stopDrillTimer() {
 }
 
 function beginDrill() {
-  const level = difficultyLevel(profile.mastery);
+  const level = difficultyLevel(profile.mastery, profile.grade);
   const d = pickDrill(run.rng, profile.mastery, run.player.runes, level);
   if (!d) { battle.mode = 'build'; return renderBattle(); } // nothing to drill yet
   battle.mode = 'drill';
@@ -539,6 +619,28 @@ function beginDrill() {
   battle.drillStart = performance.now();
   battle.typed = '';
   renderDrill();
+}
+
+/* Running the duel clock out does not end the run. The boss simply starts
+   hitting twice as hard, so a slow fight gets dangerous rather than lost. */
+function checkEnrage() {
+  if (!battle.fightMs || battle.enemy.enraged) return false;
+  if (performance.now() - battle.fightStart < battle.fightMs) return false;
+  battle.enemy.enraged = true;
+  battle.log.push(`\u{1F525} The duel has run long. ${esc(battle.enemy.name)} is ENRAGED and hits twice as hard.`);
+  return true;
+}
+
+function fightTimerHtml() {
+  if (!battle.fightMs) return '';
+  const left = Math.max(0, battle.fightMs - (performance.now() - battle.fightStart));
+  const pct = Math.max(0, left / battle.fightMs * 100);
+  const enraged = battle.enemy.enraged;
+  return `
+    <div class="fight-timer ${enraged ? 'enraged' : ''}" id="fighttimer">
+      <span style="width:${pct}%"></span>
+      <b>${enraged ? '\u{1F525} ENRAGED' : `Duel clock ${Math.ceil(left / 1000)}s`}</b>
+    </div>`;
 }
 
 function renderDrill() {
@@ -550,6 +652,9 @@ function renderDrill() {
       ${enemyCardHtml()}
 
       <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
+
+      ${battle.allDrills ? '<div class="duel-banner">\u2694\uFE0F BOSS DUEL</div>' : ''}
+      ${fightTimerHtml()}
 
       <div class="incoming">\u26A1 INCOMING: ${intent.text}. Answer to parry it.</div>
 
@@ -601,6 +706,23 @@ function startDrillTimer() {
     const pct = Math.max(0, left / battle.allowanceMs * 100);
     bar.style.width = `${pct}%`;
     bar.classList.toggle('low', pct < 33);
+
+    if (battle.fightMs) {
+      const wasEnraged = battle.enemy.enraged;
+      checkEnrage();
+      const box = app.querySelector('#fighttimer');
+      if (box) {
+        const dleft = Math.max(0, battle.fightMs - (performance.now() - battle.fightStart));
+        box.querySelector('span').style.width = `${dleft / battle.fightMs * 100}%`;
+        if (battle.enemy.enraged) {
+          box.classList.add('enraged');
+          box.querySelector('b').textContent = '\u{1F525} ENRAGED';
+        } else if (!wasEnraged) {
+          box.querySelector('b').textContent = `Duel clock ${Math.ceil(dleft / 1000)}s`;
+        }
+      }
+    }
+
     if (left <= 0) { stopDrillTimer(); resolveDrill(null); }
   }, 80);
 }
@@ -620,8 +742,19 @@ function resolveDrill(given) {
   // Mercy still means "free", so it parries without the counter.
   const mercied = !correct && battle.mercyLeft > 0;
   if (mercied) battle.mercyLeft -= 1;
+  checkEnrage();
 
   if (correct) {
+    /* A parry blunts the blow rather than stopping it outright. */
+    const pending = e.intents[e.intentIndex % e.intents.length];
+    if (pending.dmg) {
+      const block = p.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
+        .reduce((sum, r) => sum + (r.block || 0), 0);
+      const raw = e.enraged ? pending.dmg * 2 : pending.dmg;
+      const leak = Math.max(1, Math.round(raw * PARRY_LEAK) - block);
+      p.hp -= leak;
+      battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
+    }
     e.intentIndex += 1; // the telegraphed move never happens
     /* The counter deliberately gets no ward or resist bonus. The player did
        not choose this number, so the reward is for speed and accuracy, and
@@ -791,7 +924,7 @@ function resultCard({ correct, answer, given, body, onNext }) {
 
 /* ============================================================== riddle === */
 function screenRiddle() {
-  const r = generateRiddle(run.rng, profile.mastery, run.recentRiddles);
+  const r = generateRiddle(run.rng, profile.mastery, run.recentRiddles, profile.grade);
   run.recentRiddles = [r.id, ...run.recentRiddles].slice(0, 5);
   askNumber({
     title: 'Riddle Shrine',
@@ -848,7 +981,7 @@ function screenTreasure() {
 
       let body = 'The chest stays shut.';
       if (correct) {
-        const missingRune = unlockedOps(profile.mastery).find(o => !run.player.runes.includes(o));
+        const missingRune = unlockedOps(profile.mastery, profile.grade).find(o => !run.player.runes.includes(o));
         if (missingRune && run.rng() < 0.6) {
           run.player.runes.push(missingRune);
           body = `Inside is the <b>${RUNES[missingRune].name}</b> (${RUNES[missingRune].glyph}). You can use it for the rest of this run.`;
@@ -871,7 +1004,7 @@ function screenShop() {
   const stock = offerRelics(run.rng, p.relics, 2)
     .map(r => ({ kind: 'relic', relic: r, price: 35 + run.depth * 3 }));
   stock.push({ kind: 'heal', price: 20, label: 'Healing draught', art: '\u{1F9EA}', text: 'Restore 18 health.' });
-  const missingRune = unlockedOps(profile.mastery).find(o => !p.runes.includes(o));
+  const missingRune = unlockedOps(profile.mastery, profile.grade).find(o => !p.runes.includes(o));
   if (missingRune) stock.push({ kind: 'rune', op: missingRune, price: 45, label: RUNES[missingRune].name, art: RUNES[missingRune].glyph, text: 'Adds this operator for the rest of the run.' });
 
   const draw = () => {
@@ -1123,7 +1256,7 @@ function screenReport() {
    download and a file picker are not reliable inside an installed web app on
    every phone, while copy and paste always is. */
 
-function screenBackup(profiles) {
+function screenBackup(profiles, onDone = screenReport) {
   const text = JSON.stringify(store.exportPayload(profiles), null, 2);
   const filename = store.exportFilename(profiles);
   const who = profiles.length === 1 ? esc(profiles[0].name) : `all ${profiles.length} heroes`;
@@ -1146,7 +1279,7 @@ function screenBackup(profiles) {
     </div>`);
 
   const status = $('#status');
-  $('#back').onclick = () => { sfx.tap(); screenReport(); };
+  $('#back').onclick = () => { sfx.tap(); onDone(); };
 
   $('#download').onclick = () => {
     try {
