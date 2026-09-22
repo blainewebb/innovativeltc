@@ -764,7 +764,7 @@
       <input id="qsProjAge" type="number" min="70" max="100" step="1" value="80" onchange="setProjAge(this.value)">
     </label>
     <label class="qs-proj" id="qsGrowthToggle" title="Add a year-by-year benefit-growth page to the printout"><input type="checkbox" id="qsGrowth" onchange="toggleGrowth(this.checked)" style="width:auto;margin-right:6px"> Benefit-growth page</label>
-    <label class="qs-proj" id="qsSharedToggle" title="Add an NGL shared-care explainer page to the printout"><input type="checkbox" id="qsSharedPage" onchange="toggleSharedPage(this.checked)" style="width:auto;margin-right:6px"> Shared-care page</label>
+    <label class="qs-proj" id="qsSharedToggle" title="Add a shared-care explainer page to the printout"><input type="checkbox" id="qsSharedPage" onchange="toggleSharedPage(this.checked)" style="width:auto;margin-right:6px"> Shared-care page</label>
     <div class="sp">
       <button class="tb print" onclick="printSheet()">⎙ Print / Save PDF</button>
       <button class="tb close" onclick="closeSheet()">Close</button>
@@ -5097,37 +5097,94 @@ function benefitGrowthSection(items, order){
 /* ---------- NGL shared-care explainer page ("Mickey ears": two policyholders + a shared pool) ---------- */
 function isNglItem(o){ return !!o && !isCS(o) && !isOmni(o) && !isMoo(o) && !isMooc(o); }
 function toggleSharedPage(on){ QSHEET.sharedPage=!!on; renderSheet(); }
-function sharedRiderPage(items){
-  const ngl = items.find(o=>isNglItem(o)&&o.riderSharedAdditional) || items.find(o=>isNglItem(o));
-  if(!ngl) return '';
-  // names: split a "A & B" client name into two; otherwise fall back to Policyholder 1/2
+// Split a "A & B" client name into two policyholder names.
+function sharedNames(){
   const nm=((QSHEET.client&&QSHEET.client.name)||'').trim();
   let n1='Policyholder 1', n2='Policyholder 2';
   if(nm){ const parts=nm.split(/\s*(?:&|\band\b|\+)\s*/i).map(s=>s.trim()).filter(Boolean); if(parts.length>=2){ n1=parts[0]; n2=parts.slice(1).join(' '); } else { n1=nm; } }
+  return {n1,n2};
+}
+// Does a Mutual of Omaha (or Thrivent, once added) option carry Shared Care?
+function isMooSharedItem(o){ return (isMoo(o)||isMooc(o)) && (o.sharedCare || (o.__couple && o.parts && o.parts.some(x=>x.sharedCare))); }
+// Any option on the sheet that gets a shared-care explainer page (NGL's separate pools, or MoO's one combined pool).
+function hasSharedVisual(items){ return items.some(o=>(isNglItem(o)&&o.riderSharedAdditional) || isMooSharedItem(o)); }
+// ---- NGL: two individual pools + a third shared pool ("Mickey ears"). Shows today's and the projected value. ----
+function nglSharedSection(ngl){
+  const {n1,n2}=sharedNames();
   const mb=Math.round(+ngl.monthlyBenefit||4500);
   const bpM=parseInt(ngl.benefitPeriod||ngl.totalBenefitPeriod||'36')||36;
   const bpY=(bpM%12)?(bpM/12).toFixed(1):(bpM/12);
   const pool=mb*bpM, total=pool*3;
-  const svg = '<svg viewBox="0 0 640 470" width="100%" style="max-width:520px;display:block;margin:6px auto 2px" font-family="Inter,system-ui,sans-serif">'
-    + '<circle cx="185" cy="150" r="108" fill="#dbeafe" fill-opacity="0.82" stroke="#2563eb" stroke-width="2.5"/>'
-    + '<circle cx="455" cy="150" r="108" fill="#e0e7ff" fill-opacity="0.82" stroke="#4f46e5" stroke-width="2.5"/>'
-    + '<circle cx="320" cy="332" r="132" fill="#dcfce7" fill-opacity="0.8" stroke="#16a34a" stroke-width="2.5"/>'
-    + '<text x="185" y="118" text-anchor="middle" font-size="19" font-weight="800" fill="#1e3a8a">'+esc(n1)+'</text>'
-    + '<text x="185" y="145" text-anchor="middle" font-size="15" fill="#1e40af">'+fmt0(mb)+'/mo · '+bpY+'-yr</text>'
-    + '<text x="185" y="169" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">'+fmt0(pool)+' pool</text>'
-    + '<text x="455" y="118" text-anchor="middle" font-size="19" font-weight="800" fill="#3730a3">'+esc(n2)+'</text>'
-    + '<text x="455" y="145" text-anchor="middle" font-size="15" fill="#4338ca">'+fmt0(mb)+'/mo · '+bpY+'-yr</text>'
-    + '<text x="455" y="169" text-anchor="middle" font-size="15" font-weight="700" fill="#4338ca">'+fmt0(pool)+' pool</text>'
-    + '<text x="320" y="360" text-anchor="middle" font-size="20" font-weight="800" fill="#14532d">Shared Pool</text>'
-    + '<text x="320" y="386" text-anchor="middle" font-size="15" fill="#166534">either of you can draw from it</text>'
-    + '<text x="320" y="413" text-anchor="middle" font-size="17" font-weight="800" fill="#166534">'+fmt0(pool)+'</text>'
+  const projAge=+QSHEET.projAge||80;
+  const grows=!!ngl.inflation && projAge>(+ngl.age||0);
+  const pmb=projBenefitAt(ngl), ppool=pmb*bpM, ptotal=ppool*3;
+  // per-circle text block: name + today, and (when it grows) the projected value at projAge
+  const ear=(cx,name,nameFill,valFill)=>{
+    let t='<text x="'+cx+'" y="112" text-anchor="middle" font-size="19" font-weight="800" fill="'+nameFill+'">'+esc(name)+'</text>'
+      + '<text x="'+cx+'" y="137" text-anchor="middle" font-size="14" fill="'+valFill+'">'+fmt0(mb)+'/mo · '+bpY+'-yr</text>'
+      + '<text x="'+cx+'" y="160" text-anchor="middle" font-size="15" font-weight="700" fill="'+valFill+'">'+fmt0(pool)+' pool</text>';
+    if(grows){ t+='<text x="'+cx+'" y="192" text-anchor="middle" font-size="12" fill="'+valFill+'" opacity="0.85">at age '+projAge+':</text>'
+      + '<text x="'+cx+'" y="212" text-anchor="middle" font-size="13.5" fill="'+valFill+'">'+fmt0(pmb)+'/mo</text>'
+      + '<text x="'+cx+'" y="232" text-anchor="middle" font-size="15" font-weight="800" fill="'+valFill+'">'+fmt0(ppool)+' pool</text>'; }
+    return t;
+  };
+  let shared='<text x="340" y="352" text-anchor="middle" font-size="20" font-weight="800" fill="#14532d">Shared Pool</text>'
+    + '<text x="340" y="376" text-anchor="middle" font-size="13" fill="#166534">either of you can draw from it</text>'
+    + '<text x="340" y="404" text-anchor="middle" font-size="17" font-weight="800" fill="#166534">'+fmt0(pool)+' today</text>';
+  if(grows) shared+='<text x="340" y="430" text-anchor="middle" font-size="15" font-weight="800" fill="#166534">'+fmt0(ppool)+' at age '+projAge+'</text>';
+  const svg='<svg viewBox="0 0 680 540" width="100%" style="max-width:560px;display:block;margin:6px auto 2px" font-family="Inter,system-ui,sans-serif">'
+    + '<circle cx="205" cy="170" r="122" fill="#dbeafe" fill-opacity="0.82" stroke="#2563eb" stroke-width="2.5"/>'
+    + '<circle cx="475" cy="170" r="122" fill="#e0e7ff" fill-opacity="0.82" stroke="#4f46e5" stroke-width="2.5"/>'
+    + '<circle cx="340" cy="390" r="150" fill="#dcfce7" fill-opacity="0.8" stroke="#16a34a" stroke-width="2.5"/>'
+    + ear(205,n1,'#1e3a8a','#1e40af') + ear(475,n2,'#3730a3','#4338ca') + shared
     + '</svg>';
-  return '<div class="growth-page shared-page"><h3 class="growth-h">How the Shared Care rider works</h3>'
+  return '<div class="growth-page shared-page"><h3 class="growth-h">How the NGL Shared Care rider works</h3>'
     + svg
-    + '<div class="hint" style="margin:2px 0 8px">Each of you has your <b>own</b> benefit pool. NGL’s <b>Shared Additional Policy Limit</b> rider adds a <b>third pool you share</b> — if one of you needs care longer than your own pool covers, you can draw from the shared pool instead of running out. Neither of you loses coverage while the other still has benefits left.</div>'
-    + '<div class="shared-total">Combined household protection ≈ <b>'+fmt0(total)+'</b> &nbsp;('+fmt0(pool)+' each + '+fmt0(pool)+' shared)</div>'
-    + '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Illustrative example at '+fmt0(mb)+'/mo over '+bpY+' years each. The actual shared benefit follows the issued policy and rider.</div>'
+    + '<div class="hint" style="margin:2px 0 8px">Each of you has your <b>own</b> benefit pool. NGL’s <b>Shared Additional Policy Limit</b> rider adds a <b>third pool you share</b> — if one of you needs care longer than your own pool covers, you can draw from the shared pool instead of running out. Neither of you loses coverage while the other still has benefits left.'+(grows?' The <b>at age '+projAge+'</b> figures show the same benefit after inflation growth.':'')+'</div>'
+    + '<div class="shared-total">Combined household protection ≈ <b>'+fmt0(total)+'</b> today'+(grows?' → <b>'+fmt0(ptotal)+'</b> at age '+projAge:'')+' &nbsp;('+fmt0(pool)+' each + '+fmt0(pool)+' shared)</div>'
+    + '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Illustrative example at '+fmt0(mb)+'/mo over '+bpY+' years each'+(grows?', grown by the selected inflation to age '+projAge:'')+'. The actual shared benefit follows the issued policy and rider.</div>'
     + '</div>';
+}
+// ---- Mutual of Omaha / Thrivent: ONE combined pool both spouses draw from. Shows today's and the projected value. ----
+function mooSharedSection(o){
+  const {n1,n2}=sharedNames();
+  const src=mooSpecSrc(o);
+  const mb=Math.round(+src.monthlyBenefit||0);
+  const yrsEach=+src.years||3;
+  const combined=mooEffPool(o);              // already doubled for shared care
+  const combYrs=mooEffYears(o);
+  const projAge=+QSHEET.projAge||80;
+  const inflOn = isMooc(o) ? (o.inflTerm && o.inflTerm!=='none') : (o.inflation && o.inflation!=='none');
+  const grows = !!inflOn && projAge>(+ (src.age||o.age) ||0);
+  const pmb = isMooc(o) ? MOOC.projBenefit(o,projAge) : MOO.projBenefit(o,projAge);
+  const pcomb = Math.round(pmb*12*combYrs);
+  const names = esc(n1)+' & '+esc(n2);
+  let inner='<text x="310" y="150" text-anchor="middle" font-size="21" font-weight="800" fill="#7c2d12">'+names+'</text>'
+    + '<text x="310" y="180" text-anchor="middle" font-size="14" fill="#9a3412">Combined Shared Care Pool</text>'
+    + '<text x="310" y="228" text-anchor="middle" font-size="26" font-weight="800" fill="#c2410c">'+fmt0(combined)+'</text>'
+    + '<text x="310" y="256" text-anchor="middle" font-size="13.5" fill="#9a3412">today &middot; '+fmt0(mb)+'/mo each &middot; '+combYrs+'-yr combined</text>';
+  if(grows) inner+='<text x="310" y="296" text-anchor="middle" font-size="13" fill="#9a3412" opacity="0.9">at age '+projAge+':</text>'
+    + '<text x="310" y="326" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">'+fmt0(pcomb)+'</text>';
+  const svg='<svg viewBox="0 0 620 460" width="100%" style="max-width:480px;display:block;margin:6px auto 2px" font-family="Inter,system-ui,sans-serif">'
+    + '<circle cx="310" cy="225" r="205" fill="#ffedd5" fill-opacity="0.82" stroke="#ea580c" stroke-width="2.5"/>'
+    + inner
+    + '</svg>';
+  return '<div class="growth-page shared-page"><h3 class="growth-h">How Mutual of Omaha Shared Care works</h3>'
+    + svg
+    + '<div class="hint" style="margin:2px 0 8px">With Mutual of Omaha, Shared Care doesn’t create a separate third pool — it <b>merges both policies into one combined benefit pool</b> that either spouse can draw from. Both keep the same monthly benefit and benefit period; together you share <b>'+fmt0(combined)+'</b> ('+combYrs+' years combined at '+fmt0(mb)+'/mo).</div>'
+    + '<div class="shared-total" style="color:#c2410c">Combined household pool ≈ <b>'+fmt0(combined)+'</b> today'+(grows?' → <b>'+fmt0(pcomb)+'</b> at age '+projAge:'')+'</div>'
+    + '<div class="disc" style="border-top:none;padding-top:2px;margin-top:6px">Illustrative example at '+fmt0(mb)+'/mo each over '+yrsEach+' years each ('+combYrs+'-year combined pool)'+(grows?', grown by the selected inflation to age '+projAge:'')+'. The actual shared benefit follows the issued policies and rider.</div>'
+    + '</div>';
+}
+function sharedRiderPage(items){
+  const ngl = items.find(o=>isNglItem(o)&&o.riderSharedAdditional);
+  const moo = items.find(o=>isMooSharedItem(o));
+  let out='';
+  if(ngl) out+=nglSharedSection(ngl);
+  if(moo) out+=mooSharedSection(moo);
+  // no explicit shared rider anywhere but the page was toggled on → fall back to an NGL illustration
+  if(!out){ const anyNgl=items.find(o=>isNglItem(o)); if(anyNgl) out+=nglSharedSection(anyNgl); }
+  return out;
 }
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
@@ -5214,7 +5271,7 @@ function renderSheet(){
   if($('qsGrowth')) $('qsGrowth').checked = !!QSHEET.growth;
   if($('qsGrowthToggle')) $('qsGrowthToggle').classList.toggle('show', (cl.items||[]).length>0);
   if($('qsSharedPage')) $('qsSharedPage').checked = !!QSHEET.sharedPage;
-  if($('qsSharedToggle')) $('qsSharedToggle').classList.toggle('show', (cl.items||[]).some(o=>isNglItem(o)));
+  if($('qsSharedToggle')) $('qsSharedToggle').classList.toggle('show', hasSharedVisual(cl.items||[]) || (cl.items||[]).some(o=>isNglItem(o)));
   const quotes = items.map(o=>{ try{ return anyQuote(o); }catch(e){ return null; } });
   const uniform = items.length && items.every(o=>o.age===items[0].age && o.gender===items[0].gender);
   let rows;
