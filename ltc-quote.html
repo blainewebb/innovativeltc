@@ -3418,16 +3418,29 @@ const CLIENT_FIELDS={
   mooc:     {age:['mooc_age'], gender:['mooc_gender'], age2:['mooc_age2'], gender2:['mooc_g2']}
 };
 const CLIENT_COUPLE={ moo:'moo_couple', mooc:'mooc_couple', omniflex:'om_couple' };
+// Primary state select per carrier (clamped on apply to whatever states that carrier offers).
+const CLIENT_STATE={ ngl:'s_state', carescout:'cs_state', omniflex:'om_state', moo:'moo_state', mooc:'mooc_state' };
+// Age fields per carrier [primary, spouse] — used to reach the 🎂 birthday picker beside each.
+const CLIENT_AGEIDS={ ngl:['s_age','c_age2'], carescout:['cs_age'], omniflex:['om_age','om_age2'], moo:['moo_age','moo_age2'], mooc:['mooc_age','mooc_age2'] };
 function coupleToggleFor(c){ return c==='moo'?mooCoupleToggle:c==='mooc'?moocCoupleToggle:c==='omniflex'?omniCoupleToggle:null; }
 function clampField(id,v){ var el=$(id); if(!el)return v; var n=+v; if(isNaN(n))return v;
   if(el.min!==''&&n<+el.min)n=+el.min; if(el.max!==''&&n>+el.max)n=+el.max; return n; }
+function selHasOption(sel,val){ return !!sel && Array.prototype.some.call(sel.options,function(o){return o.value===String(val);}); }
+function dobPickFor(ageId){ var a=$(ageId); if(!a)return null; var row=a.closest('.pickrow'); return row?row.querySelector('.dobpick'):null; }
 function captureClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ for(var i=0;i<m[k].length;i++){ var el=$(m[k][i]); if(el&&el.value!==''&&el.value!=null){ CLIENT[k]=el.value; break; } } });
-  var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked; }
+  var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked;
+  var sid=CLIENT_STATE[carrier]; if(sid&&$(sid)&&$(sid).value) CLIENT.state=$(sid).value;   // remember the last state the user set
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var d0=dobPickFor(ai[0]); if(d0&&d0.value) CLIENT.dob=d0.value; if(ai[1]){ var d1=dobPickFor(ai[1]); if(d1&&d1.value) CLIENT.dob2=d1.value; } } }
 function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ if(CLIENT[k]==null)return; m[k].forEach(function(id){ var el=$(id); if(!el)return;
     el.value=(k==='age'||k==='age2')?clampField(id,CLIENT[k]):CLIENT[k]; }); });
-  var cid=CLIENT_COUPLE[carrier]; if(cid&&CLIENT.couple!=null&&$(cid)){ $(cid).checked=CLIENT.couple; var t=coupleToggleFor(carrier); if(t){ try{ t(); }catch(e){} } } }
+  var cid=CLIENT_COUPLE[carrier]; if(cid&&CLIENT.couple!=null&&$(cid)){ $(cid).checked=CLIENT.couple; var t=coupleToggleFor(carrier); if(t){ try{ t(); }catch(e){} } }
+  // State: apply only if this carrier actually offers it (OmniFlex is 6 states, CareScout/MoO exclude some);
+  // otherwise leave the carrier's own default. Fire change so state-driven UI (CS pools, OmniFlex EPs) resyncs.
+  var sid=CLIENT_STATE[carrier]; if(sid&&CLIENT.state!=null){ var sel=$(sid); if(selHasOption(sel,CLIENT.state) && sel.value!==CLIENT.state){ sel.value=CLIENT.state; try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+  // Birthday pickers, matched to the primary/spouse age fields.
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ if(CLIENT.dob!=null){ var p0=dobPickFor(ai[0]); if(p0) p0.value=CLIENT.dob; } if(ai[1]&&CLIENT.dob2!=null){ var p1=dobPickFor(ai[1]); if(p1) p1.value=CLIENT.dob2; } } }
 function setCarrier(c){
   const prev=CARRIER; if(prev) captureClient(prev);
   CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc') ? c : 'ngl';
