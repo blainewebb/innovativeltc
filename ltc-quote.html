@@ -3431,7 +3431,8 @@ function captureClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ for(var i=0;i<m[k].length;i++){ var el=$(m[k][i]); if(el&&el.value!==''&&el.value!=null){ CLIENT[k]=el.value; break; } } });
   var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked;
   var sid=CLIENT_STATE[carrier]; if(sid&&$(sid)&&$(sid).value) CLIENT.state=$(sid).value;   // remember the last state the user set
-  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var d0=dobPickFor(ai[0]); if(d0&&d0.value) CLIENT.dob=d0.value; if(ai[1]){ var d1=dobPickFor(ai[1]); if(d1&&d1.value) CLIENT.dob2=d1.value; } } }
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var d0=dobPickFor(ai[0]); if(d0&&d0.value) CLIENT.dob=d0.value; if(ai[1]){ var d1=dobPickFor(ai[1]); if(d1&&d1.value) CLIENT.dob2=d1.value; } }
+  capturePlan(carrier); }
 function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ if(CLIENT[k]==null)return; m[k].forEach(function(id){ var el=$(id); if(!el)return;
     el.value=(k==='age'||k==='age2')?clampField(id,CLIENT[k]):CLIENT[k]; }); });
@@ -3440,7 +3441,95 @@ function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   // otherwise leave the carrier's own default. Fire change so state-driven UI (CS pools, OmniFlex EPs) resyncs.
   var sid=CLIENT_STATE[carrier]; if(sid&&CLIENT.state!=null){ var sel=$(sid); if(selHasOption(sel,CLIENT.state) && sel.value!==CLIENT.state){ sel.value=CLIENT.state; try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
   // Birthday pickers, matched to the primary/spouse age fields.
-  var ai=CLIENT_AGEIDS[carrier]; if(ai){ if(CLIENT.dob!=null){ var p0=dobPickFor(ai[0]); if(p0) p0.value=CLIENT.dob; } if(ai[1]&&CLIENT.dob2!=null){ var p1=dobPickFor(ai[1]); if(p1) p1.value=CLIENT.dob2; } } }
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ if(CLIENT.dob!=null){ var p0=dobPickFor(ai[0]); if(p0) p0.value=CLIENT.dob; } if(ai[1]&&CLIENT.dob2!=null){ var p1=dobPickFor(ai[1]); if(p1) p1.value=CLIENT.dob2; } }
+  applyPlan(carrier); }
+/* ---- Plan carry-over: monthly benefit, benefit period (years) and inflation, mapped to the
+   closest option each carrier offers. Carriers store these very differently — monthly $ vs a
+   daily $, years vs days, a compound % vs a code vs a 5%-simple checkbox — so we keep a single
+   normalized model (mb $/mo, years, inflPct, inflTerm) and snap to the nearest available choice. */
+function nearestVal(x, arr){ return arr.reduce(function(b,v){ return Math.abs(v-x)<Math.abs(b-x)?v:b; }, arr[0]); }
+var MOOC_PCTS=(function(){ var a=[]; for(var p=1;p<=5.0001;p+=0.25) a.push(Math.round(p*100)/100); return a; })();
+function mooCodeToCanon(code){ switch(code){ case '3L':return {pct:3,term:'L'}; case '4L':return {pct:4,term:'L'};
+  case '5L':return {pct:5,term:'L'}; case '320':return {pct:3,term:'20'}; case '520':return {pct:5,term:'20'};
+  default:return {pct:0,term:'none'}; } }
+function canonToMooCode(pct,term){ if(!(pct>0)) return 'none';
+  if(term==='20'){ if(pct<=3)return '320'; if(pct>=5)return '520'; return '4L'; }   // no 4%-20yr → 4% lifetime
+  return nearestVal(pct,[3,4,5])+'L'; }                                              // Secure lifetime = 3/4/5 only
+function moocTermToCanon(t){ return t==='10 Years'?'10':t==='15 Years'?'15':t==='20 Years'?'20':t==='Lifetime'?'L':'none'; }
+function canonToMoocTerm(t){ return t==='10'?'10 Years':t==='15'?'15 Years':t==='20'?'20 Years':'Lifetime'; }
+// Raw string values of a carrier's [benefit, period, inflation] fields — used to detect whether the
+// USER changed a field vs. the tool having snapped it, so that clicking through carriers to compare
+// never drifts the design. Only a field the user actually edited overwrites the normalized model.
+function planFieldVals(carrier){
+  function v(id){ var e=$(id); if(!e)return ''; return String(e.type==='checkbox'?(e.checked?1:0):e.value); }
+  if(carrier==='ngl') return {mb:v('s_benefit'), per:v('s_bp'), inf:v('s_infl')};
+  if(carrier==='moo') return {mb:v('moo_benefit'), per:v('moo_bp'), inf:v('moo_infl')};
+  if(carrier==='mooc') return {mb:v('mooc_benefit'), per:(($('mooc_covbasis')||{}).value==='total'?v('mooc_totben'):v('mooc_bp')), inf:v('mooc_infterm')+'|'+v('mooc_infpct')};
+  if(carrier==='carescout') return {mb:v('cs_daily'), per:v('cs_pool'), inf:v('cs_infl')};
+  if(carrier==='omniflex') return {mb:v('om_daily'), per:v('om_bp'), inf:v('om_infl')};
+  return {};
+}
+function capturePlan(carrier){ try{
+  var ap=(CLIENT._ap||{})[carrier], cur=planFieldVals(carrier);
+  var chMb=!ap||cur.mb!==ap.mb, chPer=!ap||cur.per!==ap.per, chInf=!ap||cur.inf!==ap.inf;
+  if(!chMb && !chPer && !chInf) return;                 // user didn't touch benefit/period/inflation — keep model as-is
+  var mb=null, years=null, pct=null, term=null;
+  if(carrier==='ngl'){
+    mb=+($('s_benefit')||{}).value; years=(+($('s_bp')||{}).value)/12;
+    var inf=+($('s_infl')||{}).value; pct=inf*100; term=inf>0?'L':'none';
+  } else if(carrier==='moo'){
+    mb=+($('moo_benefit')||{}).value; years=+($('moo_bp')||{}).value;
+    var c=mooCodeToCanon(($('moo_infl')||{}).value||'none'); pct=c.pct; term=c.term;
+  } else if(carrier==='mooc'){
+    mb=+($('mooc_benefit')||{}).value;
+    if(($('mooc_covbasis')||{}).value==='total'){ years=(+($('mooc_totben')||{}).value)/((mb||3000)*12); } else { years=+($('mooc_bp')||{}).value; }
+    var tm=($('mooc_infterm')||{}).value; if(tm==='none'||!tm){ pct=0; term='none'; } else { pct=parseFloat(($('mooc_infpct')||{}).value)||0; term=moocTermToCanon(tm); }
+  } else if(carrier==='carescout'){
+    var d=+($('cs_daily')||{}).value; mb=Math.round(d*30);
+    var pool=+($('cs_pool')||{}).value; if(pool>0&&d>0)years=pool/d/365.25;
+    var ci=($('cs_infl')||{}).value; pct=(!ci||ci==='none')?0:parseFloat(ci); term=pct>0?'L':'none';
+  } else if(carrier==='omniflex'){
+    var od=+($('om_daily')||{}).value; mb=Math.round(od*30);
+    var days=+($('om_bp')||{}).value; if(days>0)years=days/360;
+    var on=!!($('om_infl')&&$('om_infl').checked); pct=on?5:0; term=on?'L':'none';   // OmniFlex inflation is 5% simple, on/off
+  }
+  if(chMb && mb>0) CLIENT.mb=mb;
+  if(chPer && years>0) CLIENT.years=years;
+  if(chInf && pct!=null){ CLIENT.inflPct=pct; CLIENT.inflTerm=term; }
+}catch(e){} }
+function applyPlan(carrier){ if(CLIENT.mb==null && CLIENT.years==null && CLIENT.inflPct==null) return; try{
+  var mb=CLIENT.mb, years=CLIENT.years, pct=CLIENT.inflPct, term=CLIENT.inflTerm||'L';
+  if(carrier==='ngl'){
+    if(mb!=null&&$('s_benefit')) $('s_benefit').value=Math.min(12000,Math.max(300,Math.round(mb)));
+    if(years!=null&&$('s_bp')) $('s_bp').value=nearestVal(years*12,[24,36,48,60,72]);
+    if(pct!=null&&$('s_infl')) $('s_infl').value=nearestVal(pct/100,[0,0.01,0.02,0.03,0.04,0.05]);
+  } else if(carrier==='moo'){
+    if(mb!=null&&$('moo_benefit')) $('moo_benefit').value=Math.min(12000,Math.max(1500,Math.round(mb)));
+    if(years!=null&&$('moo_bp')) $('moo_bp').value=nearestVal(years,[2,3,4]);
+    if(pct!=null&&$('moo_infl')) $('moo_infl').value=canonToMooCode(pct,term);
+  } else if(carrier==='mooc'){
+    if(mb!=null&&$('mooc_benefit')) $('mooc_benefit').value=Math.min(15000,Math.max(1500,Math.round(mb)));
+    if($('mooc_covbasis')){ $('mooc_covbasis').value='years'; try{ moocCovBasis(); }catch(e){} }
+    if(years!=null&&$('mooc_bp')) $('mooc_bp').value=nearestVal(years,[2,3,4,5,6]);
+    try{ moocFillPct(); }catch(e){}
+    if(pct!=null&&$('mooc_infterm')){ if(!(pct>0)){ $('mooc_infterm').value='none'; }
+      else { $('mooc_infterm').value=canonToMoocTerm(term); if($('mooc_infpct')) $('mooc_infpct').value=String(nearestVal(pct,MOOC_PCTS)); }
+      try{ moocSyncInfl(); }catch(e){} }
+  } else if(carrier==='carescout'){
+    var st=($('cs_state')||{}).value||'';
+    if(mb!=null&&$('cs_daily')){ var dl=csDailies(st); $('cs_daily').value=nearestVal(mb/30,dl); }
+    try{ csSyncPool(); }catch(e){}
+    if(years!=null&&$('cs_pool')){ var d2=+($('cs_daily')||{}).value||100; var pools=csPoolsFor(d2,st); $('cs_pool').value=nearestVal(d2*years*365.25,pools); }
+    if(pct!=null&&$('cs_infl')) $('cs_infl').value=(pct>0?String(nearestVal(pct,[1,3,5])):'none');
+  } else if(carrier==='omniflex'){
+    if(mb!=null&&$('om_daily')){ var oday=Math.min(400,Math.max(10,Math.round((mb/30)/10)*10)); $('om_daily').value=oday;
+      if($('om_hcdaily')) $('om_hcdaily').value=Math.min(300,Math.max(10,oday)); }
+    if(years!=null&&$('om_bp')){ var bd=nearestVal(years*360,[90,180,270,360]); $('om_bp').value=bd; if($('om_hcbp')) $('om_hcbp').value=bd; }
+    if(pct!=null&&$('om_infl')) $('om_infl').checked = pct>0;
+  }
+  // Remember what we just put in each field, so a later capture can tell a snap from a real user edit.
+  CLIENT._ap=CLIENT._ap||{}; CLIENT._ap[carrier]=planFieldVals(carrier);
+}catch(e){} }
 function setCarrier(c){
   const prev=CARRIER; if(prev) captureClient(prev);
   CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc') ? c : 'ngl';
