@@ -236,12 +236,39 @@ Deployed on GitHub Pages it installs to a phone or tablet home screen (Share →
 Add to Home Screen on iOS, the install prompt on Android) and works with no
 connection after the first load.
 
+## Updates reaching the device
+
+The service worker fetches **everything** from the network first, falling back
+to the cache only when there is no connection. That is deliberate and it is
+worth not "optimising" back.
+
+The obvious setup, and the one this shipped with, is network-first for the page
+and cache-first for scripts and styles. It is quietly broken: `index.html` came
+back fresh on every load while `js/main.js` was served from cache forever,
+because a cached entry is only replaced when the cache name changes. The result
+is a current page running months-old code, with nothing visibly wrong, on the
+one device that matters. It cost a full round of "I don't see the new feature"
+to spot.
+
+The app is a couple of hundred kilobytes of text, so the round trip costs
+nothing worth having, and offline still works the moment the network is gone.
+`test/sw.test.mjs` pins this behaviour, since it is invisible to every other
+test: the game works perfectly while being out of date.
+
+The page also reloads itself once when a new worker takes over, so a deploy
+lands without anyone having to know they must refresh twice. Bumping `CACHE` in
+`sw.js` is what evicts the old files on devices that already have them.
+
 ## Tests
 
 ```
 ./test/run.sh
 ```
 
+- `test/sw.test.mjs` — the service worker, driven in a fake worker scope: that
+  scripts are never served stale, that offline still falls back to the cache,
+  that other origins and POSTs are untouched, and that activating clears the
+  old Runebreaker cache without touching the other apps in this repo.
 - `test/storage.test.mjs` — backup and restore: round trips, older exports,
   hand-edited junk, and that a bad file fails with a message a parent can act
   on rather than a stack trace.
