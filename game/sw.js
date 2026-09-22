@@ -1,6 +1,6 @@
 /* Runebreaker service worker. Scoped to /game/ so it never touches the
    other apps in this repo. Bump CACHE whenever the shell changes. */
-const CACHE = 'runebreaker-v4';
+const CACHE = 'runebreaker-v5';
 const SHELL = [
   './',
   './index.html',

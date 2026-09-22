@@ -1239,6 +1239,12 @@ function screenReport() {
         <h4>Last 14 days</h4>
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
+        <h4>School year</h4>
+        <p class="muted tiny">Only a starting point, and it fades as their own answers accumulate. Raise it if they are being served work below them; lower it if they are struggling. Changing it never touches their record.</p>
+        <div class="grades compact">
+          ${GRADES.map(g => `<button class="grade ${p.grade === g.id ? 'on' : ''}" data-grade-for="${p.id}" data-grade="${g.id}"><b>${g.label}</b></button>`).join('')}
+        </div>
+
         <div class="card-actions">
           <button class="btn ghost small" data-drills="${p.id}">Timed drill turns: <b>${p.prefs?.drills === false ? 'off' : 'on'}</b></button>
           <button class="btn ghost small" data-export="${p.id}">Back up / move ${esc(p.name)}</button>
@@ -1271,6 +1277,13 @@ function screenReport() {
   $('#importBtn').onclick = () => { sfx.tap(); screenImport(); };
   const exAll = $('#exportAll');
   if (exAll) exAll.onclick = () => { sfx.tap(); screenBackup(data.profiles); };
+  $$('[data-grade-for]').forEach(b => b.onclick = () => {
+    const hero = data.profiles.find(x => x.id === b.dataset.gradeFor);
+    if (!hero) return;
+    const next = Number(b.dataset.grade);
+    hero.grade = hero.grade === next ? 0 : next;  // tapping the current one clears it
+    persist(); sfx.tap(); screenReport();
+  });
   $$('[data-drills]').forEach(b => b.onclick = () => {
     const hero = data.profiles.find(x => x.id === b.dataset.drills);
     if (!hero) return;

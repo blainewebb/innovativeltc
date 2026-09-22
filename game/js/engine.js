@@ -124,12 +124,17 @@ function evidenceLevel(mastery) {
    sensible first run without letting a parent's guess outlive the evidence,
    in either direction. */
 export const GRADE_DECAY_ATTEMPTS = 30;
+/* Roughly one run of grace first. Without it the floor dropped a level while
+   the child's own record was still too thin to replace it, and the game
+   visibly got easier thirty problems in. */
+export const GRADE_GRACE_ATTEMPTS = 60;
 
 export function difficultyLevel(mastery, grade = 0) {
   const evidence = evidenceLevel(mastery);
   const seeded = GRADE_BY_ID[grade]?.level || 0;
   if (!seeded) return evidence;
-  const floor = seeded - Math.floor(totalAttempts(mastery) / GRADE_DECAY_ATTEMPTS);
+  const past = Math.max(0, totalAttempts(mastery) - GRADE_GRACE_ATTEMPTS);
+  const floor = seeded - Math.floor(past / GRADE_DECAY_ATTEMPTS);
   return Math.max(1, Math.min(MAX_LEVEL, Math.max(evidence, floor)));
 }
 
@@ -140,6 +145,10 @@ export function unlockedOps(mastery, grade = 0) {
   if (addOk) ops.push('*');
   const multOk = skillScore(mastery.skills.mult_easy, 'mult_easy') > 0.5 || (mastery.skills.mult_easy?.attempts || 0) > 20;
   if (multOk) ops.push('/');
+  /* Powers need an earned route too. Declaring 7th grade was the only way in,
+     so a child who climbed there on their own never saw the rune. */
+  const hardMultOk = skillScore(mastery.skills.mult_hard, 'mult_hard') > 0.6 && (mastery.skills.mult_hard?.attempts || 0) >= 12;
+  if (hardMultOk) ops.push('^');
   // A third grader is being taught multiplication whether or not they are
   // good at it yet, so the grade adds operators it never takes away.
   for (const op of GRADE_BY_ID[grade]?.ops || []) if (!ops.includes(op)) ops.push(op);

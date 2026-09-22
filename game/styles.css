@@ -308,6 +308,9 @@ p { margin: 0 0 10px; line-height: 1.45; }
 .grade b { font-size: .92rem; }
 .grade small { color: var(--muted); font-size: .74rem; }
 .grade.on { border-color: var(--gold); background: #3a3050; }
+.grades.compact { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.grades.compact .grade { padding: 8px 4px; min-height: 40px; text-align: center; }
+.grades.compact .grade b { font-size: .78rem; }
 
 /* ---------------------------------------------------------- boss duel */
 .duel-banner {

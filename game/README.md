@@ -232,6 +232,17 @@ difficulty. A wrong guess corrects itself in either direction, and it is a
 floor rather than a ceiling, so a kid who races ahead is never held back by
 what was ticked in September.
 
+The school year can be **changed later** from the report card, since the best
+setting is often not obvious until you have watched a few runs. Changing it
+never touches their record.
+
+Starting a capable child low works, and is a reasonable thing to do
+deliberately. Measured on a simulated strong player declared as 4th grade:
+the power rune is earned around 45 problems, level 5 around 120, level 7
+around 125, and level 8 by roughly 770. Every middle school topic is reached.
+The declared grade is a floor, never a ceiling, so their own record lifts them
+past it as fast as they can demonstrate it.
+
 Heroes are deleted from the picker: **Manage heroes**, then the cross beside
 one. It says how many problems and minutes are about to be lost and offers to
 back the hero up first, because it is the one irreversible action in the game.

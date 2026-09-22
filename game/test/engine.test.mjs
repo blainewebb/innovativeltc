@@ -8,7 +8,7 @@ import {
   effectiveHit, tileRangeFor, parseFactKey, problemForSkill, pickDrill,
   drillAllowanceMs, DRILL_MIN_MS, DRILL_MAX_MS, DRILL_DEFAULT_MS,
   isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
-  GRADE_DECAY_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
+  GRADE_DECAY_ATTEMPTS, GRADE_GRACE_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
   parseAnswer, checkAnswer, answerValue, formatAnswer, typeInto,
   expectedDrillDamage,
 } from '../js/engine.js';
@@ -630,12 +630,92 @@ test('the grade fades out as real answers arrive', () => {
   const m = blankMastery();
   const start = difficultyLevel(m, 5);
   assert.equal(start, 5);
-  for (let i = 0; i < GRADE_DECAY_ATTEMPTS * 5; i++) {
+  // Grace window first, then one level of the declared grade per decay step.
+  const enough = GRADE_GRACE_ATTEMPTS + GRADE_DECAY_ATTEMPTS * 6;
+  for (let i = 0; i < enough; i++) {
     recordAttempt(m, { skill: 'add_small', fact: '3+4', correct: false, ms: 14000 });
   }
-  assert.ok(totalAttempts(m) >= 150);
+  assert.ok(totalAttempts(m) >= enough);
   assert.equal(difficultyLevel(m, 5), difficultyLevel(m),
     'after enough evidence the declared grade should count for nothing');
+});
+
+test('the declared grade holds while the record is still too thin to replace it', () => {
+  /* The floor used to erode after thirty problems, before the child's own
+     record was thick enough to stand in for it, so the game visibly got
+     EASIER a third of a run in. Within the grace window the declared level
+     must hold regardless of what they have happened to be asked so far. */
+  const m = blankMastery();
+  for (let i = 0; i < GRADE_GRACE_ATTEMPTS; i++) {
+    recordAttempt(m, { skill: 'add_small', fact: '3+4', correct: true, ms: 1800 });
+    assert.ok(difficultyLevel(m, 6) >= 6,
+      `level fell to ${difficultyLevel(m, 6)} after only ${totalAttempts(m)} problems`);
+  }
+});
+
+test('a player answering a real mix correctly only ever climbs', () => {
+  const m = blankMastery();
+  const rng = makeRng(77);
+  let previous = difficultyLevel(m, 4);
+  for (let i = 0; i < 600; i++) {
+    const level = difficultyLevel(m, 4);
+    const runes = unlockedOps(m, 4);
+    const hand = generateHand(rng, { mastery: m, runes, size: 5, depth: 5, grade: 4 });
+    const plays = legalPlays(hand, runes);
+    if (plays.length) {
+      const p = plays[Math.floor(rng() * plays.length)];
+      recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: true, ms: 2200 });
+    }
+    const d = pickDrill(rng, m, runes, level);
+    if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: true, ms: 2200 });
+    const now = difficultyLevel(m, 4);
+    assert.ok(now >= previous, `level fell from ${previous} to ${now} after ${totalAttempts(m)} problems`);
+    previous = now;
+  }
+});
+
+test('the power rune can be earned, not only declared', () => {
+  // Reachable only by declaring 7th grade meant a kid who climbed there on
+  // their own record never saw it.
+  const m = blankMastery();
+  for (let i = 0; i < 25; i++) recordAttempt(m, { skill: 'add_small', fact: '3+4', correct: true, ms: 1200 });
+  for (let i = 0; i < 25; i++) recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: true, ms: 1200 });
+  assert.ok(!unlockedOps(m).includes('^'), 'not before the harder tables');
+  for (let i = 0; i < 16; i++) recordAttempt(m, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 1600 });
+  assert.ok(unlockedOps(m).includes('^'), 'solid times tables should earn it');
+  // And struggling with them should not.
+  const weak = blankMastery();
+  for (let i = 0; i < 25; i++) recordAttempt(weak, { skill: 'add_small', fact: '3+4', correct: true, ms: 1200 });
+  for (let i = 0; i < 20; i++) recordAttempt(weak, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 12000 });
+  assert.ok(!unlockedOps(weak).includes('^'));
+});
+
+test('a strong player who starts low still climbs to the top', () => {
+  /* Starting a capable child at a low grade has to work: the declared grade
+     is a floor, and their own record has to be able to lift them past it. */
+  const m = blankMastery();
+  const rng = makeRng(2024);
+  for (let i = 0; i < 900; i++) {
+    const level = difficultyLevel(m, 4);
+    const runes = unlockedOps(m, 4);
+    const hand = generateHand(rng, { mastery: m, runes, size: 5, depth: 5, grade: 4 });
+    const plays = legalPlays(hand, runes);
+    if (plays.length) {
+      const p = plays[Math.floor(rng() * plays.length)];
+      recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: true, ms: 2500 });
+    }
+    const d = pickDrill(rng, m, runes, level);
+    if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: true, ms: 2500 });
+  }
+  assert.ok(difficultyLevel(m, 4) >= 7, `only reached level ${difficultyLevel(m, 4)} starting from 4th`);
+  const seen = new Set();
+  for (let s2 = 1; s2 <= 400; s2++) {
+    const d = pickDrill(makeRng(s2), m, unlockedOps(m, 4), difficultyLevel(m, 4));
+    if (d) seen.add(d.skill);
+  }
+  for (const topic of ['percent', 'ratio', 'fractions', 'solve_x']) {
+    assert.ok(seen.has(topic), `never reached ${topic} starting from 4th grade`);
+  }
 });
 
 test('a kid who races ahead is never held back by the grade', () => {
