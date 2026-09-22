@@ -285,6 +285,26 @@ ordinary Safari browsing is subject to.
 
 To move a hero between browsers, use the backup below rather than hoping.
 
+## Earning heroes
+
+Twenty avatars. Eight to choose from on day one, so picking still feels like a
+choice and two brothers need not look identical, and twelve earned one every
+five floors beaten.
+
+Floors count **cumulatively, across every run, and never reset**. A kid who
+dies on floor four after a good run has still moved four floors closer to the
+next hero, which is exactly the moment the encouragement is worth something.
+Tying it to deepest-floor-ever instead would have put the twentieth at floor
+100, reachable only in endless mode.
+
+Earning one gets its own screen rather than a line in the battle log, since it
+is the only reward in the game that is not about the fight. The picker is
+reached by tapping your hero on the hub, and shows the locked ones with what
+they cost: a locked row a kid can see is most of the motivation.
+
+Heroes saved before this existed are credited their deepest floor rather than
+reading as zero, which is the most that can honestly be inferred.
+
 ## Where progress lives, and moving it
 
 There is no account and no server, which is what makes the game work offline

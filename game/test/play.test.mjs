@@ -189,6 +189,62 @@ try {
     await page.waitForTimeout(120);
   }
 
+  /* ---- earning a hero ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  // A hero four floors from their first unlock, so one more beaten floor does it.
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('runebreaker.v1'));
+    data.profiles[0].records.floorsBeaten = 4;
+    data.activeId = data.profiles[0].id;
+    localStorage.setItem('runebreaker.v1', JSON.stringify(data));
+  });
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#startRun');
+  const nextHeroLine = await page.$eval('.hero-row', e => e.textContent);
+  ok('the hub says how close the next hero is', /Next hero: .* in 1 floor\b/.test(nextHeroLine), nextHeroLine);
+
+  await page.click('#looksBtn');
+  await page.waitForSelector('.look');
+  ok('the look picker shows all twenty', (await page.$$('.look')).length === 20);
+  ok('twelve of them are still locked', (await page.$$('.look.locked')).length === 12);
+  ok('a locked one says what it costs', /floors/.test(await page.$eval('.look.locked small', e => e.textContent)));
+  const secondLook = await page.$$eval('[data-look]', els => els[1]?.dataset.look);
+  await page.click(`[data-look="${secondLook}"]`);
+  await page.waitForTimeout(100);
+  ok('picking an earned hero changes it', (await page.$eval('.look.on', e => e.dataset.look)) === secondLook);
+  await page.click('#done');
+  await page.waitForSelector('#startRun');
+
+  // Beat one floor and the unlock should fire.
+  await page.click('#startRun');
+  let earnedScreen = false;
+  for (let step = 0; step < 90 && !earnedScreen; step++) {
+    if (await page.$('#wear')) { earnedScreen = true; break; }
+    if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
+    if (await page.$('.hand')) {
+      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      const ex = await readExpression(page);
+      if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
+      await typeNumber(page, ex.answer, '#strike');
+      continue;
+    }
+    if (await page.$('#cont')) { await page.click('#cont'); continue; }
+    if (await page.$('#next')) { await page.click('#next'); continue; }
+    if (await page.$('.choice')) { await page.click('.choice'); continue; }
+    if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
+    if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('.node')) { const n = await page.$('.node.battle') || await page.$('.node'); await n.click(); continue; }
+    break;
+  }
+  ok('beating a floor earns the next hero', earnedScreen);
+  if (earnedScreen) {
+    const panel = await page.$eval('.panel', e => e.textContent);
+    ok('the earning screen names the hero and the floors', /is yours, for beating 5 floors/.test(panel), panel.slice(0, 160));
+    await page.click('#wear');
+    await page.waitForSelector('.node, .drill-problem, .hand');
+    ok('wearing it carries on with the run', true);
+  }
+
   /* ---- an 8th grader is served middle school work, typed as such ---- */
   await page.goto(URL, { waitUntil: 'networkidle' });
   if (await page.$('#switchBtn')) await page.click('#switchBtn');

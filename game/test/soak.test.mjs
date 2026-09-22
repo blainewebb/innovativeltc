@@ -287,6 +287,9 @@ try {
       // The bot cannot read word problems, so it guesses. Wrong is fine here:
       // the point is that the screen survives both outcomes.
       await typeNum(7, '#go');
+    } else if (await page.$('#wear')) {          // a hero was earned
+      seen.add('avatar-earned');
+      await page.click('#wear');
     } else if (await page.$('#next')) {
       await page.click('#next');
     } else if (await page.$('#cont')) {
@@ -345,6 +348,8 @@ try {
   ok('saw battles', seen.has('battle'));
   ok('saw drill turns', seen.has('drill'));
   ok('saw a boss duel', seen.has('boss-duel'), [...seen].join(','));
+  // Twelve heroes across sixty floors, so several runs must produce some.
+  ok('heroes are earned along the way', seen.has('avatar-earned'), [...seen].join(','));
   ok('saw the map', seen.has('map'));
   ok('saw a victory screen', seen.has('victory'));
   ok('saw a boss node', seen.has('node:boss'), [...seen].join(','));

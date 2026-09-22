@@ -55,7 +55,7 @@ export function newProfile(name, avatar, grade = 0) {
     /* Per hero, so a kid who freezes under a clock can have drills off
        without changing anything for their brother. */
     prefs: { drills: true },
-    records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0 },
+    records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0, floorsBeaten: 0 },
     /* One entry per day the kid played: { date:'YYYY-MM-DD', ms, correct, wrong } */
     days: [],
   };
@@ -75,7 +75,13 @@ export function normalizeProfile(raw) {
     grade: Number(raw.grade) || 0,
     meta: { ...base.meta, ...(raw.meta || {}) },
     prefs: { ...base.prefs, ...(raw.prefs || {}) },
-    records: { ...base.records, ...(raw.records || {}) },
+    records: (() => {
+      const r = { ...base.records, ...(raw.records || {}) };
+      /* Heroes from before avatars were earned should not read as zero. Credit
+         them their deepest floor, which is the most we can honestly infer. */
+      if (!Number.isFinite(Number(raw.records?.floorsBeaten))) r.floorsBeaten = Number(r.deepest) || 0;
+      return r;
+    })(),
     days: Array.isArray(raw.days) ? raw.days.filter(d => d && typeof d.date === 'string').map(d => ({
       date: d.date, ms: Number(d.ms) || 0, correct: Number(d.correct) || 0, wrong: Number(d.wrong) || 0,
     })) : [],

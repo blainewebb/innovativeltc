@@ -10,7 +10,9 @@ import {
   bestHitEstimate, makeRng as engineRng, typeInto, checkAnswer, formatAnswer, parseAnswer,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
-import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION } from './data.js';
+import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
+         AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
+         FLOORS_PER_AVATAR } from './data.js';
 import * as store from './storage.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
@@ -39,7 +41,6 @@ function startClock() {
   }, 10000);
 }
 
-const AVATARS = ['\u{1F9D9}', '\u{1F9DD}', '\u{1F9DB}', '\u{1F916}', '\u{1F98A}', '\u{1F42F}', '\u{1F409}', '\u{1F984}'];
 
 /* ================================================================ boot === */
 function boot() {
@@ -74,7 +75,8 @@ function screenProfiles() {
           <h3>${data.profiles.length ? 'Add another hero' : 'Make your hero'}</h3>
           ${data.profiles.length ? '<p class="muted tiny">Every hero keeps their own progress, their own difficulty and their own report card. Give each kid their own.</p>' : ''}
           <input id="newName" maxlength="12" placeholder="${data.profiles.length ? 'Their name' : 'Hero name'}" autocomplete="off">
-          <div class="avatars">${AVATARS.map((a, i) => `<button class="av ${i === 0 ? 'on' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+          <div class="avatars">${unlockedAvatars(0).map((a, i) => `<button class="av ${i === 0 ? 'on' : ''}" data-av="${a.char}" title="${a.name}">${a.char}</button>`).join('')}</div>
+          <p class="muted tiny">Twelve more heroes are earned by playing, one for every ${FLOORS_PER_AVATAR} floors beaten.</p>
           <label class="field-label">School year</label>
           <div class="grades">
             ${GRADES.map(g => `<button class="grade" data-grade="${g.id}"><b>${g.label}</b><small>${g.hint}</small></button>`).join('')}
@@ -98,7 +100,7 @@ function screenProfiles() {
     const hero = data.profiles.find(x => x.id === b.dataset.del);
     if (hero) { sfx.tap(); screenConfirmDelete(hero); }
   });
-  let chosen = AVATARS[0];
+  let chosen = unlockedAvatars(0)[0].char;
   let grade = 0;
   $$('.av').forEach(b => b.onclick = () => {
     chosen = b.dataset.av; $$('.av').forEach(x => x.classList.remove('on')); b.classList.add('on'); sfx.tap();
@@ -147,6 +149,7 @@ function screenConfirmDelete(hero) {
 
 /* ================================================================= hub === */
 function screenHub() {
+  const upNext = nextAvatar(profile.records.floorsBeaten || 0);
   const level = difficultyLevel(profile.mastery, profile.grade);
   const ops = unlockedOps(profile.mastery, profile.grade);
   render(`
@@ -154,10 +157,11 @@ function screenHub() {
       <h1 class="logo small">RUNE<span>BREAKER</span></h1>
       <div class="panel">
         <div class="hero-row">
-          <span class="pa big">${profile.avatar}</span>
+          <button class="pa big as-button" id="looksBtn" title="Change your hero">${profile.avatar}</button>
           <div>
             <h2>${esc(profile.name)}</h2>
             <p class="muted">Deepest floor <b>${profile.records.deepest}</b> &middot; ${profile.records.runs} runs &middot; ${profile.records.bossesFelled} bosses felled</p>
+            <p class="muted tiny">${upNext ? `Next hero: ${upNext.char} in ${upNext.away} floor${upNext.away === 1 ? '' : 's'}` : 'Every hero earned'} &middot; tap your hero to change it</p>
           </div>
         </div>
         <div class="runes-owned">
@@ -178,6 +182,7 @@ function screenHub() {
   $('#startRun').onclick = () => { sfx.tap(); beginRun(false); };
   const endlessBtn = $('#startEndless');
   if (endlessBtn) endlessBtn.onclick = () => { sfx.tap(); beginRun(true); };
+  $('#looksBtn').onclick = () => { sfx.tap(); screenLooks(screenHub); };
   $('#switchBtn').onclick = () => { data.activeId = null; persist(); screenProfiles(); };
   $('#soundBtn').onclick = () => {
     setEnabled(!isEnabled()); data.settings.sound = isEnabled(); persist(); sfx.tap(); screenHub();
@@ -242,13 +247,78 @@ function topBar() {
 }
 
 function nextFloor() {
+  /* The floor they were standing on is now beaten. Counted across every run
+     and never reset, so dying on floor four after a good run still leaves
+     them four floors closer to the next hero. */
+  const before = profile.records.floorsBeaten || 0;
+  profile.records.floorsBeaten = before + 1;
+  const earned = avatarsEarnedBetween(before, profile.records.floorsBeaten);
+
   run.depth += 1;
   run.stats.deepest = Math.max(run.stats.deepest, run.depth);
   if (run.depth > profile.records.deepest) profile.records.deepest = run.depth;
   if (run.endless && run.depth > (profile.records.bestEndless || 0)) profile.records.bestEndless = run.depth;
   run.floorNodes = generateFloor(run.rng, run.depth);
   persist();
+
+  if (earned.length) return screenAvatarEarned(earned);
   screenMap();
+}
+
+/* Earning a hero is the one reward in the game that is not about the fight,
+   so it gets its own screen rather than a line in the log. */
+function screenAvatarEarned(earned) {
+  const a = earned[0];
+  const rest = earned.slice(1);
+  sfx.win();
+  render(`
+    <div class="screen center">
+      <div class="panel win">
+        <h2>NEW HERO EARNED</h2>
+        <div class="big-art huge">${a.char}</div>
+        <p class="center"><b>${esc(a.name)}</b> is yours, for beating ${profile.records.floorsBeaten} floors.</p>
+        ${rest.length ? `<p class="center">Also earned: ${rest.map(x => `${x.char} ${esc(x.name)}`).join(', ')}</p>` : ''}
+        <div class="row">
+          <button class="btn ghost" id="later">Keep going</button>
+          <button class="btn primary" id="wear">Wear ${a.char}</button>
+        </div>
+      </div>
+    </div>`);
+  $('#wear').onclick = () => {
+    profile.avatar = a.char;
+    persist(); sfx.reward(); screenMap();
+  };
+  $('#later').onclick = () => { sfx.tap(); screenMap(); };
+}
+
+/* Every hero they have earned, plus the ones still to come and what they
+   cost, because a locked row a kid can see is most of the motivation. */
+function screenLooks(onDone) {
+  const beaten = profile.records.floorsBeaten || 0;
+  const next = nextAvatar(beaten);
+  render(`
+    <div class="screen center">
+      <div class="panel">
+        <h2>Your heroes</h2>
+        <p class="muted tiny center">One more every ${FLOORS_PER_AVATAR} floors beaten. You have beaten <b>${beaten}</b>.${next ? ` Next: ${next.char} ${esc(next.name)} in ${next.away}.` : ' You have earned them all.'}</p>
+        <div class="looks">
+          ${AVATARS.map(a => {
+            const locked = a.at > beaten;
+            return `<button class="look ${locked ? 'locked' : ''} ${profile.avatar === a.char ? 'on' : ''}"
+                      ${locked ? 'disabled' : `data-look="${a.char}"`}>
+                      <span class="lk">${locked ? '\u{1F512}' : a.char}</span>
+                      <small>${locked ? `${a.at} floors` : esc(a.name)}</small>
+                    </button>`;
+          }).join('')}
+        </div>
+        <button class="btn primary" id="done">Done</button>
+      </div>
+    </div>`);
+  $$('[data-look]').forEach(b => b.onclick = () => {
+    profile.avatar = b.dataset.look;
+    persist(); sfx.reward(); screenLooks(onDone);
+  });
+  $('#done').onclick = () => { sfx.tap(); onDone(); };
 }
 
 function enterNode(node) {
