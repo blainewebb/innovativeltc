@@ -296,6 +296,19 @@
     <button class="vtab" data-view="qc" onclick="setView('qc')">⚡ Quick Commands</button>
   </div>
 
+  <div class="card" id="nameCard">
+    <div class="cs-head" style="margin-bottom:8px"><h2 style="margin:0 0 2px">👤 Client</h2><p class="hint" style="margin:0">Optional — the name shown on the printed quote and the shared-care page. Leave blank to quote without a name.</p></div>
+    <div class="grid">
+      <div class="field"><label>First name</label><input id="cl_first" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
+      <div class="field"><label>Last name</label><input id="cl_last" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
+    </div>
+    <div class="riders" style="margin-top:10px"><label><input type="checkbox" id="cl_spouse" onchange="toggleSpouseName()"> Add spouse / partner</label></div>
+    <div class="grid" id="cl_spousebox" hidden>
+      <div class="field"><label>Spouse first name</label><input id="sp_first" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
+      <div class="field"><label>Spouse last name</label><input id="sp_last" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
+    </div>
+  </div>
+
   <div class="card" id="qccard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">⚡ Quick Commands</h2>
@@ -3379,6 +3392,7 @@ function setView(v){
   const qc = VIEW==='qc';
   document.querySelectorAll('#viewTabs .vtab').forEach(t=>t.classList.toggle('on', t.dataset.view===VIEW));
   if($('qccard')) $('qccard').hidden = !qc;
+  if($('nameCard')) $('nameCard').hidden = qc;   // client-name box: quote view only
   if(qc){
     if($('askCard')) $('askCard').style.display='none';
     QUOTE_CARDS.forEach(id=>{ const e=$(id); if(e) e.hidden=true; });
@@ -3583,6 +3597,7 @@ function omniCoupleToggle(){
   if(on){ $('om_spousal').checked=true; }                     // both applying → spousal discount
   $('om_spousal').disabled = on;
   $('om_spousal').closest('label').style.opacity = on ? .55 : '';
+  spouseNameAuto(on);
 }
 function omniRunSingle(){ try{
   if($('om_couple') && $('om_couple').checked) return omniRunCouple();
@@ -3644,6 +3659,7 @@ function mooCoupleToggle(){
   if(!on && $('moo_jwp')) $('moo_jwp').checked=false;         // Joint Waiver is couple-only
   if(on && $('moo_spousal')) $('moo_spousal').checked=false;  // both-applying supersedes spouse-not-applying
   if($('moo_eachnote')) $('moo_eachnote').hidden = !on;
+  spouseNameAuto(on);
 }
 function mooRunSingle(){ try{
   if($('moo_couple') && $('moo_couple').checked) return mooRunCouple();
@@ -3761,6 +3777,7 @@ function moocCoupleToggle(){
   if(!on && $('mooc_jwp')) $('mooc_jwp').checked=false;         // Joint Waiver is couple-only
   if(on && $('mooc_spousal')) $('mooc_spousal').checked=false;  // both-applying supersedes spouse-not-applying
   if($('mooc_eachnote')) $('mooc_eachnote').hidden = !on;
+  spouseNameAuto(on);
 }
 function moocRunSingle(){ try{
   if($('mooc_couple') && $('mooc_couple').checked) return moocRunCouple();
@@ -4314,6 +4331,7 @@ function showSameBenefit(p){
 function activateTab(mode){
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.mode===mode));
   document.querySelectorAll('.pane').forEach(p=>p.hidden = p.dataset.pane!==mode);
+  if(mode==='couple') spouseNameAuto(true);   // NGL couple tab → reveal spouse name boxes
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>activateTab(t.dataset.mode));
 function openWaiting(){ setMode('manual'); activateTab('waiting'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
@@ -4835,6 +4853,7 @@ function saveClient(){ const a=LS.tray(); if(!a.length){ alert('Add at least one
   EDIT_CLIENT=-1; PENDING_ITEMS=a.slice(); $('clientModalTitle').textContent='Save to client';
   $('clientModalIntro').innerHTML='Just a name to save it. You can add a birthday and contact info anytime with <b>Edit</b>.';
   ['cf_name','cf_dob','cf_email','cf_phone','cf_note'].forEach(id=>$(id).value='');
+  $('cf_name').value=getClientNameData().display;   // prefill from the up-front client-name box
   clientModalExtras(false);   // new save = name only
   $('clientModal').classList.add('show'); $('cf_name').focus(); }
 function editClient(i){ const x=LS.clients()[i]; if(!x) return; EDIT_CLIENT=i; PENDING_ITEMS=null; closeClients();
@@ -5098,8 +5117,11 @@ function benefitGrowthSection(items, order){
 /* ---------- NGL shared-care explainer page ("Mickey ears": two policyholders + a shared pool) ---------- */
 function isNglItem(o){ return !!o && !isCS(o) && !isOmni(o) && !isMoo(o) && !isMooc(o); }
 function toggleSharedPage(on){ QSHEET.sharedPage=!!on; renderSheet(); }
-// Split a "A & B" client name into two policyholder names.
+// Two policyholder names for the shared-care circles: prefer the structured names from the
+// top form; otherwise split a "A & B" client name into two.
 function sharedNames(){
+  const st=QSHEET.client&&QSHEET.client.names;
+  if(st && (st.n1||st.n2)) return {n1:st.n1||'Policyholder 1', n2:st.n2||'Policyholder 2'};
   const nm=((QSHEET.client&&QSHEET.client.name)||'').trim();
   let n1='Policyholder 1', n2='Policyholder 2';
   if(nm){ const parts=nm.split(/\s*(?:&|\band\b|\+)\s*/i).map(s=>s.trim()).filter(Boolean); if(parts.length>=2){ n1=parts[0]; n2=parts.slice(1).join(' '); } else { n1=nm; } }
@@ -5190,11 +5212,39 @@ function sharedRiderPage(items){
 function setProjAge(v){ let n=Math.round(+v||80); n=Math.max(70,Math.min(100,n)); QSHEET.projAge=n; $('qsProjAge').value=n; renderSheet(); }
 // Optional client name (toolbar box). Re-renders so the printout header and the shared-care
 // page pick it up immediately; the box lives outside #sheet, so typing keeps focus.
-function setSheetName(v){ if(QSHEET.client) QSHEET.client.name=v; renderSheet(); }
+// Editing here replaces the structured names from the top form, so the shared page falls back
+// to splitting whatever's typed on "&".
+function setSheetName(v){ if(QSHEET.client){ QSHEET.client.name=v; QSHEET.client.names=null; } renderSheet(); }
+/* ---------- up-front client-name card (first thing on the quote view) ---------- */
+function nmVal(id){ const el=$(id); return el ? (el.value||'').trim() : ''; }
+function fullName(first,last){ return [first,last].map(s=>(s||'').trim()).filter(Boolean).join(' '); }
+// Reads the four optional name boxes into: a display header for the printout, and the two
+// first-name labels used inside the shared-care circles. All four boxes are optional.
+function getClientNameData(){
+  const clF=nmVal('cl_first'), clL=nmVal('cl_last');
+  const spOn=!!($('cl_spouse')&&$('cl_spouse').checked);
+  const spF=nmVal('sp_first'), spL=nmVal('sp_last');
+  const n1=fullName(clF,clL), n2=spOn?fullName(spF,spL):'';
+  const c1=clF||n1||'Policyholder 1';
+  const c2=(spF||n2)||(spOn?'Policyholder 2':'');
+  let display='';
+  if(n1&&n2){
+    const shareLast = clL && (!spL || spL===clL);   // "John & Jane Smith" when the surname is shared/blank
+    display = shareLast ? ((clF||n1)+' & '+(spF||n2)+(clL?' '+clL:'')) : (n1+' & '+n2);
+  } else display = n1||n2||'';
+  return {display, c1, c2, hasAny:!!(n1||n2)};
+}
+function toggleSpouseName(){ const on=!!($('cl_spouse')&&$('cl_spouse').checked); if($('cl_spousebox')) $('cl_spousebox').hidden=!on; onClientNameInput(); }
+// When a couple/married pricing mode is turned on in any carrier form, reveal the spouse name boxes too.
+function spouseNameAuto(on){ const sp=$('cl_spouse'); if(sp&&on&&!sp.checked){ sp.checked=true; toggleSpouseName(); } }
+// Live-update an already-open ad-hoc print sheet as the names are typed (focus stays in the form box).
+function onClientNameInput(){ if($('qsheet')&&$('qsheet').classList.contains('show')&&QSHEET.adhoc&&QSHEET.client){
+  const nd=getClientNameData(); QSHEET.client.name=nd.display; QSHEET.client.names={n1:nd.c1,n2:nd.c2}; renderSheet(); } }
 function viewQuote(i){ closeClients(); const cl=LS.clients()[i]; if(!cl) return; QSHEET={client:cl, adhoc:false, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 // Print a quote straight from the comparison — no need to save a client first
 function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add at least one quote to the comparison first.'); return; }
-  QSHEET={client:{name:'', items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
+  const nd=getClientNameData();
+  QSHEET={client:{name:nd.display, names:{n1:nd.c1,n2:nd.c2}, items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 // Build a self-contained, print-ready HTML document from the given content.
