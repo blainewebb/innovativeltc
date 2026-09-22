@@ -108,6 +108,15 @@ p { margin: 0 0 10px; line-height: 1.45; }
   min-height: 62px;
 }
 .profile-card:active { transform: translateY(2px); }
+.profile-card:disabled { opacity: .75; }
+.profile-row { display: flex; gap: 8px; align-items: stretch; }
+.profile-row .profile-card { flex: 1; }
+.hero-del {
+  width: 52px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 1.1rem;
+  background: #5a2330; border: 1px solid #7d3f4a; color: #ffd9de;
+}
+.hero-del:active { transform: translateY(2px); }
+.btn.ghost.small.manage { margin: 0 auto 12px; }
 .pa { font-size: 1.8rem; }
 .pa.big { font-size: 2.6rem; }
 .pn { font-weight: 800; font-size: 1.05rem; }
@@ -274,6 +283,45 @@ p { margin: 0 0 10px; line-height: 1.45; }
   color: #fff; border-color: #8a1f2a;
 }
 .key.strike:disabled { opacity: .35; }
+
+/* ------------------------------------------------------------- grades */
+.field-label {
+  display: block; font-size: .78rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 6px;
+}
+.grades { display: grid; gap: 6px; margin-bottom: 10px; }
+.grade {
+  display: grid; gap: 1px; text-align: left; padding: 9px 12px; min-height: 48px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 10px;
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.grade b { font-size: .92rem; }
+.grade small { color: var(--muted); font-size: .74rem; }
+.grade.on { border-color: var(--gold); background: #3a3050; }
+
+/* ---------------------------------------------------------- boss duel */
+.duel-banner {
+  text-align: center; font-weight: 900; letter-spacing: .08em; font-size: .85rem;
+  color: var(--gold); background: #2e2410; border: 1px solid var(--gold-dk);
+  border-radius: 10px; padding: 6px;
+}
+.fight-timer {
+  position: relative; height: 22px; border-radius: 999px; overflow: hidden;
+  background: #191527; border: 1px solid var(--line);
+}
+.fight-timer span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #a678ff, #59a5ff);
+  transition: width .2s linear;
+}
+.fight-timer b {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: .72rem; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.8);
+}
+.fight-timer.enraged span { background: linear-gradient(90deg, var(--red), #ff8a3d); width: 100% !important; }
+.fight-timer.enraged { border-color: var(--red); animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .fight-timer.enraged { animation: none; } }
 
 /* ---------------------------------------------------------- drill turn */
 .incoming {

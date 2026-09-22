@@ -78,11 +78,17 @@ page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 try {
   await page.goto(URL, { waitUntil: 'networkidle' });
 
-  /* ---- profile creation ---- */
+  /* ---- profile creation, with a school year ---- */
+  ok('the picker asks for a school year', (await page.$$('.grade')).length === 5);
   await page.fill('#newName', 'Tester');
+  await page.click('.grade[data-grade="4"]');
   await page.click('#createProfile');
   await page.waitForSelector('#startRun');
   ok('creates a hero and lands on the hub', await page.isVisible('#startRun'));
+  const hubText = await page.$eval('.panel', e => e.textContent);
+  ok('a 4th grader starts above level 1', /Challenge level [4-6]/.test(hubText), hubText.slice(0, 200));
+  const runeChips = await page.$$eval('.rune-chip.on', els => els.length);
+  ok('a 4th grader starts with all four operators', runeChips === 4, `${runeChips} runes`);
 
   /* ---- start a run, reach a battle ---- */
   await page.click('#startRun');
@@ -158,6 +164,41 @@ try {
     await page.waitForTimeout(120);
   }
 
+  /* ---- the boss duel on floor 3 ---- */
+  // Walk to the first boss floor. Answering everything correctly is enough.
+  let sawDuel = false;
+  for (let step = 0; step < 120 && !sawDuel; step++) {
+    if (await page.$('.duel-banner')) { sawDuel = true; break; }
+    if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
+    if (await page.$('.hand')) {
+      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      const ex = await readExpression(page);
+      if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
+      await typeNumber(page, ex.answer, '#strike');
+      continue;
+    }
+    if (await page.$('#cont')) { await page.click('#cont'); continue; }
+    if (await page.$('#next')) { await page.click('#next'); continue; }
+    if (await page.$('.choice')) { await page.click('.choice'); continue; }
+    if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
+    if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('.node')) {
+      const n = await page.$('.node.boss') || await page.$('.node.battle') || await page.$('.node');
+      await n.click();
+      continue;
+    }
+    break;
+  }
+  ok('a boss duel appears within the first few floors', sawDuel);
+  if (sawDuel) {
+    ok('the duel has an overall clock', !!(await page.$('#fighttimer')));
+    ok('the duel clock counts seconds', /Duel clock \d+s/.test(await page.$eval('#fighttimer b', e => e.textContent)));
+    ok('the duel is all asked questions, no tiles', !(await page.$('.hand')));
+    ok('the duel still shows a per-question clock', !!(await page.$('#timerbar')));
+    await clearDrill(page);
+    ok('answering in a duel keeps you in the duel or ends it', !!(await page.$('.drill-problem, #cont, #again')));
+  }
+
   /* ---- a second hero, kept entirely separate ---- */
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForSelector('#switchBtn');
@@ -191,8 +232,14 @@ try {
   ok('the report card has a section per hero', cards.length === 2, `${cards.length} cards`);
   const perCard = await page.$$eval('.report-card', els => els.map(e => e.querySelectorAll('.skill-row').length));
   ok('report card lists every skill for each hero', perCard.every(n => n >= 11), perCard.join(','));
-  const played = await page.$$eval('.report-card', els => els.map(e => /0 problems/.test(e.textContent)));
-  ok('the two heroes have independent records', played.filter(Boolean).length === 1, JSON.stringify(played));
+  // Read the actual count: /0 problems/ also matches "40 problems".
+  const counts = await page.$$eval('.report-card', els => els.map(e => {
+    const m = e.textContent.match(/(\d+) problems/);
+    return m ? Number(m[1]) : -1;
+  }));
+  ok('the two heroes have independent records',
+     counts.filter(n => n === 0).length === 1 && counts.some(n => n > 0),
+     JSON.stringify(counts));
   const reportText = await page.$eval('.report-card', e => e.textContent);
   ok('report card shows attempts, not just zeros', /% right/.test(reportText), reportText.slice(0, 200));
 
@@ -247,6 +294,46 @@ try {
   const errText = await page.$eval('#err', e => e.textContent);
   ok('junk input explains itself', /Runebreaker backup/.test(errText), errText);
   await page.click('#back');
+
+  /* ---- deleting a hero from the picker ---- */
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#newName');
+  await page.fill('#newName', 'Doomed');
+  await page.click('.grade[data-grade="2"]');
+  await page.click('#createProfile');
+  await page.waitForSelector('#switchBtn');
+  await page.click('#switchBtn');
+  await page.waitForSelector('#manageBtn');
+  ok('the picker offers to manage heroes', true);
+  ok('no delete buttons until you ask for them', !(await page.$('[data-del]')));
+  await page.click('#manageBtn');
+  await page.waitForSelector('[data-del]');
+  // Target Doomed specifically: clicking the first delete button would remove
+  // whichever hero happens to be top of the list.
+  const doomedId = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.profile-row')]
+      .find(r => r.querySelector('.pn')?.textContent.trim() === 'Doomed');
+    return row?.querySelector('[data-del]')?.dataset.del || null;
+  });
+  ok('each hero has its own delete button', !!doomedId);
+  await page.click(`[data-del="${doomedId}"]`);
+  await page.waitForSelector('#confirm');
+  const warn = await page.$eval('.panel', e => e.textContent);
+  ok('deleting says what will be lost', /answered problems/.test(warn), warn.slice(0, 160));
+  ok('deleting offers a backup first', !!(await page.$('#backup')));
+  await page.click('#cancel');
+  await page.waitForSelector('.profile-card');
+  ok('cancelling keeps the hero', (await page.$$('.profile-card')).length >= 1);
+  // Cancelling leaves manage mode on, so only re-enter it if it turned off.
+  if (!(await page.$('[data-del]'))) await page.click('#manageBtn');
+  await page.waitForSelector(`[data-del="${doomedId}"]`);
+  await page.click(`[data-del="${doomedId}"]`);
+  await page.waitForSelector('#confirm');
+  await page.click('#confirm');
+  await page.waitForTimeout(150);
+  const left = await page.$$eval('.profile-card .pn', els => els.map(e => e.textContent.trim()));
+  ok('confirming removes that hero and no other',
+     !left.includes('Doomed') && left.some(n => n.startsWith('Tester')), left.join(','));
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {
