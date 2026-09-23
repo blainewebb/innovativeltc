@@ -91,7 +91,9 @@ async function clearDrill(page, { correct = true } = {}) {
 }
 
 const b = await chromium.launch();
-const page = await b.newPage({ viewport: { width: 420, height: 880 } });
+// Reduced motion skips the hit animations, so most of this test can check
+// state straight after each move. The animations get their own page below.
+const page = await b.newPage({ viewport: { width: 420, height: 880 }, reducedMotion: 'reduce' });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -136,7 +138,7 @@ try {
   ok('reaches a battle with a hand of tiles', foundBattle);
 
   /* ---- a correct strike deals damage ---- */
-  const hpBefore = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim()));
+  const hpBefore = await page.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim()));
   ok('enemy shows a readable ward or armor line', (await page.$$('.enemy-tags .tag, .intent')).length > 0);
 
   let built = await buildLegalExpression(page);
@@ -146,7 +148,7 @@ try {
   await typeNumber(page, expr.answer, '#strike');
   await page.waitForTimeout(120);
   const log = await page.$eval('.log', e => e.textContent);
-  const hpAfter = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim()));
+  const hpAfter = await page.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim()));
   ok('a correct answer damages the enemy', hpAfter < hpBefore, `${hpBefore} -> ${hpAfter}`);
   ok('the log reports the strike', /damage|shield|EXACT/i.test(log), log);
   ok('combo went up', (await page.$eval('.combo', e => e.textContent)).includes('1'));
@@ -156,9 +158,9 @@ try {
   if (await page.$('.drill-problem')) {
     ok('the drill shows a clock', !!(await page.$('#timerbar')));
     ok('the drill says what it is parrying', /INCOMING/.test(await page.$eval('.incoming', e => e.textContent)));
-    const hpBeforeParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim()));
+    const hpBeforeParry = await page.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim()));
     await clearDrill(page);
-    const afterParry = await page.$eval('.enemy-card .bar.hp b', e => Number(e.textContent.split('/')[0].trim())).catch(() => 0);
+    const afterParry = await page.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim())).catch(() => 0);
     ok('a correct parry counters for damage', afterParry < hpBeforeParry, `${hpBeforeParry} -> ${afterParry}`);
     const parryLog = await page.$eval('.log', e => e.textContent).catch(() => '');
     ok('the log says it was parried', /PARRIED/.test(parryLog), parryLog);
@@ -503,6 +505,84 @@ try {
   const left = await page.$$eval('.profile-card .pn', els => els.map(e => e.textContent.trim()));
   ok('confirming removes that hero and no other',
      !left.includes('Doomed') && left.length >= 1, left.join(','));
+
+  /* ---- the battlefield and its animations ---- */
+  const fxPage = await b.newPage({ viewport: { width: 390, height: 844 } });
+  fxPage.on('pageerror', e => errors.push(e.message));
+  await fxPage.goto(URL, { waitUntil: 'networkidle' });
+  await fxPage.waitForSelector('.profile-card, #newName');
+  if (await fxPage.$('.profile-card')) await fxPage.click('.profile-card');
+  else {
+    await fxPage.fill('#newName', 'Mover');
+    await fxPage.click('.grade[data-grade="4"]');
+    await fxPage.click('#createProfile');
+  }
+  await fxPage.waitForSelector('#startRun');
+  await fxPage.click('#startRun');
+  await fxPage.waitForSelector('.node');
+  for (let i = 0; i < 6 && !(await fxPage.$('.hand')); i++) {
+    const n = await fxPage.$('.node.battle');
+    await (n || await fxPage.$('.node')).click();
+    if (await fxPage.$('.hand')) break;
+    if (await fxPage.$('#go')) { await typeNumber(fxPage, 1, '#go'); await fxPage.click('#next'); }
+    else if (await fxPage.$('#leave')) await fxPage.click('#leave');
+    else if (await fxPage.$('#heal')) await fxPage.click('#heal');
+    await fxPage.waitForSelector('.node, .hand');
+  }
+  ok('the battle shows both fighters on a field',
+     !!(await fxPage.$('.field #heroSprite')) && !!(await fxPage.$('.field #foeSprite')));
+  ok('both fighters have a health bar', !!(await fxPage.$('#heroHp')) && !!(await fxPage.$('#foeHp')));
+
+  await buildLegalExpression(fxPage);
+  const fxExpr = await readExpression(fxPage);
+  const fxHpBefore = await fxPage.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim()));
+  await typeNumber(fxPage, fxExpr.answer, '#strike');
+  ok('a strike plays out before the next turn', !!(await fxPage.$('#app[data-busy]')));
+  ok('the answer flies at the enemy', !!(await fxPage.$('.fx-orb')));
+  ok('the caption names the move', /used .*Strike/.test(await fxPage.$eval('.log', e => e.textContent)));
+  await fxPage.waitForSelector('.fx-num', { timeout: 1500 }).catch(() => {});
+  const popped = await fxPage.$eval('.fx-num', e => e.textContent).catch(() => '');
+  ok('the hit shows a damage number or a block', /^-\d+$|BLOCKED/.test(popped), popped);
+  const midHp = await fxPage.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim()));
+  ok('the enemy bar drops during the hit', midHp < fxHpBefore || popped === 'BLOCKED', `${fxHpBefore} -> ${midHp}`);
+  const fxT0 = Date.now();
+  await fxPage.waitForSelector('#app:not([data-busy])', { timeout: 5000 });
+  ok('the whole exchange is quick', Date.now() - fxT0 < 2500, `${Date.now() - fxT0}ms`);
+
+  // Tapping skips it at once, and the tap does not also press anything.
+  if (await fxPage.$('.drill-problem')) {
+    const parts = await fxPage.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+    const guess = parts.length === 3 ? OPS[parts[1]](Number(parts[0]), Number(parts[2])) : 7;
+    await typeNumber(fxPage, guess, '#answer');
+    ok('a parry plays out too', !!(await fxPage.$('#app[data-busy]')));
+    await fxPage.click('.fx-skip');
+    ok('tapping skips straight to the next turn', !(await fxPage.$('#app[data-busy]')) && !(await fxPage.$('.fx-skip')));
+    ok('after skipping the next turn is ready', !!(await fxPage.$('.hand')) || !!(await fxPage.$('.drill-problem'))
+       || !!(await fxPage.$('.node')) || !!(await fxPage.$('#cont, #next')));
+  }
+
+  // Keep fighting until something faints, watching the caption for it.
+  let fainted = '';
+  for (let turn = 0; turn < 40 && !fainted; turn++) {
+    if (await fxPage.$('.hand')) {
+      if (!(await buildLegalExpression(fxPage))) break;
+      const ex = await readExpression(fxPage);
+      await typeNumber(fxPage, ex.answer, '#strike');
+    } else if (await fxPage.$('.drill-problem')) {
+      const parts = await fxPage.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+      const guess = parts.length === 3 ? OPS[parts[1]](Number(parts[0]), Number(parts[2])) : 7;
+      await typeNumber(fxPage, guess, '#answer');
+    } else break;
+    for (let t = 0; t < 40; t++) {
+      const cap = await fxPage.$eval('.log', e => e.textContent).catch(() => '');
+      if (/fainted/.test(cap)) { fainted = cap; break; }
+      if (!(await fxPage.$('#app[data-busy]'))) break;
+      await fxPage.waitForTimeout(40);
+    }
+    await fxPage.waitForSelector('#app:not([data-busy])', { timeout: 5000 });
+  }
+  ok('a knockout is shown as a faint', /fainted/.test(fainted), fainted);
+  await fxPage.close();
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {

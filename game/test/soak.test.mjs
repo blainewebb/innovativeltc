@@ -31,7 +31,8 @@ function legalPlay(a, op, b) {
 const OP_KEY = { '+': '+', '−': '-', '×': '*', '÷': '/', '^': '^' };
 
 const b = await chromium.launch();
-const page = await b.newPage({ viewport: { width: 420, height: 880 } });
+// Reduced motion skips the hit animations, which would only slow the bot.
+const page = await b.newPage({ viewport: { width: 420, height: 880 }, reducedMotion: 'reduce' });
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
