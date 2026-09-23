@@ -196,16 +196,87 @@ p { margin: 0 0 10px; line-height: 1.45; }
 
 /* --------------------------------------------------------------- battle */
 .battle { gap: 8px; }
-.enemy-card {
-  display: flex; gap: 12px; align-items: center;
-  background: linear-gradient(180deg, #2b1f33 0%, #201a2e 100%);
-  border: 1px solid #4a3255; border-radius: var(--radius); padding: 12px;
+/* The battlefield, laid out the way kids already know from Pokemon: the foe
+   up and to the right on its platform with its box opposite, the player's
+   own avatar down and to the left facing it.
+
+   Sticky because on a short phone the keypad sits below the fold, and
+   pressing it scrolls the page. Pinning the field keeps the fight in view,
+   so a hit is never played out off screen. */
+.field {
+  position: sticky; top: max(4px, env(safe-area-inset-top)); z-index: 5;
+  height: 150px; overflow: hidden; flex: none;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background:
+    radial-gradient(120% 60% at 50% 115%, #2c5a3a 0%, transparent 60%),
+    linear-gradient(180deg, #2a2650 0%, #26305a 55%, #2a4a44 100%);
 }
-.enemy-card.elite { border-color: #ff8a3d; }
-.enemy-card.boss { border-color: var(--gold); box-shadow: 0 0 24px rgba(245,192,74,.18); }
-.enemy-art { font-size: 2.8rem; line-height: 1; }
-.enemy-info { flex: 1; min-width: 0; }
-.enemy-name { font-weight: 900; font-size: 1.05rem; margin-bottom: 4px; }
+.field.elite { border-color: #ff8a3d; }
+.field.boss { border-color: var(--gold); box-shadow: 0 0 24px rgba(245,192,74,.18); }
+.field.boss { background:
+    radial-gradient(120% 60% at 50% 115%, #5a2c2c 0%, transparent 60%),
+    linear-gradient(180deg, #2a1f40 0%, #3a2540 55%, #4a2c30 100%); }
+
+.ibox {
+  position: absolute; width: 50%; z-index: 2;
+  background: rgba(20,17,36,.88); border: 1px solid var(--line); border-radius: 10px;
+  padding: 4px 8px 5px;
+}
+.ibox.foe { top: 6px; left: 6px; }
+.ibox.hero { bottom: 6px; right: 6px; }
+.ibox .nm {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
+  font-weight: 900; font-size: .84rem; margin-bottom: 2px;
+}
+.ibox .nm span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibox .combo { font-size: .76rem; font-weight: 800; }
+.ibox .bar { height: 14px; }
+.ibox .intent { font-size: .72rem; margin-top: 3px; line-height: 1.2; }
+.ibox .bar b { font-size: .68rem; }
+
+.plat {
+  position: absolute; width: 100px; height: 20px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,.45), rgba(0,0,0,.18) 70%, transparent);
+}
+.plat.foe { top: 64px; right: 18px; }
+.plat.hero { bottom: 10px; left: 16px; }
+.sprite {
+  position: absolute; font-size: 54px; line-height: 1; z-index: 1;
+  width: 90px; text-align: center; user-select: none;
+}
+.sprite.foe { top: 12px; right: 23px; }
+.sprite.hero { bottom: 18px; left: 21px; }
+.field.boss .sprite.foe { font-size: 62px; top: 6px; }
+
+.bar.hp.good span { background: linear-gradient(90deg, #2fbf6a, var(--green)); }
+.bar.hp.warn span { background: linear-gradient(90deg, #e0a526, var(--gold)); }
+.bar.hp.bad span { background: linear-gradient(90deg, #c7303f, var(--red)); }
+
+/* Effects drawn over the field while a move plays out. */
+.fx-orb {
+  position: absolute; z-index: 3; pointer-events: none;
+  min-width: 44px; height: 44px; padding: 0 8px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-weight: 900; font-size: 1.15rem; color: #1b1400;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, var(--gold) 60%, var(--gold-dk));
+  box-shadow: 0 0 18px rgba(245,192,74,.8);
+  transform: translate(-50%,-50%);
+}
+.fx-orb.warded { background: radial-gradient(circle at 35% 30%, #efe2ff, var(--purple) 60%, #573c8a); color: #fff; box-shadow: 0 0 18px rgba(166,120,255,.9); }
+.fx-orb.shatter { box-shadow: 0 0 26px rgba(255,255,255,.95); }
+.fx-num {
+  position: absolute; z-index: 4; pointer-events: none; white-space: nowrap;
+  font-weight: 900; font-size: 1.6rem; transform: translate(-50%, 0);
+  text-shadow: 0 2px 0 #000, 0 0 8px rgba(0,0,0,.7);
+}
+.fx-num.hit { color: #fff; }
+.fx-num.crit { color: var(--gold); font-size: 2rem; }
+.fx-num.hurt { color: #ff8a95; }
+.fx-num.small { font-size: 1.25rem; }
+.fx-num.heal { color: var(--green); }
+.fx-num.blocked { color: var(--blue); font-size: 1.1rem; letter-spacing: .04em; }
+.fx-caption { color: var(--ink); font-weight: 700; }
+.fx-skip { position: fixed; inset: 0; z-index: 50; cursor: pointer; background: transparent; }
 
 .bar {
   position: relative; height: 18px; border-radius: 999px; overflow: hidden;
@@ -218,13 +289,24 @@ p { margin: 0 0 10px; line-height: 1.45; }
 }
 .bar.skill span { background: linear-gradient(90deg, #59a5ff, #4ade80); }
 
-.enemy-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 4px; }
+.enemy-tags { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 5px; margin: 0; flex: none; }
 .tag { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: #1a1628; }
 .tag.ward { color: var(--purple); border-color: #573c8a; }
 .tag.armor { color: var(--blue); border-color: #2f5a8a; }
 .tag.shield { color: var(--gold); border-color: var(--gold-dk); }
 .tag.resist { color: #ff9aa6; border-color: #7d3f4a; }
 .intent { font-size: .82rem; color: #ffcf8a; font-weight: 700; }
+
+/* Short phones: shrink the field so the tiles and keypad still fit. */
+@media (max-height: 740px) {
+  .field { height: 132px; }
+  .sprite { font-size: 44px; width: 76px; }
+  .field.boss .sprite.foe { font-size: 50px; }
+  .plat { width: 84px; height: 16px; }
+  .plat.foe { top: 52px; }
+  .sprite.foe { top: 10px; }
+  .sprite.hero { bottom: 14px; }
+}
 
 .log {
   min-height: 42px; font-size: .84rem; line-height: 1.35; color: var(--muted);

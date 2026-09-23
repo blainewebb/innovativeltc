@@ -305,6 +305,37 @@ they cost: a locked row a kid can see is most of the motivation.
 Heroes saved before this existed are credited their deepest floor rather than
 reading as zero, which is the most that can honestly be inferred.
 
+## The battlefield
+
+The fight is drawn the way kids already know from Pokemon: the enemy up and to
+the right on its platform, the player's own hero down and to the left facing
+it, each with a name box and a health bar that goes green, then yellow, then
+red. The enemy's next move sits in its name box, and any ward, resist, armor or
+shield shows as tags just under the field.
+
+Every move plays out before the next turn. The number you made flies at the
+enemy, it flashes, the damage pops off it and its bar drops. A wrong answer
+fizzles halfway. Then the enemy lunges and your bar drops, or on a drill turn
+you parry it (a blue flash, and the small leak that still gets through) and
+counter. A knockout is a faint: the loser drops and fades.
+
+Choices worth knowing about:
+
+- **The maths resolves first, the picture is a replay.** Damage, mastery and
+  the learning record are all worked out the instant the answer goes in, so
+  the animation cannot change a result, and skipping it loses nothing.
+- **Quick, and tap to skip.** Around half a second a hit, a little over a
+  second for a full exchange. Over eighty-odd problems a run, a
+  slow animation would add minutes of watching and no maths. Any tap or key
+  skips to the next turn.
+- **No clock runs during it.** The drill clock starts after it ends, and the
+  duel clock is paused for its length, so it never costs a kid time.
+- **The field is pinned to the top of the screen.** On a short phone the
+  keypad is below the fold and pressing it scrolls the page; pinning keeps the
+  hit in view instead of playing it off screen.
+- **Reduced motion is honoured.** If the device asks for less motion, the
+  screen just changes and the sound still plays.
+
 ## Where progress lives, and moving it
 
 There is no account and no server, which is what makes the game work offline
@@ -390,7 +421,10 @@ lands without anyone having to know they must refresh twice. Bumping `CACHE` in
   browser needed.
 - `test/play.test.mjs` — drives a real Chromium session: makes a hero, fights,
   answers right and wrong, checks the report card and that progress survives a
-  reload.
+  reload. It runs with reduced motion so it can check state straight after
+  each move, then opens a second page with motion on to check that a strike
+  flies, the damage number pops, the bar drops mid-hit, a tap skips it, and a
+  knockout is shown as a faint.
 - `test/soak.test.mjs` — a bot plays a dozen full runs, reading each enemy card
   and answering perfectly. It catches runtime errors on every screen and keeps
   the balance honest: it should clear floor 20 roughly half the time. Because it

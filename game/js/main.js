@@ -28,7 +28,7 @@ const $ = sel => app.querySelector(sel);
 const $$ = sel => Array.from(app.querySelectorAll(sel));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function render(html) { stopDrillTimer(); app.innerHTML = html; }
+function render(html) { stopDrillTimer(); fxGen += 1; delete app.dataset.busy; app.innerHTML = html; }
 function persist() { store.save(data); }
 
 /* Count playing time honestly: a ticking clock only while a run is live. */
@@ -235,14 +235,15 @@ function screenMap() {
   $$('.node').forEach(b => b.onclick = () => { sfx.tap(); enterNode(run.floorNodes[+b.dataset.i]); });
 }
 
-function topBar() {
+function topBar({ inBattle = false } = {}) {
   const p = run.player;
   return `
     <div class="topbar">
-      <span class="hp-pill">❤️ ${Math.max(0, p.hp)}/${p.maxHp}</span>
+      ${inBattle ? '' : `<span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>`}
       <span class="gold-pill">\u{1FA99} ${p.gold}</span>
       <span class="depth-pill">Floor ${run.depth}${run.endless ? '' : `/${FINAL_DEPTH}`}</span>
       <span class="runes-pill">${p.runes.map(o => RUNES[o].glyph).join(' ')}</span>
+      ${inBattle && p.relics.length ? `<span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>` : ''}
     </div>`;
 }
 
@@ -436,26 +437,277 @@ function selectedExpression() {
 
 /* Shared by the built turn and the drill turn: both need the player to see
    armor, the ward, the resist and what is coming next. */
-function enemyCardHtml() {
-  const e = battle.enemy;
+/* ============================================================= field === */
+/* A Pokemon-style stage: the enemy top right with its name box top left, the
+   hero bottom left with theirs bottom right. The hero is whichever of the
+   twenty they have earned and picked, so what they unlocked is what fights. */
+const pct = (v, m) => Math.max(0, Math.min(100, (v / m) * 100));
+const hpTone = p2 => (p2 > 50 ? 'good' : p2 > 20 ? 'warn' : 'bad');
+
+function hpBar(id, hp, max) {
+  const p2 = pct(hp, max);
+  return `<div class="bar hp ${hpTone(p2)}" id="${id}"><span style="width:${p2}%"></span><b>${Math.max(0, hp)} / ${max}</b></div>`;
+}
+
+function fieldHtml() {
+  const e = battle.enemy, p = run.player;
   const ward = WARDS[e.ward];
   const resist = RESISTS[e.resist] || RESISTS.none;
   const intent = describeIntent(e);
+  const tags = [
+    e.armor ? `<span class="tag armor">\u{1F6E1}\uFE0F Armor ${e.armor}</span>` : '',
+    !e.duel && ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : '',
+    !e.duel && resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : '',
+    e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : '',
+  ].join('');
   return `
-    <div class="enemy-card ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
-      <div class="enemy-art">${e.art}</div>
-      <div class="enemy-info">
-        <div class="enemy-name">${esc(e.name)}</div>
-        <div class="bar hp"><span style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></span><b>${Math.max(0, e.hp)} / ${e.maxHp}</b></div>
-<div class="enemy-tags">
-          ${e.armor ? `<span class="tag armor">\u{1F6E1}\uFE0F Armor ${e.armor}</span>` : ''}
-          ${!e.duel && ward.id !== 'none' ? `<span class="tag ward">\u{1F52E} ${ward.label}</span>` : ''}
-          ${!e.duel && resist.id !== 'none' ? `<span class="tag resist">\u{1F6AB} ${resist.label(e.resistAt)}</span>` : ''}
-          ${e.shield ? `<span class="tag shield">\u{1F512} Shield: hit EXACTLY ${e.shield}</span>` : ''}
-        </div>
+    <div class="field ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
+      <div class="ibox foe">
+        <div class="nm"><span>${esc(e.name)}</span></div>
+        ${hpBar('foeHp', e.hp, e.maxHp)}
         <div class="intent">Next: ${intent.icon} ${intent.text}</div>
       </div>
-    </div>`;
+      <div class="plat foe"></div>
+      <div class="sprite foe" id="foeSprite">${e.art}</div>
+      <div class="plat hero"></div>
+      <div class="sprite hero" id="heroSprite">${profile.avatar}</div>
+      <div class="ibox hero">
+        <div class="nm"><span>${esc(profile.name)}</span><small class="combo ${p.combo ? 'on' : ''}">\u{1F525}${p.combo}</small></div>
+        ${hpBar('heroHp', p.hp, p.maxHp)}
+      </div>
+    </div>
+    ${tags ? `<div class="enemy-tags">${tags}</div>` : ''}`;
+}
+
+/* =============================================================== fx === */
+/* The maths always resolves first and instantly, so scoring, balance and the
+   learning record are untouched by any of this. What follows is a short
+   replay of what just happened, drawn over the screen as it was, and then
+   the game carries on to the next state.
+
+   Quick by design, about half a second a hit, because every second
+   here is a second not spent on maths across eighty problems a run. Tapping
+   or pressing any key skips it. It never runs while a clock is counting: the
+   per-question clock starts only after it ends, and the duel clock is paused
+   for its length. Honours reduced-motion, which also keeps the test bots fast. */
+const MOVE = { '+': 'Joining Strike', '-': 'Taking Strike', '*': 'Stacking Strike',
+               '/': 'Splitting Strike', '^': 'Raising Strike' };
+let fxGen = 0;
+let fxSkip = null;
+
+function reducedMotion() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+}
+
+function anim(el, frames, opts) {
+  if (!el || !el.animate) return null;
+  try { return el.animate(frames, { fill: 'forwards', easing: 'ease-out', ...opts }); } catch { return null; }
+}
+
+function setBar(id, hp, max) {
+  const bar = app.querySelector(`#${id}`);
+  if (!bar) return;
+  const p2 = pct(hp, max);
+  bar.className = `bar hp ${hpTone(p2)}`;
+  bar.querySelector('span').style.width = `${p2}%`;
+  bar.querySelector('b').textContent = `${Math.max(0, hp)} / ${max}`;
+}
+
+function caption(html) {
+  const log = app.querySelector('.log');
+  if (log) log.innerHTML = `<div class="fx-caption">${html}</div>`;
+}
+
+function centreOf(el, field) {
+  const r = el.getBoundingClientRect(), f = field.getBoundingClientRect();
+  return { x: r.left + r.width / 2 - f.left, y: r.top + r.height / 2 - f.top };
+}
+
+function popNumber(target, text, kind) {
+  const field = app.querySelector('.field');
+  if (!field || !target) return;
+  const c = centreOf(target, field);
+  const n = document.createElement('div');
+  n.className = `fx-num ${kind}`;
+  n.textContent = text;
+  n.style.left = `${c.x}px`;
+  n.style.top = `${c.y}px`;
+  field.appendChild(n);
+  anim(n, [
+    { opacity: 0, transform: 'translate(-50%, -50%) scale(.6)' },
+    { opacity: 1, transform: 'translate(-50%, calc(-50% - 8px)) scale(1.2)', offset: 0.25 },
+    { opacity: 0, transform: 'translate(-50%, calc(-50% - 22px)) scale(1)' },
+  ], { duration: 720 });
+}
+
+function shake(el, strong = false) {
+  const d = strong ? 9 : 6;
+  anim(el, [
+    { transform: 'translateX(0)', filter: 'brightness(1)' },
+    { transform: `translateX(-${d}px)`, filter: 'brightness(2.4)' },
+    { transform: `translateX(${d}px)`, filter: 'brightness(1.6)' },
+    { transform: `translateX(-${d / 2}px)` },
+    { transform: 'translateX(0)', filter: 'brightness(1)' },
+  ], { duration: 260 });
+}
+
+/* One beat of the replay. Returns how long it takes, so the next can follow. */
+function runBeat(b, gen, later) {
+  const field = app.querySelector('.field');
+  const hero = app.querySelector('#heroSprite');
+  const foe = app.querySelector('#foeSprite');
+  if (!field || !hero || !foe) return 0;
+  const who = esc(profile.name), them = esc(battle.enemy.name);
+
+  if (b.type === 'strike' || b.type === 'whiff') {
+    caption(`${who} used <b>${b.move}</b>!`);
+    const h = centreOf(hero, field), o = centreOf(foe, field);
+    const orb = document.createElement('div');
+    orb.className = `fx-orb ${b.kind || ''}`;
+    orb.textContent = b.value;
+    orb.style.left = `${h.x}px`;
+    orb.style.top = `${h.y}px`;
+    field.appendChild(orb);
+    anim(hero, [{ transform: 'translate(0,0)' }, { transform: 'translate(12px,-10px)' }, { transform: 'translate(0,0)' }], { duration: 240 });
+    const travel = b.type === 'whiff' ? 0.55 : 1;
+    anim(orb, [
+      { transform: 'translate(-50%,-50%) scale(.5)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${(o.x - h.x) * travel}px), calc(-50% + ${(o.y - h.y) * travel}px)) scale(1.1)`, opacity: b.type === 'whiff' ? 0 : 1 },
+    ], { duration: 280, easing: 'ease-in' });
+    later(280, () => {
+      orb.remove();
+      if (b.type === 'whiff') {
+        caption(`${who} used <b>${b.move}</b>... it fizzled!`);
+        sfx.wrong();
+        return;
+      }
+      if (b.kind === 'absorbed') {
+        caption(`The shield swallowed it! Only <b>exactly ${b.shield}</b> breaks it.`);
+        anim(foe, [{ filter: 'drop-shadow(0 0 0 gold)' }, { filter: 'drop-shadow(0 0 14px gold)' }, { filter: 'drop-shadow(0 0 0 gold)' }], { duration: 300 });
+        popNumber(foe, 'BLOCKED', 'blocked');
+        sfx.hurt();
+        return;
+      }
+      shake(foe, b.kind === 'warded' || b.kind === 'shatter');
+      popNumber(foe, `-${b.dmg}`, b.kind === 'warded' || b.kind === 'shatter' ? 'crit' : 'hit');
+      setBar('foeHp', b.hp, b.max);
+      caption(b.kind === 'shatter' ? `EXACT! The shield shatters, <b>${b.dmg}</b> damage!`
+            : b.kind === 'warded' ? `Ward broken! <b>${b.dmg}</b> damage!`
+            : `It hit for <b>${b.dmg}</b>!`);
+      (b.kind === 'shatter' ? sfx.shatter : b.kind === 'warded' ? sfx.crit : sfx.hit)();
+    });
+    return 580;
+  }
+
+  if (b.type === 'foeAttack') {
+    caption(`${them} ${b.big ? 'unleashes a big attack' : 'attacks'}!`);
+    const h = centreOf(hero, field), o = centreOf(foe, field);
+    anim(foe, [
+      { transform: 'translate(0,0)' },
+      { transform: `translate(${(h.x - o.x) * 0.35}px, ${(h.y - o.y) * 0.35}px)` },
+      { transform: 'translate(0,0)' },
+    ], { duration: 320 });
+    later(170, () => {
+      shake(hero, b.big);
+      popNumber(hero, `-${b.dmg}`, 'hurt');
+      setBar('heroHp', b.hp, b.max);
+      caption(`${them} hit you for <b>${b.dmg}</b>.`);
+      sfx.hurt();
+    });
+    return 500;
+  }
+
+  if (b.type === 'parry') {
+    caption(`${who} parried!`);
+    const h = centreOf(hero, field), o = centreOf(foe, field);
+    anim(foe, [
+      { transform: 'translate(0,0)' },
+      { transform: `translate(${(h.x - o.x) * 0.3}px, ${(h.y - o.y) * 0.3}px)` },
+      { transform: 'translate(0,0)' },
+    ], { duration: 300 });
+    later(150, () => {
+      anim(hero, [{ filter: 'drop-shadow(0 0 0 #59a5ff)' }, { filter: 'drop-shadow(0 0 16px #59a5ff)' }, { filter: 'drop-shadow(0 0 0 #59a5ff)' }], { duration: 320 });
+      popNumber(hero, b.leak ? `-${b.leak}` : 'PARRY', b.leak ? 'hurt small' : 'blocked');
+      if (b.leak) setBar('heroHp', b.hp, b.max);
+    });
+    return 420;
+  }
+
+  if (b.type === 'foeBuff') {
+    caption(b.text);
+    const tint = { heal: '#4ade80', armor: '#59a5ff', shield: '#f5c04a', jam: '#a678ff' }[b.kind] || '#fff';
+    anim(foe, [{ filter: `drop-shadow(0 0 0 ${tint})` }, { filter: `drop-shadow(0 0 16px ${tint})` }, { filter: `drop-shadow(0 0 0 ${tint})` }], { duration: 380 });
+    if (b.kind === 'heal') { popNumber(foe, `+${b.amount}`, 'heal'); setBar('foeHp', b.hp, b.max); }
+    return 400;
+  }
+
+  if (b.type === 'faint') {
+    const el = b.who === 'foe' ? foe : hero;
+    caption(`${b.who === 'foe' ? them : who} fainted!`);
+    anim(el, [
+      { transform: 'translateY(0)', opacity: 1 },
+      { transform: 'translateY(8px) rotate(-6deg)', opacity: 1, offset: 0.3 },
+      { transform: 'translateY(46px) rotate(-10deg)', opacity: 0 },
+    ], { duration: 560, easing: 'ease-in' });
+    if (b.who === 'foe') sfx.win(); else sfx.lose();
+    return 640;
+  }
+  return 0;
+}
+
+/* Play a list of beats, then call done. Skippable, and a no-op under
+   reduced motion, in which case the final screen simply appears. */
+function playFx(beats, done) {
+  const field = app.querySelector('.field');
+  if (!beats.length || !field || reducedMotion()) {
+    // Still make a sound, so skipping the picture does not also skip the feedback.
+    const loud = beats.find(b => b.type === 'faint') || beats.find(b => b.kind === 'shatter' || b.kind === 'warded')
+      || beats.find(b => b.type === 'strike') || beats.find(b => b.type === 'foeAttack') || beats.find(b => b.type === 'whiff');
+    if (loud) {
+      if (loud.type === 'faint') (loud.who === 'foe' ? sfx.win : sfx.lose)();
+      else if (loud.kind === 'shatter') sfx.shatter();
+      else if (loud.kind === 'warded') sfx.crit();
+      else if (loud.type === 'strike') sfx.hit();
+      else if (loud.type === 'foeAttack') sfx.hurt();
+      else sfx.wrong();
+    }
+    return done();
+  }
+
+  const gen = ++fxGen;
+  const t0 = performance.now();
+  let finished = false;
+  let timer = null;
+  const later = (ms, fn) => setTimeout(() => { if (gen === fxGen && !finished) fn(); }, ms);
+
+  app.dataset.busy = '1';
+  const shield = document.createElement('div');
+  shield.className = 'fx-skip';
+  shield.title = 'Tap to skip';
+  app.appendChild(shield);
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    fxSkip = null;
+    shield.remove();
+    delete app.dataset.busy;
+    // The duel clock does not run while a move is being shown.
+    if (battle && battle.fightMs) battle.fightStart += performance.now() - t0;
+    done();
+  };
+  fxSkip = finish;
+  shield.onclick = finish;
+
+  let i = 0;
+  const step = () => {
+    if (finished || gen !== fxGen) return;
+    if (i >= beats.length) return finish();
+    const ms = runBeat(beats[i++], gen, later);
+    timer = setTimeout(step, ms);
+  };
+  step();
 }
 
 function renderBattle() {
@@ -478,8 +730,8 @@ function renderBattle() {
 
   render(`
     <div class="screen battle">
-      ${topBar()}
-      ${enemyCardHtml()}
+      ${topBar({ inBattle: true })}
+      ${fieldHtml()}
 
       <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
 
@@ -505,11 +757,6 @@ function renderBattle() {
 
       ${keypadHtml({ submitId: 'strike', submitLabel: 'STRIKE', ready: !!(expr && battle.typed), extras: false })}
 
-      <div class="player-strip">
-        <span class="hp-pill">❤️ ${Math.max(0, p.hp)}/${p.maxHp}</span>
-        <span class="combo ${p.combo ? 'on' : ''}">\u{1F525} Combo ${p.combo}</span>
-        <span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>
-      </div>
     </div>`);
 
   $$('.tile').forEach(b => b.onclick = () => onTile(+b.dataset.i));
@@ -568,6 +815,7 @@ function hintFor(a, op, b) {
 }
 
 function submitStrike() {
+  if (app.dataset.busy) return;
   const expr = selectedExpression();
   if (!expr || !battle.typed) return;
   const { a, op, b, result } = expr;
@@ -581,22 +829,22 @@ function submitStrike() {
   if (correct) { day.correct += 1; run.stats.correct += 1; } else { day.wrong += 1; run.stats.wrong += 1; }
 
   const e = battle.enemy, p = run.player;
+  const clearSelection = () => { battle.sel = { aIdx: null, op: null, bIdx: null }; battle.typed = ''; battle.exprReadyAt = null; };
 
   if (!correct) {
     if (battle.mercyLeft > 0) {
       battle.mercyLeft -= 1;
-      battle.log.push(`\u{1F54A}️ Mercy Rune: ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}. This one is free.`);
+      battle.log.push(`\u{1F54A}\uFE0F Mercy Rune: ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}. This one is free.`);
       sfx.wrong();
-      battle.sel = { aIdx: null, op: null, bIdx: null }; battle.typed = ''; battle.exprReadyAt = null;
+      clearSelection();
       persist(); renderBattle(); return;
     }
     const tip = hintFor(a, op, b);
-    battle.log.push(`❌ ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
+    battle.log.push(`\u274C ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
     p.combo = 0;
-    sfx.wrong();
-    battle.sel = { aIdx: null, op: null, bIdx: null }; battle.typed = ''; battle.exprReadyAt = null;
+    clearSelection();
     persist();
-    return enemyTurn();
+    return finishPlayerTurn([{ type: 'whiff', value: given, move: MOVE[op] }]);
   }
 
   /* Correct. Work out what the number actually did. */
@@ -605,45 +853,63 @@ function submitStrike() {
     armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: battle.firstHit,
   });
 
+  let beat;
   if (e.shield > 0) {
     if (result === e.shield) {
       e.shield = 0; battle.shieldTurns = 0;
       e.hp -= damage;
       battle.log.push(`\u{1F4A5} EXACT ${result}! The shield shatters and you hit for <b>${damage}</b>.`);
-      sfx.shatter();
+      beat = { type: 'strike', kind: 'shatter', value: result, dmg: damage, hp: e.hp, max: e.maxHp, move: MOVE[op] };
     } else {
-      battle.log.push(`\u{1F6E1}️ The ${e.shield} shield swallows your ${result}. You need exactly ${e.shield}.`);
-      sfx.hurt();
+      battle.log.push(`\u{1F6E1}\uFE0F The ${e.shield} shield swallows your ${result}. You need exactly ${e.shield}.`);
+      beat = { type: 'strike', kind: 'absorbed', value: result, dmg: 0, shield: e.shield, move: MOVE[op] };
     }
   } else {
     e.hp -= damage;
     const note = capped ? ' (capped)' : resisted ? ' (resisted)' : '';
     battle.log.push(`${warded ? '\u{1F52E} WARD BROKEN! ' : '\u2694\uFE0F '}${a} ${RUNES[op].glyph} ${b} = ${result} \u2192 <b>${damage}</b> damage${note}.`);
-    warded ? sfx.crit() : sfx.hit();
+    beat = { type: 'strike', kind: warded ? 'warded' : '', value: result, dmg: damage, hp: e.hp, max: e.maxHp, move: MOVE[op] };
   }
 
   p.combo += 1;
   battle.firstHit = false;
   const used = [battle.sel.aIdx, battle.sel.bIdx];
-  battle.sel = { aIdx: null, op: null, bIdx: null }; battle.typed = ''; battle.exprReadyAt = null;
+  clearSelection();
   replaceTiles(used);
   persist();
+  finishPlayerTurn([beat]);
+}
 
-  if (e.hp <= 0) return winBattle();
-  enemyTurn();
+/* After the player's move: if the enemy survived it strikes back, then the
+   whole exchange plays out and the next turn begins. */
+function finishPlayerTurn(beats) {
+  const e = battle.enemy, p = run.player;
+  if (e.hp <= 0) {
+    beats.push({ type: 'faint', who: 'foe' });
+    return playFx(beats, nextTurn);
+  }
+  beats.push(...enemyAction());
+  endEnemyPhase();
+  if (p.hp <= 0) beats.push({ type: 'faint', who: 'hero' });
+  persist();
+  playFx(beats, nextTurn);
 }
 
 /* The enemy's telegraphed move actually happening. Skipped entirely when the
    player parries it on a drill turn. */
 function enemyAction() {
   const e = battle.enemy, p = run.player;
-  const { events } = enemyAct(e, p, run.rng);
+  const { intent, events } = enemyAct(e, p, run.rng);
+  const beats = [];
   for (const ev of events) {
     battle.log.push(ev.text);
-    if (ev.type === 'damage') sfx.hurt();
-    if (ev.type === 'jam') battle.pendingJam = true;
-    if (ev.type === 'shield') battle.shieldTurns = 3;
+    if (ev.type === 'damage') beats.push({ type: 'foeAttack', dmg: ev.amount, hp: p.hp, max: p.maxHp, big: intent.type === 'bigAttack' });
+    if (ev.type === 'jam') { battle.pendingJam = true; beats.push({ type: 'foeBuff', kind: 'jam', text: ev.text }); }
+    if (ev.type === 'shield') { battle.shieldTurns = 3; beats.push({ type: 'foeBuff', kind: 'shield', text: ev.text }); }
+    if (ev.type === 'armor') beats.push({ type: 'foeBuff', kind: 'armor', text: ev.text });
+    if (ev.type === 'heal') beats.push({ type: 'foeBuff', kind: 'heal', text: ev.text, amount: intent.amount, hp: e.hp, max: e.maxHp });
   }
+  return beats;
 }
 
 /* Timers and locks tick down whether or not the move landed, so a parry does
@@ -660,12 +926,6 @@ function endEnemyPhase() {
     if (free.length) battle.lockedId = free[Math.floor(run.rng() * free.length)].id;
     battle.pendingJam = false;
   }
-}
-
-function enemyTurn() {
-  enemyAction();
-  endEnemyPhase();
-  nextTurn();
 }
 
 /* Turns alternate: the player builds their own strike, then the game hands
@@ -740,8 +1000,8 @@ function renderDrill() {
   const intent = describeIntent(battle.enemy);
   render(`
     <div class="screen battle drill">
-      ${topBar()}
-      ${enemyCardHtml()}
+      ${topBar({ inBattle: true })}
+      ${fieldHtml()}
 
       <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
 
@@ -768,11 +1028,6 @@ function renderDrill() {
 
       ${keypadHtml({ submitId: 'answer', submitLabel: 'PARRY', ready: !!battle.typed, extras: d.kind === 'text' })}
 
-      <div class="player-strip">
-        <span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>
-        <span class="combo ${p.combo ? 'on' : ''}">\u{1F525} Combo ${p.combo}</span>
-        <span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>
-      </div>
     </div>`);
 
   $$('.key').forEach(b => b.onclick = () => {
@@ -818,6 +1073,7 @@ function startDrillTimer() {
 }
 
 function resolveDrill(text) {
+  if (app.dataset.busy) return;
   stopDrillTimer();
   const d = battle.drill, e = battle.enemy, p = run.player;
   const ms = Math.round(performance.now() - battle.drillStart);
@@ -834,6 +1090,8 @@ function resolveDrill(text) {
   const mercied = !correct && battle.mercyLeft > 0;
   if (mercied) battle.mercyLeft -= 1;
   checkEnrage();
+  const move = d.kind === 'text' ? 'Scholar Strike' : MOVE[d.op];
+  const beats = [];
 
   if (correct) {
     /* A parry blunts the blow rather than stopping it outright. */
@@ -845,6 +1103,9 @@ function resolveDrill(text) {
       const leak = Math.max(1, Math.round(raw * PARRY_LEAK) - block);
       p.hp -= leak;
       battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
+      beats.push({ type: 'parry', leak, hp: p.hp, max: p.maxHp });
+    } else {
+      beats.push({ type: 'parry', leak: 0 });
     }
     e.intentIndex += 1; // the telegraphed move never happens
 
@@ -867,24 +1128,27 @@ function resolveDrill(text) {
     battle.log.push(d.kind === 'text'
       ? `\u{1F6E1}\uFE0F PARRIED! ${expected} is right, riposte for <b>${damage}</b>.${note ? ' ' + note : ''}`
       : `\u{1F6E1}\uFE0F PARRIED! ${shown} = ${expected}, riposte for <b>${damage}</b>.`);
-    sfx.crit();
+    beats.push({ type: 'strike', kind: '', value: expected, dmg: damage, hp: e.hp, max: e.maxHp, move });
   } else if (mercied) {
     e.intentIndex += 1;
     battle.log.push(`\u{1F54A}\uFE0F Mercy Rune parries it. The answer was <b>${expected}</b>.`);
-    sfx.wrong();
+    beats.push({ type: 'parry', leak: 0 });
   } else {
     const tip = d.kind === 'arith' ? hintFor(d.a, d.op, d.b) : null;
     battle.log.push(timedOut
       ? `\u23F1\uFE0F Too slow. The answer was <b>${expected}</b>.${tip ? ' ' + tip : ''}`
       : `\u274C The answer was <b>${expected}</b>, not ${esc(text)}.${tip ? ' ' + tip : ''}`);
     p.combo = 0;
-    sfx.wrong();
-    enemyAction();
+    beats.push({ type: 'whiff', value: timedOut ? '...' : text, move });
+    if (e.hp > 0) beats.push(...enemyAction());
   }
 
   endEnemyPhase();
+  // Same order nextTurn checks in, so the picture matches what happens next.
+  if (p.hp <= 0) beats.push({ type: 'faint', who: 'hero' });
+  else if (e.hp <= 0) beats.push({ type: 'faint', who: 'foe' });
   persist();
-  nextTurn();
+  playFx(beats, nextTurn);
 }
 
 function winBattle() {
@@ -1527,6 +1791,7 @@ function commitImport(heroes, mode) {
 /* Physical keyboards should work as well as the on-screen pad. */
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (app.dataset.busy) { if (fxSkip) { ev.preventDefault(); fxSkip(); } return; }
   if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);
