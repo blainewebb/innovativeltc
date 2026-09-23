@@ -391,6 +391,7 @@ function startBattle(enemy, reward) {
     allDrills: !!reward.boss && drillsOn(),
     fightMs: 0,
     fightStart: performance.now(),
+    stats: { right: 0, wrong: 0, best: 0, fastMs: null }, // for the win screen's recap
     log: [`A ${enemy.name} blocks your way!`],
   };
   /* What one written answer is worth as damage in this fight. Sampled from
@@ -490,6 +491,7 @@ function fieldHtml() {
    or pressing any key skips it. It never runs while a clock is counting: the
    per-question clock starts only after it ends, and the duel clock is paused
    for its length. Honours reduced-motion, which also keeps the test bots fast. */
+const CONFETTI = ['#f5c04a', '#ef4b5c', '#4ade80', '#59a5ff', '#a678ff', '#ff8a3d'];
 const MOVE = { '+': 'Joining Strike', '-': 'Taking Strike', '*': 'Stacking Strike',
                '/': 'Splitting Strike', '^': 'Raising Strike' };
 let fxGen = 0;
@@ -649,8 +651,7 @@ function runBeat(b, gen, later) {
       { transform: 'translateY(8px) rotate(-6deg)', opacity: 1, offset: 0.3 },
       { transform: 'translateY(46px) rotate(-10deg)', opacity: 0 },
     ], { duration: 560, easing: 'ease-in' });
-    if (b.who === 'foe') sfx.win(); else sfx.lose();
-    return 640;
+    return 640; // silent: the win and lose screens play their own fanfare
   }
   return 0;
 }
@@ -661,11 +662,10 @@ function playFx(beats, done) {
   const field = app.querySelector('.field');
   if (!beats.length || !field || reducedMotion()) {
     // Still make a sound, so skipping the picture does not also skip the feedback.
-    const loud = beats.find(b => b.type === 'faint') || beats.find(b => b.kind === 'shatter' || b.kind === 'warded')
+    const loud = beats.find(b => b.kind === 'shatter' || b.kind === 'warded')
       || beats.find(b => b.type === 'strike') || beats.find(b => b.type === 'foeAttack') || beats.find(b => b.type === 'whiff');
     if (loud) {
-      if (loud.type === 'faint') (loud.who === 'foe' ? sfx.win : sfx.lose)();
-      else if (loud.kind === 'shatter') sfx.shatter();
+      if (loud.kind === 'shatter') sfx.shatter();
       else if (loud.kind === 'warded') sfx.crit();
       else if (loud.type === 'strike') sfx.hit();
       else if (loud.type === 'foeAttack') sfx.hurt();
@@ -837,12 +837,14 @@ function submitStrike() {
       battle.log.push(`\u{1F54A}\uFE0F Mercy Rune: ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}. This one is free.`);
       sfx.wrong();
       clearSelection();
+      tally(false);
       persist(); renderBattle(); return;
     }
     const tip = hintFor(a, op, b);
     battle.log.push(`\u274C ${a} ${RUNES[op].glyph} ${b} = <b>${result}</b>, not ${given}.${tip ? ' ' + tip : ''}`);
     p.combo = 0;
     clearSelection();
+    tally(false);
     persist();
     return finishPlayerTurn([{ type: 'whiff', value: given, move: MOVE[op] }]);
   }
@@ -872,12 +874,22 @@ function submitStrike() {
   }
 
   p.combo += 1;
+  tally(true, ms);
   battle.firstHit = false;
   const used = [battle.sel.aIdx, battle.sel.bIdx];
   clearSelection();
   replaceTiles(used);
   persist();
   finishPlayerTurn([beat]);
+}
+
+/* Keep score for this fight alone, for the recap on the win screen. Called
+   after the combo has been updated for the answer. */
+function tally(correct, ms) {
+  const st = battle.stats;
+  if (correct) { st.right += 1; if (st.fastMs === null || ms < st.fastMs) st.fastMs = ms; }
+  else st.wrong += 1;
+  st.best = Math.max(st.best, run.player.combo);
 }
 
 /* After the player's move: if the enemy survived it strikes back, then the
@@ -1143,6 +1155,7 @@ function resolveDrill(text) {
     if (e.hp > 0) beats.push(...enemyAction());
   }
 
+  tally(correct, ms);
   endEnemyPhase();
   // Same order nextTurn checks in, so the picture matches what happens next.
   if (p.hp <= 0) beats.push({ type: 'faint', who: 'hero' });
@@ -1166,19 +1179,50 @@ function winBattle() {
   persist();
   sfx.win();
 
+  const st = battle.stats;
+  const recap = [
+    `<b>${st.right}</b> right`,
+    `<b>${st.wrong}</b> wrong`,
+    st.best >= 2 ? `best streak <b>${st.best}</b>` : '',
+    st.fastMs !== null ? `fastest <b>${(st.fastMs / 1000).toFixed(1)}s</b>` : '',
+  ].filter(Boolean).map(x => `<span>${x}</span>`).join(' &middot; ');
+  const boss = !!e.boss;
+  const confetti = boss ? Array.from({ length: 26 }, (_, i) =>
+    `<i style="left:${(i * 37) % 100}%;--d:${((i * 7) % 10) / 10}s;--c:${CONFETTI[i % CONFETTI.length]};--x:${((i * 53) % 60) - 30}px"></i>`).join('') : '';
+
   render(`
-    <div class="screen center">
+    <div class="screen center win-scene ${boss ? 'boss' : ''}">
       ${topBar()}
-      <div class="panel win">
-        <h2>${e.boss ? 'BOSS FELLED' : 'Victory'}</h2>
-        <div class="big-art">${e.art}</div>
-        <p>${esc(e.name)} is beaten.</p>
-        <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; ❤️ +${healAfter}` : ''}</p>
+      <div class="stage ${boss ? 'boss' : ''}">
+        ${boss ? `<div class="rays"></div><div class="confetti">${confetti}</div>` : ''}
+        <div class="vbanner">${boss ? 'BOSS FELLED!' : 'VICTORY!'}</div>
+        <div class="vplat"></div>
+        <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${profile.avatar}</div>
+        <div class="vfoe">${e.art}</div>
+        <div class="dizzy">\u{1F4AB}</div>
+      </div>
+      <div class="panel win vpanel">
+        <p class="vline">${esc(profile.name)} beat ${esc(e.name)}!</p>
+        <p class="recap">${recap}</p>
+        <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; \u2764\uFE0F +${healAfter}` : ''}</p>
         ${unlockMsg ? `<p class="unlock">${unlockMsg}</p>` : ''}
         <button class="btn primary" id="cont">Continue</button>
       </div>
     </div>`);
+
+  /* The scene plays for a moment, then waits for Continue. A tap before it
+     finishes only skips to the end, so a kid still tapping through the
+     knockout does not fly past the rewards. */
+  const scene = $('.win-scene');
+  const finishScene = () => scene.classList.add('done');
+  if (reducedMotion()) finishScene();
+  else {
+    const gen = fxGen;
+    setTimeout(() => { if (gen === fxGen) finishScene(); }, boss ? 1900 : 1500);
+  }
+  scene.addEventListener('click', finishScene);
   $('#cont').onclick = () => {
+    if (!scene.classList.contains('done')) return finishScene();
     sfx.tap();
     if (e.boss && !run.endless && run.depth >= FINAL_DEPTH) return screenRunComplete();
     if (battle.reward.relic) return screenRelicPick(() => nextFloor());
@@ -1792,6 +1836,8 @@ function commitImport(heroes, mode) {
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if (app.dataset.busy) { if (fxSkip) { ev.preventDefault(); fxSkip(); } return; }
+  const scene = app.querySelector('.win-scene:not(.done)');
+  if (scene) { ev.preventDefault(); scene.classList.add('done'); return; }
   if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);

@@ -336,6 +336,26 @@ Choices worth knowing about:
 - **Reduced motion is honoured.** If the device asks for less motion, the
   screen just changes and the sound still plays.
 
+## Winning a fight
+
+A knockout leads to a short win scene: a VICTORY banner drops in, the hero
+hops on a stage in the middle, and the beaten enemy lies greyed out to the
+side with dizzy stars. Then a card with the recap and the rewards, and a
+Continue button.
+
+Bosses get the bigger version: BOSS FELLED in gold, light rays turning behind
+the hero, confetti, and a crown dropping onto the hero's head. Regular wins
+stay short on purpose. There are twenty or so a run, and a long scene every
+time would soon be tapped past.
+
+The recap is the fight's maths, the way Pokemon shows experience gained:
+right, wrong, best streak and fastest answer, for that fight only. It rewards
+the speed and accuracy the game is built on, not just the win.
+
+A tap before the scene finishes only skips to the end of it, so a kid still
+tapping through the knockout lands on the rewards rather than past them.
+Continue then moves on. Under reduced motion the finished scene just appears.
+
 ## Where progress lives, and moving it
 
 There is no account and no server, which is what makes the game work offline
@@ -424,7 +444,12 @@ lands without anyone having to know they must refresh twice. Bumping `CACHE` in
   reload. It runs with reduced motion so it can check state straight after
   each move, then opens a second page with motion on to check that a strike
   flies, the damage number pops, the bar drops mid-hit, a tap skips it, and a
-  knockout is shown as a faint.
+  knockout is shown as a faint, then that the win scene shows its banner and
+  recap and that an early tap finishes it rather than leaving it. Fights are
+  random, so when it walks somewhere (to a boss, to a written question) it
+  plays on through whatever comes up: a counter that ends the fight early, a
+  new hero earned, or a death on a question it could only guess, which just
+  starts another run.
 - `test/soak.test.mjs` — a bot plays a dozen full runs, reading each enemy card
   and answering perfectly. It catches runtime errors on every screen and keeps
   the balance honest: it should clear floor 20 roughly half the time. Because it
