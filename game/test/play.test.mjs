@@ -90,6 +90,36 @@ async function clearDrill(page, { correct = true } = {}) {
   return true;
 }
 
+/** Play on until a build turn with tiles is on screen. The fight is random,
+    so a hit can end it early, or a guessed question can end the run; neither
+    is what the check that follows is about. */
+async function toHand(page) {
+  for (let step = 0; step < 60; step++) {
+    await page.waitForSelector('#app:not([data-busy])', { timeout: 5000 });
+    if (await page.$('.win-scene:not(.done)')) await page.click('.win-scene');
+    if (await page.$('.hand')) return true;
+    if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
+    if (await page.$('#cont')) { await page.click('#cont'); continue; }
+    if (await page.$('#next')) { await page.click('#next'); continue; }
+    if (await page.$('#wear')) { await page.click('#wear'); continue; }
+    if (await page.$('.choice')) { await page.click('.choice'); continue; }
+    if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
+    if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('#again')) { await page.click('#again'); continue; }
+    const n = await page.$('.node.battle') || await page.$('.node');
+    if (n) { await n.click(); continue; }
+    return false;
+  }
+  return false;
+}
+
+/** Reshuffle if there is one left. A stuck hand with none left ends the walk. */
+async function tryReshuffle(page) {
+  const btn = await page.$('#reshuffle:not([disabled])');
+  if (btn) { await btn.click(); return true; }
+  return false;
+}
+
 const b = await chromium.launch();
 // Reduced motion skips the hit animations, so most of this test can check
 // state straight after each move. The animations get their own page below.
@@ -163,11 +193,14 @@ try {
     const afterParry = await page.$eval('#foeHp b', e => Number(e.textContent.split('/')[0].trim())).catch(() => 0);
     ok('a correct parry counters for damage', afterParry < hpBeforeParry, `${hpBeforeParry} -> ${afterParry}`);
     const parryLog = await page.$eval('.log', e => e.textContent).catch(() => '');
-    ok('the log says it was parried', /PARRIED/.test(parryLog), parryLog);
+    // The counter can finish the enemy off, in which case the win scene is up
+    // and there is no log to read.
+    const wonOnParry = !!(await page.$('.win-scene'));
+    ok('the log says it was parried', wonOnParry || /PARRIED/.test(parryLog), parryLog);
   }
 
   /* ---- a wrong answer teaches, does not just punish ---- */
-  if (!(await page.$('.hand'))) await clearDrill(page);
+  await toHand(page);
   built = await buildLegalExpression(page);
   const expr2 = await readExpression(page);
   await typeNumber(page, expr2.answer + 1, '#strike');
@@ -180,7 +213,7 @@ try {
   }
 
   /* ---- keyboard input works too ---- */
-  if (!(await page.$('.hand'))) await clearDrill(page);
+  await toHand(page);
   if (await page.$('.hand')) {
     await buildLegalExpression(page);
     const expr3 = await readExpression(page);
@@ -224,7 +257,7 @@ try {
     if (await page.$('#wear')) { earnedScreen = true; break; }
     if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
     if (await page.$('.hand')) {
-      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      if (!(await buildLegalExpression(page))) { if (await tryReshuffle(page)) continue; break; }
       const ex = await readExpression(page);
       if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
       await typeNumber(page, ex.answer, '#strike');
@@ -235,6 +268,7 @@ try {
     if (await page.$('.choice')) { await page.click('.choice'); continue; }
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('#again')) { await page.click('#again'); continue; }
     if (await page.$('.node')) { const n = await page.$('.node.battle') || await page.$('.node'); await n.click(); continue; }
     break;
   }
@@ -265,7 +299,7 @@ try {
     if (asked) { askedSeen = await asked.textContent(); break; }
     if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
     if (await page.$('.hand')) {
-      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      if (!(await buildLegalExpression(page))) { if (await tryReshuffle(page)) continue; break; }
       const ex = await readExpression(page);
       if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
       await typeNumber(page, ex.answer, '#strike');
@@ -276,6 +310,8 @@ try {
     if (await page.$('.choice')) { await page.click('.choice'); continue; }
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    if (await page.$('#again')) { await page.click('#again'); continue; }
+    if (await page.$('#wear')) { await page.click('#wear'); continue; }
     if (await page.$('.node')) {
       const n = await page.$('.node.battle') || await page.$('.node');
       await n.click();
@@ -312,7 +348,7 @@ try {
     if (await page.$('.duel-banner')) { sawDuel = true; break; }
     if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
     if (await page.$('.hand')) {
-      if (!(await buildLegalExpression(page))) { await page.click('#reshuffle'); continue; }
+      if (!(await buildLegalExpression(page))) { if (await tryReshuffle(page)) continue; break; }
       const ex = await readExpression(page);
       if (!Number.isFinite(ex.answer)) { await page.click('#clearSel'); continue; }
       await typeNumber(page, ex.answer, '#strike');
@@ -323,6 +359,10 @@ try {
     if (await page.$('.choice')) { await page.click('.choice'); continue; }
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
+    // The bot guesses at written questions, so now and then it dies before
+    // floor 3. That says nothing about duels, so it just starts again.
+    if (await page.$('#again')) { await page.click('#again'); continue; }
+    if (await page.$('#wear')) { await page.click('#wear'); continue; }
     if (await page.$('.node')) {
       const n = await page.$('.node.boss') || await page.$('.node.battle') || await page.$('.node');
       await n.click();
@@ -510,13 +550,14 @@ try {
   const fxPage = await b.newPage({ viewport: { width: 390, height: 844 } });
   fxPage.on('pageerror', e => errors.push(e.message));
   await fxPage.goto(URL, { waitUntil: 'networkidle' });
+  // Its own 4th grader, so the bot can answer every drill: whichever hero
+  // happens to be listed first might be one whose questions it can only guess.
   await fxPage.waitForSelector('.profile-card, #newName');
-  if (await fxPage.$('.profile-card')) await fxPage.click('.profile-card');
-  else {
-    await fxPage.fill('#newName', 'Mover');
-    await fxPage.click('.grade[data-grade="4"]');
-    await fxPage.click('#createProfile');
-  }
+  if (await fxPage.$('#switchBtn')) await fxPage.click('#switchBtn');
+  await fxPage.waitForSelector('#newName');
+  await fxPage.fill('#newName', 'Mover');
+  await fxPage.click('.grade[data-grade="4"]');
+  await fxPage.click('#createProfile');
   await fxPage.waitForSelector('#startRun');
   await fxPage.click('#startRun');
   await fxPage.waitForSelector('.node');
@@ -561,27 +602,56 @@ try {
        || !!(await fxPage.$('.node')) || !!(await fxPage.$('#cont, #next')));
   }
 
-  // Keep fighting until something faints, watching the caption for it.
+  // Keep fighting until something faints, watching the caption for it. The
+  // bot's moves can be weak, so it skips the replay until the enemy is low,
+  // then lets the finishing blow play out. A knockout missed while skipping
+  // just means on to the next fight.
   let fainted = '';
-  for (let turn = 0; turn < 40 && !fainted; turn++) {
-    if (await fxPage.$('.hand')) {
-      if (!(await buildLegalExpression(fxPage))) break;
-      const ex = await readExpression(fxPage);
-      await typeNumber(fxPage, ex.answer, '#strike');
-    } else if (await fxPage.$('.drill-problem')) {
+  for (let move = 0; move < 200 && !fainted; move++) {
+    if (await fxPage.$('.win-scene')) {
+      await fxPage.click('#cont', { force: true }); await fxPage.click('#cont');
+    }
+    if (!(await toHand(fxPage)) && !(await fxPage.$('.drill-problem'))) break;
+    const bar = await fxPage.$eval('#foeHp b', e => e.textContent.split('/').map(x => Number(x.trim()))).catch(() => null);
+    const low = bar && bar[0] <= bar[1] * 0.5;
+    if (await fxPage.$('.drill-problem')) {
       const parts = await fxPage.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
       const guess = parts.length === 3 ? OPS[parts[1]](Number(parts[0]), Number(parts[2])) : 7;
       await typeNumber(fxPage, guess, '#answer');
-    } else break;
-    for (let t = 0; t < 40; t++) {
+    } else {
+      if (!(await buildLegalExpression(fxPage))) { if (await tryReshuffle(fxPage)) continue; break; }
+      const ex = await readExpression(fxPage);
+      await typeNumber(fxPage, ex.answer, '#strike');
+    }
+    if (!low) { if (await fxPage.$('.fx-skip')) await fxPage.click('.fx-skip'); continue; }
+    for (let t = 0; t < 60; t++) {
       const cap = await fxPage.$eval('.log', e => e.textContent).catch(() => '');
       if (/fainted/.test(cap)) { fainted = cap; break; }
       if (!(await fxPage.$('#app[data-busy]'))) break;
-      await fxPage.waitForTimeout(40);
+      await fxPage.waitForTimeout(30);
     }
     await fxPage.waitForSelector('#app:not([data-busy])', { timeout: 5000 });
+    // Only the enemy fainting counts here; if the hero fell, play on.
+    if (fainted && !(await fxPage.$('.win-scene'))) fainted = '';
   }
   ok('a knockout is shown as a faint', /fainted/.test(fainted), fainted);
+
+  /* ---- the win scene ---- */
+  if (await fxPage.$('.win-scene')) {
+    const banner = await fxPage.$eval('.vbanner', e => e.textContent);
+    ok('a win gets a victory banner', /VICTORY|BOSS FELLED/.test(banner), banner);
+    ok('the hero stands on the stage', (await fxPage.$eval('.vhero', e => e.textContent)).length > 0);
+    const recap = await fxPage.$eval('.recap', e => e.textContent);
+    ok('the win recaps the maths in that fight', /\d+ right/.test(recap) && /\d+ wrong/.test(recap), recap);
+    ok('the scene is still playing at first', !(await fxPage.$('.win-scene.done')));
+    await fxPage.click('#cont', { force: true });
+    ok('an early tap finishes the scene instead of leaving it', !!(await fxPage.$('.win-scene.done')));
+    await fxPage.click('#cont');
+    await fxPage.waitForTimeout(150);
+    ok('Continue then moves on', !(await fxPage.$('.win-scene')));
+  } else {
+    ok('a win gets a victory banner', false, 'no win scene after the knockout');
+  }
   await fxPage.close();
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
