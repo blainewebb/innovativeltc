@@ -55,7 +55,7 @@ function title() {
         </button>`;
       }).join('')}
     </div>
-    <button class="btn ghost" id="add">+ New boxer</button>
+    <button class="btn ghost" id="add">+ Add another boxer</button>
     ${state.readOnly ? '<p class="warn">This browser is not letting the game save. Progress will be lost when you close it.</p>' : ''}
     <p class="version">v${VERSION}</p>
   </div>`, 'bg-title');
@@ -119,8 +119,11 @@ function hub() {
 
   view(`<div class="screen hub">
     <header class="hub-top">
-      <button class="me" id="switch"><span class="glove-dot" style="background:${esc(b.gloves)}"></span>${esc(b.name)}</button>
-      <button class="btn small ghost" id="coach">Coach's Corner</button>
+      <div class="me"><span class="glove-dot" style="background:${esc(b.gloves)}"></span>${esc(b.name)}</div>
+      <div class="hub-actions">
+        <button class="btn small switch" id="switch">&#8644; Switch boxer</button>
+        <button class="btn small ghost" id="coach">Coach's Corner</button>
+      </div>
     </header>
     <div class="grade-tabs" role="tablist">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => {
       const belts = (b.progress[n]?.belts || []).length;
@@ -577,7 +580,9 @@ function coach() {
       <button class="btn ghost danger" id="del">Delete this boxer</button>
     </section>
     <button class="btn big" id="back">Back</button>
+    <button class="btn ghost" id="switch2">&#8644; Switch boxer</button>
   </div>`, 'bg-hub');
+  on('#switch2', title);
   const bind = (id, key) => $(id).addEventListener('change', e => { b.settings[key] = e.target.checked; if (key === 'sound') setSound(e.target.checked); persist(); });
   bind('#clock', 'clock');
   bind('#read', 'readAloud');
