@@ -3,7 +3,7 @@
    up on the next load, and the cache only answers when there is no network.
    (Cache-first for scripts once left another app in this repo running
    months-old code behind a fresh page.) Bump CACHE with VERSION in data.js. */
-const CACHE = 'wordkick-v1';
+const CACHE = 'wordkick-v2';
 const SHELL = [
   './',
   './index.html',
