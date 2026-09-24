@@ -1,0 +1,1 @@
+{"name":"wordpunch","private":true,"type":"module","description":"Word Punch. Static PWA, no build step. package.json exists only so Node treats js/ as ES modules for the tests."}
