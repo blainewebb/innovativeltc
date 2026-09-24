@@ -50,10 +50,11 @@ function title() {
     <h1 class="logo"><span>WORD</span><span>KICK</span></h1>
     <p class="tag">Score with nouns, verbs, adjectives and spelling. Win the Golden Cup!</p>
     <h2 class="sub">Who's playing?</h2>
+    <p class="muted small pick-hint">Tap your name to play. Each player keeps their own trophies.</p>
     <div class="player-list">
       ${state.players.map(p => {
         const cups = Object.values(p.progress).reduce((n, g) => n + g.cups.length, 0);
-        return `<button class="player-btn" data-id="${esc(p.id)}">
+        return `<button class="player-btn${p.id === state.current ? ' current' : ''}" data-id="${esc(p.id)}">
           <span class="mini-shirt">${shirtSVG(kitById(p.kit), { number: p.number })}</span>
           <span class="pname">${esc(p.name)}</span>
           <span class="pmeta">Grade ${p.grade} &middot; ${cups} troph${cups === 1 ? 'y' : 'ies'}</span>
@@ -136,8 +137,11 @@ function hub() {
 
   view(`<div class="screen hub">
     <header class="hub-top">
-      <button class="me" id="switch"><span class="mini-shirt">${shirtSVG(kitById(p.kit), { number: p.number })}</span>${esc(p.name)}</button>
-      <button class="btn small ghost" id="coach">Coach's Corner</button>
+      <div class="me"><span class="mini-shirt">${shirtSVG(kitById(p.kit), { number: p.number })}</span><span class="me-name">${esc(p.name)}</span></div>
+      <div class="hub-btns">
+        <button class="btn small ghost" id="switch">&#8644; Switch player</button>
+        <button class="btn small ghost" id="coach">Coach's Corner</button>
+      </div>
     </header>
     <div class="grade-tabs" role="tablist">${GRADES.map(n => {
       const cups = (p.progress[n]?.cups || []).length;

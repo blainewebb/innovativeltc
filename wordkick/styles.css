@@ -78,7 +78,12 @@ button:disabled { cursor: default; }
 
 /* ---------------------------------------------------------------- hub -- */
 .hub-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.me { display: flex; align-items: center; gap: 8px; background: none; border: 0; font-weight: 800; font-size: 1.15rem; padding: 0; }
+.me { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.15rem; min-width: 0; }
+.me-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-top { flex-wrap: wrap; }
+.hub-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.pick-hint { margin: -8px 0 0; }
+.player-btn.current { border-color: var(--gold); }
 .grade-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .grade-tabs::-webkit-scrollbar { display: none; }
 .gtab { flex: 0 0 auto; border: 2px solid var(--line); background: var(--panel); border-radius: 999px; padding: .45rem .8rem; font-weight: 700; font-size: .9rem; }

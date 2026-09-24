@@ -160,12 +160,18 @@ try {
   // A second player has their own progress.
   await page.evaluate(() => { location.search = '?test&seed=9'; });
   await page.waitForSelector('.tcard');
+  ok('hub has a visible Switch player button', (await page.textContent('#switch')).includes('Switch player'));
   await page.click('#switch');
   await page.click('#add');
   await page.fill('#name', 'Sibling');
   await page.click('#create');
   ok('second player starts fresh', await page.isVisible('.tcard.next[data-i="0"]'));
   ok('both players are saved', (await page.evaluate(() => window.__wk.state().players.length)) === 2);
+  await page.click('#switch');
+  ok('player list shows both players', (await page.$$('.player-btn')).length === 2);
+  await page.click('.player-btn:not(.current)');
+  ok('switching back opens the first player', (await page.textContent('.me-name')) === 'Tester');
+  ok('first player still has their trophy', (await page.$$('.trophy-slot.won')).length === 1);
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 
