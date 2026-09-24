@@ -328,6 +328,12 @@ export function buildQuestion(type, ctx) {
   return BUILDERS[type](ctx, FIGHTERS[ctx.idx]);
 }
 
+/* Same builders without the fighter ladder, for other games that share this
+   content (Word Kick). `lean` is { focus } like a fighter's. */
+export function buildQuestionWith(type, ctx, lean = {}) {
+  return BUILDERS[type](ctx, { focus: null, ...lean });
+}
+
 /* ------------------------------------------------------------------ fight --
    The fight is a small state machine. The UI asks a question, the kid
    answers, `resolveAnswer` works out everything that happens, and the UI
