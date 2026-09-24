@@ -74,6 +74,13 @@ speech. Everyday words that are two at once (run, play, fish, light, fast...)
 only appear inside sentences, where the sentence decides. The tests fail if any
 word lands in two lists.
 
+### Shared with Word Kick
+
+Word Kick (`../wordkick/`) imports the word lists, sentences, spelling and
+question builders from this folder. Anything changed in `js/data.js` or the
+question part of `js/engine.js` changes both games, so run both test suites
+after editing.
+
 ## Learning from misses
 
 Every miss is logged against the specific word or sentence. Missed items come

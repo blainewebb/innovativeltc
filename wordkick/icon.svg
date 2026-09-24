@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0b3d20"/>
+  <rect y="300" width="512" height="212" fill="#15803d"/>
+  <rect y="340" width="512" height="40" fill="#16a34a"/>
+  <rect y="420" width="512" height="40" fill="#16a34a"/>
+  <path d="M70 300 L70 110 L442 110 L442 300" stroke="#f8fafc" stroke-width="18" fill="none" stroke-linejoin="round"/>
+  <path d="M100 130 L100 300 M150 130 L150 300 M200 130 L200 300 M250 130 L250 300 M300 130 L300 300 M350 130 L350 300 M400 130 L400 300 M80 170 L432 170 M80 220 L432 220 M80 270 L432 270" stroke="rgba(255,255,255,.35)" stroke-width="5"/>
+  <circle cx="256" cy="360" r="92" fill="#fff" stroke="#111" stroke-width="10"/>
+  <path d="M256 318 L292 344 L278 386 L234 386 L220 344 Z" fill="#111"/>
+  <path d="M256 318 L256 272 M292 344 L336 330 M278 386 L304 424 M234 386 L208 424 M220 344 L176 330" stroke="#111" stroke-width="10"/>
+  <text x="256" y="78" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="64" fill="#facc15">WORD KICK</text>
+</svg>
