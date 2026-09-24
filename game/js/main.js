@@ -1618,7 +1618,7 @@ function screenReport() {
         <div class="spark">${last14.map(d => `<span class="sp" style="height:${Math.max(3, d.ms / maxMs * 40)}px" title="${d.key}: ${fmtMinutes(d.ms)}"></span>`).join('')}</div>
 
         <h4>School year</h4>
-        <p class="muted tiny">Only a starting point, and it fades as their own answers accumulate. Raise it if they are being served work below them; lower it if they are struggling. Changing it never touches their record.</p>
+        <p class="muted tiny">Only a starting point. Their own answers lift them past it; it only comes down if they are getting problems wrong. Raise it if they are being served work below them; lower it if they are struggling. Changing it never touches their record.</p>
         <div class="grades compact">
           ${GRADES.map(g => `<button class="grade ${p.grade === g.id ? 'on' : ''}" data-grade-for="${p.id}" data-grade="${g.id}"><b>${g.label}</b></button>`).join('')}
         </div>

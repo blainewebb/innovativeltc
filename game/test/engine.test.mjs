@@ -720,6 +720,47 @@ test('a strong player who starts low still climbs to the top', () => {
   }
 });
 
+test('a kid getting nearly everything right is never dropped below their grade', () => {
+  /* A real report card: a 4th grader, 60 problems, 98% right, 4 to 11
+     seconds an answer. His record alone rated him 3rd grade, because a few
+     tries on a skill count for little and he had only been served 3rd grade
+     tables and division so far. So once the grade floor began to fade he was
+     handed easier work while getting almost everything right. The floor may
+     only fall for a kid who is actually getting problems wrong. */
+  const m = blankMastery();
+  const card = [
+    ['add_small', '3+4', 8, 4100], ['sub_small', '9-4', 13, 5600], ['add_big', '23+18', 4, 11100],
+    ['mult_hard', '7*8', 24, 6300], ['div_easy', '12/3', 8, 6100],
+    ['word_1step', null, 1, 15000], ['word_2step', null, 1, 20000], ['place_est', null, 1, 15000],
+  ];
+  for (const [skill, fact, n, ms] of card) {
+    for (let i = 0; i < n; i++) {
+      recordAttempt(m, { skill, fact, correct: !(skill === 'mult_hard' && i === 5), ms });
+    }
+  }
+  assert.equal(totalAttempts(m), 60);
+  assert.equal(difficultyLevel(m, 4), 4);
+  // Keep playing at the same accuracy and speed, sticking to favourites the
+  // way a kid building their own strikes can: subtraction and times tables.
+  const mix = card.filter(c => c[0] === 'sub_small' || c[0] === 'mult_hard');
+  for (let i = 0; i < 150; i++) {
+    const [skill, fact, , ms] = mix[i % mix.length];
+    recordAttempt(m, { skill, fact, correct: i % 40 !== 39, ms });
+    assert.ok(difficultyLevel(m, 4) >= 4,
+      `fell to level ${difficultyLevel(m, 4)} after ${totalAttempts(m)} problems at 97% right`);
+  }
+});
+
+test('a kid who is struggling still has the grade fade, gradually', () => {
+  // Mostly right is not the same as struggling, but a parent's guess must not
+  // hold a kid who gets a third of it wrong.
+  const m = blankMastery();
+  for (let i = 0; i < GRADE_GRACE_ATTEMPTS + GRADE_DECAY_ATTEMPTS * 6; i++) {
+    recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: i % 3 !== 0, ms: 9000 });
+  }
+  assert.ok(difficultyLevel(m, 6) < 6, `stayed at ${difficultyLevel(m, 6)} while getting a third wrong`);
+});
+
 test('a kid who races ahead is never held back by the grade', () => {
   const m = blankMastery();
   for (let i = 0; i < 20; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: true, ms: 1400 });
