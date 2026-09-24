@@ -129,12 +129,40 @@ export const GRADE_DECAY_ATTEMPTS = 30;
    visibly got easier thirty problems in. */
 export const GRADE_GRACE_ATTEMPTS = 60;
 
+/** Recent accuracy across everything answered, each skill weighted by how
+    much of it there has been. 1 when there is nothing to go on. */
+export function overallAccuracy(mastery) {
+  let n = 0, sum = 0;
+  for (const sk of SKILLS) {
+    const r = mastery.skills[sk.id];
+    if (!r?.attempts) continue;
+    n += r.attempts;
+    sum += r.ema * r.attempts;
+  }
+  return n ? sum / n : 1;
+}
+
+/* How far a doing-well kid's accuracy lets the grade floor fall. The count
+   of problems alone used to decide it, so a kid getting 97% right whose
+   record was still thin (few tries per skill, or sticking to favourite
+   operations) was dropped below the grade they started at and handed easier
+   work. Now only mistakes lower the floor: mostly right keeps it where it
+   is, and their own record lifts them past it as it fills in. */
+export const GRADE_HOLD_ACCURACY = [
+  { atLeast: 0.85, maxDrop: 0 },
+  { atLeast: 0.75, maxDrop: 1 },
+  { atLeast: 0.65, maxDrop: 2 },
+];
+
 export function difficultyLevel(mastery, grade = 0) {
   const evidence = evidenceLevel(mastery);
   const seeded = GRADE_BY_ID[grade]?.level || 0;
   if (!seeded) return evidence;
   const past = Math.max(0, totalAttempts(mastery) - GRADE_GRACE_ATTEMPTS);
-  const floor = seeded - Math.floor(past / GRADE_DECAY_ATTEMPTS);
+  const byCount = Math.floor(past / GRADE_DECAY_ATTEMPTS);
+  const acc = overallAccuracy(mastery);
+  const hold = GRADE_HOLD_ACCURACY.find(h => acc >= h.atLeast);
+  const floor = seeded - Math.min(byCount, hold ? hold.maxDrop : Infinity);
   return Math.max(1, Math.min(MAX_LEVEL, Math.max(evidence, floor)));
 }
 

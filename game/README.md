@@ -226,11 +226,22 @@ Making a hero asks for a **school year**, 1st through 8th. It is asked as a US
 grade rather than an age because age predicts very little: two eight year olds
 can be two years apart on times tables. The grade only sets where they start,
 opening the operators that year is taught and lifting the first few runs off
-level 1. Its influence then erodes by one level every 30 answers, so within
-roughly 150 problems the child's own record is the only thing setting
-difficulty. A wrong guess corrects itself in either direction, and it is a
-floor rather than a ceiling, so a kid who races ahead is never held back by
-what was ticked in September.
+level 1. It is a floor rather than a ceiling, so a kid who races ahead is
+never held back by what was ticked in September.
+
+The floor holds for the first 60 problems. After that it only comes down for
+a kid who is **getting problems wrong**: at 85% right or better it stays put,
+at 75 to 85% it can drop one level, at 65 to 75% two, and below that it
+erodes a level every 30 answers until their own record is all that sets
+difficulty. So a guess that was too high corrects itself, but a kid doing
+well is never handed easier work than they started on.
+
+That last part is a fix. The floor used to erode on the count of problems
+alone, and a real 4th grader at 98% right was about to be dropped to 3rd
+grade work: his own record still looked thin (a few tries on a skill count
+for little until there are a dozen), and he had mostly been playing
+subtraction and times tables, which count as 3rd grade skills. The engine
+test now replays his report card to keep it from coming back.
 
 The school year can be **changed later** from the report card, since the best
 setting is often not obvious until you have watched a few runs. Changing it
