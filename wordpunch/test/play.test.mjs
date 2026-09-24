@@ -90,6 +90,13 @@ try {
   res = await playFight(page, 1);
   ok('Captain Capital beaten', res === 'win');
   ok('belt is offered', await page.isVisible('#belt'));
+  ok('third win offers a prize', await page.isVisible('#prize'));
+  await page.click('#prize');
+  ok('prize reveal shows a boxer card', (await page.textContent('.reveal-title')).includes('CARD'));
+  await page.click('#done');
+  ok('back on the result after the prize', await page.isVisible('#belt') && !(await page.isVisible('#prize')));
+  const rw = await page.evaluate(() => window.__wp.state().boxers[0].rewards);
+  ok('prize is saved', rw.earned.length === 1 && rw.wins === 3);
   await page.click('#belt');
   ok('belt screen shows the Minor Circuit Belt', (await page.textContent('.belt-screen h2')).includes('Minor Circuit Belt'));
   await page.click('#hub');
@@ -100,6 +107,11 @@ try {
   await page.reload();
   await page.waitForSelector('.fcard');
   ok('reload goes straight to the hub', await page.isVisible('.fcard.next[data-i="3"]'));
+  ok('hub shows prize progress', (await page.textContent('.prize-bar')).includes('1 of 24'));
+  await page.click('#prizes');
+  ok('prize room shows the card in the album', (await page.$$('.ptile[data-card]')).length === 1);
+  ok('prize room shows locked slots', (await page.$$('.ptile.locked')).length === 23);
+  await page.click('#back');
   ok('belt survives a reload', (await page.$$('.belt-slot.won')).length === 1);
 
   // Other grades have their own ladder.

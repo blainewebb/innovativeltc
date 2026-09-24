@@ -7,6 +7,8 @@ import {
   createFight, resolveAnswer, resolveGetUp, newProfile, recordAnswer, finishFight, progressFor, fighterStats,
 } from '../js/engine.js';
 import { hydrate, load, save, KEY } from '../js/storage.js';
+import { PRIZES } from '../js/prizes.js';
+import { WINS_PER_PRIZE, newRewards, recordWin, winsToNext, toggleEquip, equipped, hydrateRewards } from '../js/rewards.js';
 
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
@@ -265,6 +267,67 @@ section('storage');
   bad.setItem(KEY, '{not json');
   const r = load(bad);
   ok('an unreadable save is not overwritten', r.readOnly && !save(r, bad) && bad.getItem(KEY) === '{not json');
+}
+
+/* -------------------------------------------------------------- prizes -- */
+section('prizes');
+{
+  ok('24 prizes', PRIZES.length === 24);
+  ok('prize ids are unique', new Set(PRIZES.map(p => p.id)).size === PRIZES.length);
+  ok('prizes go card, gear, character', PRIZES.every((p, i) => p.kind === ['card', 'gear', 'character'][i % 3]));
+  ok('gear slots are known', PRIZES.filter(p => p.kind === 'gear').every(g => ['gloves', 'ropes', 'celebration'].includes(g.slot)));
+  ok('celebrations have a move', PRIZES.filter(p => p.slot === 'celebration').every(g => ['dance', 'spin', 'flex'].includes(g.move)));
+  ok('cards have a full look', PRIZES.filter(p => p.kind === 'card').every(c => ['skin', 'hair', 'trunks', 'gloves', 'acc', 'brow'].every(k => c.look[k])));
+  ok('every prize has words to show', PRIZES.every(p => p.name && (p.fact || p.desc)));
+
+  const p = newProfile({ name: 'K', grade: 3, gloves: '#fff' });
+  ok('new boxers start with no prizes', p.rewards.wins === 0 && p.rewards.earned.length === 0);
+  ok('3 wins to the first prize', winsToNext(p, PRIZES) === WINS_PER_PRIZE && WINS_PER_PRIZE === 3);
+  let r = recordWin(p, 2, PRIZES);
+  ok('a win below their grade does not count', !r.counted && p.rewards.wins === 0);
+  r = recordWin(p, 3, PRIZES);
+  ok('a win at their grade counts', r.counted && !r.prize && winsToNext(p, PRIZES) === 2);
+  recordWin(p, 5, PRIZES);
+  ok('a win above their grade counts', p.rewards.wins === 2);
+  r = recordWin(p, 3, PRIZES);
+  ok('third win earns the first prize, a card', r.prize?.id === PRIZES[0].id && r.prize.kind === 'card');
+  ok('meter resets after a prize', winsToNext(p, PRIZES) === 3);
+  for (let i = 0; i < 3; i++) r = recordWin(p, 3, PRIZES);
+  ok('next prize is gear', r.prize?.kind === 'gear');
+  for (let i = 0; i < 3; i++) r = recordWin(p, 3, PRIZES);
+  ok('then a character', r.prize?.kind === 'character');
+
+  // A loss through finishFight never touches prizes.
+  const before = p.rewards.wins;
+  const out = finishFight(p, 3, 0, false);
+  ok('a loss earns nothing and takes nothing', p.rewards.wins === before && !out.reward.counted);
+  const win = finishFight(p, 3, 0, true);
+  ok('finishFight counts a win toward prizes', win.reward.counted && p.rewards.wins === before + 1);
+
+  // Switching things on.
+  const gear = PRIZES.find(x => x.kind === 'gear');
+  const ch = PRIZES.find(x => x.kind === 'character');
+  const card = PRIZES.find(x => x.kind === 'card');
+  ok('gear can be switched on', toggleEquip(p, gear) && equipped(p, PRIZES, gear.slot)?.id === gear.id);
+  ok('tapping it again switches it off', toggleEquip(p, gear) && !equipped(p, PRIZES, gear.slot));
+  ok('a character can be picked', toggleEquip(p, ch) && equipped(p, PRIZES, 'character')?.id === ch.id);
+  ok('cards cannot be switched on', !toggleEquip(p, card));
+  const unearned = PRIZES.filter(x => x.kind === 'gear')[3];
+  ok('unearned gear cannot be switched on', !toggleEquip(p, unearned));
+
+  // Everything earned: no more prizes, meter says done.
+  const q = newProfile({ name: 'Q', grade: 1 });
+  for (let i = 0; i < 24 * 3 + 5; i++) recordWin(q, 1, PRIZES);
+  ok('all 24 prizes can be earned', q.rewards.earned.length === 24);
+  ok('no next prize once all are earned', winsToNext(q, PRIZES) === null);
+
+  // Saves: junk cleaned, unearned or wrong-slot equips dropped.
+  const h = hydrateRewards({ wins: '7', earned: [PRIZES[1].id, 'nope', PRIZES[1].id], equip: { gloves: PRIZES[1].id, ropes: PRIZES[1].id, character: PRIZES[2].id } }, PRIZES);
+  ok('saved prizes are cleaned up', h.wins === 7 && h.earned.length === 1);
+  ok('only earned prizes in the right slot stay on', h.equip.gloves === PRIZES[1].id && !h.equip.ropes && !h.equip.character);
+  ok('missing rewards load as empty', JSON.stringify(hydrateRewards(undefined, PRIZES)) === JSON.stringify(newRewards()));
+  const old = hydrate({ boxers: [{ id: 'x', name: 'Old', grade: 2 }] });
+  ok('boxers saved before prizes existed load fine', old.boxers[0].rewards.wins === 0);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

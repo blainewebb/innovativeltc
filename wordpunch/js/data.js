@@ -3,7 +3,7 @@
 
 /* Shown on the title screen so "is this the new version?" is something you
    read rather than guess. Bump it alongside CACHE in sw.js. */
-export const VERSION = '2026-09-24.2';
+export const VERSION = '2026-09-24.3';
 
 /* ------------------------------------------------------ parts of speech --
    `short` is the one-line rule shown after a miss. Grade 1 gets the plain

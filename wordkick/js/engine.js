@@ -2,7 +2,9 @@
    running a penalty shootout, and a player's bookkeeping. No DOM, no storage,
    so all of it can be tested in Node. Randomness always comes in as `rng`. */
 import { formatsFor, buildQuestionWith, weightedPick, shuffle, recordAnswer, accuracy } from '../../wordpunch/js/engine.js';
+import { newRewards, recordWin } from '../../wordpunch/js/rewards.js';
 import { TEAMS, CUPS, KICK_NAMES, contentGrade } from './data.js';
+import { PRIZES } from './prizes.js';
 
 export { recordAnswer, accuracy };
 
@@ -184,6 +186,7 @@ export function newProfile({ name, grade, kit, number }) {
     missed: {},        // item key -> how many more rights it needs
     misses: [],        // recent misses for the coach's corner
     matches: 0, wins: 0,
+    rewards: newRewards(),   // prizes: every 3 wins at their grade or above
   };
 }
 
@@ -193,12 +196,14 @@ export function progressFor(profile, grade) {
   return p;
 }
 
-/* A match is over: move the ladder on and hand out a trophy if one was won. */
+/* A match is over: move the ladder on, hand out a trophy if one was won,
+   and count the win toward the next prize. */
 export function finishMatch(profile, grade, idx, won) {
   profile.matches++;
-  const out = { cup: null, gradeChamp: false, nextUnlocked: null };
+  const out = { cup: null, gradeChamp: false, nextUnlocked: null, reward: { counted: false, prize: null } };
   if (!won) return out;
   profile.wins++;
+  out.reward = recordWin(profile, grade, PRIZES);
   const p = progressFor(profile, grade);
   if (idx + 1 > p.next) {
     p.next = Math.min(TEAMS.length, idx + 1);

@@ -10,7 +10,9 @@ import {
 } from './engine.js';
 import { load, save } from './storage.js';
 import { sfx, setEnabled as setSound, speak, stopSpeaking, canSpeak } from './sfx.js';
-import { shirtSVG, shooterSVG, myKeeperSVG, rivalKeeperSVG, ballSVG, goalSVG, crestSVG, trophySVG } from './art.js';
+import { shirtSVG, shooterSVG, myKeeperSVG, rivalKeeperSVG, ballSVG, goalSVG, crestSVG, trophySVG, starSVG, gearSVG } from './art.js';
+import { PRIZES } from './prizes.js';
+import { WINS_PER_PRIZE, winsToNext, toggleEquip, equipped, hasPrize } from '../../wordpunch/js/rewards.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -143,6 +145,7 @@ function hub() {
         <button class="btn small ghost" id="coach">Coach's Corner</button>
       </div>
     </header>
+    ${prizeBar(p)}
     <div class="grade-tabs" role="tablist">${GRADES.map(n => {
       const cups = (p.progress[n]?.cups || []).length;
       return `<button class="gtab${n === g ? ' on' : ''}" data-g="${n}">Gr ${n}${cups ? `<i class="pips">${'&#9679;'.repeat(cups)}</i>` : ''}</button>`;
@@ -164,6 +167,7 @@ function hub() {
   on('#go', () => intro(g, allBeaten ? TEAMS.length - 1 : prog.next));
   on('#coach', coach);
   on('#switch', title);
+  on('#prizes', prizeRoom);
 }
 
 /* ================================================================ intro == */
@@ -206,7 +210,8 @@ const TARGETS = {
 function match(grade, idx) {
   const p = me();
   const t = TEAMS[idx];
-  const kit = kitById(p.kit);
+  const look = myLook(p);
+  const kit = look.kit;
   const M = createMatch(grade, idx);
   const used = new Set();
   const token = ++matchToken;
@@ -214,7 +219,7 @@ function match(grade, idx) {
 
   view(`<div class="match">
     <div class="hud">
-      <div class="sb-row sb-you"><span class="sb-badge">${shirtSVG(kit)}</span><span class="nm">${esc(p.name)}</span><span class="pens"></span><b class="score">0</b></div>
+      <div class="sb-row sb-you"><span class="sb-badge">${shirtSVG(kit)}</span><span class="nm">${esc(look.name)}</span><span class="pens"></span><b class="score">0</b></div>
       <div class="sb-row sb-them"><span class="sb-badge">${crestSVG(t)}</span><span class="nm">${esc(t.short)}</span><span class="pens"></span><b class="score">0</b></div>
     </div>
     <div class="pitch">
@@ -224,7 +229,7 @@ function match(grade, idx) {
       <div class="keeper"></div>
       <div class="spot"></div>
       <div class="shooter"></div>
-      <div class="ball">${ballSVG()}</div>
+      <div class="ball">${ballSVG(look.ball || {})}</div>
       <div class="fx"></div>
       <div class="side-tag"></div>
       <div class="banner"></div>
@@ -310,16 +315,27 @@ function match(grade, idx) {
     pitchEl.classList.toggle('defending', side === 'them');
     if (side === 'you') {
       keeperEl.innerHTML = rivalKeeperSVG(t);
-      shooterEl.innerHTML = shooterSVG(kit, { number: p.number, name: p.name });
+      shooterEl.innerHTML = shooterSVG(kit, { number: look.number, name: look.name, skin: look.skin, hair: look.hair, boots: look.boots });
       sideEl.innerHTML = 'YOUR KICK';
     } else {
-      keeperEl.innerHTML = myKeeperSVG(kit);
+      keeperEl.innerHTML = myKeeperSVG(kit, { gloves: look.gloves, skin: look.skin, hair: look.hair });
       shooterEl.innerHTML = shooterSVG(t.kit, { number: [9, 7, 11, 10][M.them.length % 4], name: t.short, skin: t.skin, hair: t.hair });
       sideEl.innerHTML = 'SAVE IT!';
     }
   }
   const anim = (el, frames, ms, easing = 'ease-out') =>
     el.animate(frames, { duration: Math.max(1, ms * SPEED), easing, fill: 'forwards' }).finished.catch(() => {});
+
+  /* After your goal: a little hop, or the celebration from the Prize Room. */
+  function celebrate(move) {
+    const base = 'translate(-50%, 0)';
+    const frames = {
+      slide: [{ transform: base }, { transform: `${base} translate(120%, -8%) rotate(-12deg)` }, { transform: `${base} translate(170%, 0) rotate(-18deg)` }],
+      flip: [{ transform: base }, { transform: `${base} translateY(-45%) rotate(-180deg)` }, { transform: `${base} translateY(0) rotate(-360deg)` }],
+      airplane: [{ transform: base }, { transform: `${base} translate(90%, -10%) rotate(18deg)` }, { transform: `${base} translate(-40%, -14%) rotate(-18deg)` }, { transform: `${base} translate(60%, 0) rotate(8deg)` }],
+    }[move] || [{ transform: base }, { transform: `${base} translateY(-18%)` }, { transform: base }];
+    return anim(shooterEl, frames, move ? 900 : 450, 'ease-in-out');
+  }
 
   /* Keeper dive toward a target (in pitch %). `reach` 0..1 is how far they get. */
   function dive(target, reach = 1, ms = 420) {
@@ -484,6 +500,7 @@ function match(grade, idx) {
           pitchEl.classList.add('flash-goal');
           if (e.quick) pop('TOP CORNER!', 'quick');
           hud();
+          celebrate(look.celebration);
           await banner('GOAL!', 'gold', 1000);
           pitchEl.classList.remove('flash-goal');
         } else if (e.reason === 'slow') {
@@ -609,7 +626,9 @@ function result(grade, idx, M, outcome) {
     ${M.misses.length ? `<details class="review" ${won ? '' : 'open'}><summary>Words to practice (${M.misses.length})</summary>
       <ul>${M.misses.map(m => `<li><b>${esc(m.answer)}</b> <span>${esc(m.explain)}</span></li>`).join('')}</ul></details>` : ''}
     ${next ? `<p class="unlock">Next up: <b>${esc(next.name)}</b></p>` : ''}
+    ${won ? prizeNote(me(), outcome.reward) : ''}
     <div class="result-btns">
+      ${outcome.reward?.prize ? '<button class="btn big prize" id="prize">&#9733; Open your prize!</button>' : ''}
       ${outcome.cup ? '<button class="btn big kick" id="cup">Lift the trophy!</button>' : ''}
       ${!outcome.cup && won && next ? `<button class="btn big kick" id="nextm">Play ${esc(next.name)}</button>` : ''}
       ${!won ? '<button class="btn big kick" id="again">Rematch!</button>' : ''}
@@ -617,6 +636,8 @@ function result(grade, idx, M, outcome) {
     </div>
   </div>`, won ? 'bg-win' : 'bg-lose');
   if (won) sfx.win();
+  on('#prize', () => prizeReveal(outcome.reward.prize,
+    () => result(grade, idx, M, { ...outcome, reward: { ...outcome.reward, prize: null, opened: true } })));
   on('#cup', () => trophyScreen(grade, outcome.cup, outcome.gradeChamp));
   on('#nextm', () => intro(grade, outcome.nextUnlocked));
   on('#again', () => match(grade, idx));
@@ -647,6 +668,124 @@ function trophyScreen(grade, cup, gradeChamp) {
     hub();
   });
   on('#hub', hub);
+}
+
+/* =============================================================== prizes == */
+/* What the player looks like in a match: their own kit and name, or the
+   character they picked, plus any gear switched on. */
+function myLook(p) {
+  const ch = equipped(p, PRIZES, 'character');
+  const boots = equipped(p, PRIZES, 'boots');
+  const ball = equipped(p, PRIZES, 'ball');
+  const gloves = equipped(p, PRIZES, 'gloves');
+  const cel = equipped(p, PRIZES, 'celebration');
+  return {
+    kit: kitById(ch ? ch.kit : p.kit),
+    name: ch ? ch.name.split(' ').pop() : p.name,
+    number: ch ? ch.number : p.number,
+    skin: ch?.skin, hair: ch?.hair,
+    boots: boots?.color, ball, gloves: gloves?.color, celebration: cel?.move,
+  };
+}
+
+const meterHTML = n => `<span class="meter">${Array.from({ length: WINS_PER_PRIZE }, (_, i) =>
+  `<i class="${i < WINS_PER_PRIZE - n ? 'on' : ''}"></i>`).join('')}</span>`;
+
+function prizeBar(p) {
+  const n = winsToNext(p, PRIZES);
+  const got = p.rewards.earned.length;
+  return `<button class="prize-bar" id="prizes">
+    <span class="pb-title">&#9733; Prize Room <small>${got} of ${PRIZES.length}</small></span>
+    ${n == null ? '<span class="pb-meta">You got them all!</span>'
+      : `<span class="pb-meta">${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} to your next prize</span>`}
+  </button>`;
+}
+
+function prizeNote(p, reward) {
+  if (!reward || reward.prize || reward.opened) return '';
+  if (!reward.counted) return `<p class="prize-note muted">Wins at Grade ${p.grade} or higher count toward prizes.</p>`;
+  const n = winsToNext(p, PRIZES);
+  return n == null ? '' : `<p class="prize-note">${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} to your next prize!</p>`;
+}
+
+const KIND_TITLE = { card: 'NEW STAR CARD!', gear: 'NEW GEAR!', character: 'NEW PLAYER!' };
+const SLOT_NAME = { boots: 'Boots', ball: 'Ball', gloves: 'Keeper gloves', celebration: 'Goal celebration' };
+
+function prizeArt(prize) {
+  if (prize.kind === 'gear') return gearSVG(prize);
+  return starSVG(kitById(prize.kit), { skin: prize.skin, hair: prize.hair, number: prize.number });
+}
+
+function prizeCardHTML(prize, { big = false } = {}) {
+  const sub = prize.kind === 'card' ? `${prize.pos} &middot; ${esc(kitById(prize.kit).name)} colors`
+    : prize.kind === 'gear' ? SLOT_NAME[prize.slot] : `Playable &middot; ${esc(kitById(prize.kit).name)} colors`;
+  return `<div class="pcard ${prize.kind}${big ? ' big' : ''}">
+    <div class="pcard-art">${prizeArt(prize)}</div>
+    <b class="pcard-name">${esc(prize.name)}</b>
+    <small class="pcard-sub">${sub}</small>
+    ${big ? `<p class="pcard-text">${esc(prize.fact || prize.desc)}</p>` : ''}
+  </div>`;
+}
+
+function prizeReveal(prize, done) {
+  const p = me();
+  const usable = prize.kind !== 'card';
+  const confetti = Array.from({ length: 30 }, (_, i) =>
+    `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 10) * 0.12}s;background:${['#facc15', '#ef4444', '#3b82f6', '#22c55e', '#ec4899'][i % 5]}"></i>`).join('');
+  view(`<div class="screen reveal">
+    <div class="confetti">${confetti}</div>
+    <h1 class="reveal-title">${KIND_TITLE[prize.kind]}</h1>
+    <div class="reveal-card">${prizeCardHTML(prize, { big: true })}</div>
+    ${usable ? `<button class="btn big kick" id="use">${prize.kind === 'character' ? `Play as ${esc(prize.name.split(' ').pop())}` : 'Use it now'}</button>` : ''}
+    <button class="btn ${usable ? 'ghost' : 'big kick'}" id="done">${usable ? 'Maybe later' : 'Put it in my album'}</button>
+  </div>`, 'bg-trophy');
+  sfx.star();
+  sfx.cheer();
+  on('#use', () => {
+    if (equipped(p, PRIZES, prize.kind === 'character' ? 'character' : prize.slot)?.id !== prize.id) toggleEquip(p, prize);
+    persist();
+    done();
+  });
+  on('#done', done);
+}
+
+function prizeRoom() {
+  const p = me();
+  const n = winsToNext(p, PRIZES);
+  const earnedOf = kind => PRIZES.filter(x => x.kind === kind && hasPrize(p, x.id));
+  const lockedOf = kind => PRIZES.filter(x => x.kind === kind && !hasPrize(p, x.id)).length;
+  const on_ = x => equipped(p, PRIZES, x.kind === 'character' ? 'character' : x.slot)?.id === x.id;
+  const tile = x => `<button class="ptile${on_(x) ? ' on' : ''}" data-id="${x.id}">${prizeCardHTML(x)}${on_(x) ? '<span class="ptag">ON</span>' : ''}</button>`;
+  const locked = k => Array.from({ length: k }, () => '<div class="ptile locked"><span>?</span></div>').join('');
+  const chars = earnedOf('character');
+  const noChar = !equipped(p, PRIZES, 'character');
+  view(`<div class="screen prize-room">
+    <h2>Prize Room</h2>
+    <p class="muted">${n == null ? 'You collected every prize. Legend!' : `${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} at Grade ${p.grade} or higher to your next prize.`}</p>
+    <section><h3>Players <small>Tap to play as them</small></h3>
+      <div class="pgrid">
+        <button class="ptile${noChar ? ' on' : ''}" id="me-tile"><div class="pcard"><div class="pcard-art">${starSVG(kitById(p.kit), { number: p.number })}</div>
+          <b class="pcard-name">${esc(p.name)}</b><small class="pcard-sub">That's you!</small></div>${noChar ? '<span class="ptag">ON</span>' : ''}</button>
+        ${chars.map(tile).join('')}${locked(lockedOf('character'))}
+      </div></section>
+    <section><h3>Gear <small>Tap to switch on or off</small></h3>
+      <div class="pgrid">${earnedOf('gear').map(tile).join('')}${locked(lockedOf('gear'))}</div></section>
+    <section><h3>Sticker album <small>${earnedOf('card').length} of ${PRIZES.filter(x => x.kind === 'card').length}</small></h3>
+      <div class="pgrid">${earnedOf('card').map(x => `<button class="ptile" data-card="${x.id}">${prizeCardHTML(x)}</button>`).join('')}${locked(lockedOf('card'))}</div></section>
+    <button class="btn big" id="back">Back</button>
+  </div>`, 'bg-hub');
+  on('.ptile[data-id]', (e, el) => { toggleEquip(p, PRIZES.find(x => x.id === el.dataset.id)); persist(); prizeRoom(); });
+  on('#me-tile', () => { delete p.rewards.equip.character; persist(); prizeRoom(); });
+  on('.ptile[data-card]', (e, el) => cardView(PRIZES.find(x => x.id === el.dataset.card)));
+  on('#back', hub);
+}
+
+function cardView(card) {
+  view(`<div class="screen reveal">
+    <div class="reveal-card">${prizeCardHTML(card, { big: true })}</div>
+    <button class="btn big" id="back">Back to the album</button>
+  </div>`, 'bg-hub');
+  on('#back', prizeRoom);
 }
 
 /* ================================================================ coach == */

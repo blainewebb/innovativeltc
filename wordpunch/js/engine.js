@@ -2,6 +2,8 @@
    resolving punches, tracking what a boxer gets wrong. No DOM, no storage,
    so all of it can be tested in Node. Randomness always comes in as `rng`. */
 import { POS, POS_ORDER, posForGrade, FIGHTERS, CIRCUITS, WORDS, SENTENCES, SPELLING } from './data.js';
+import { newRewards, recordWin } from './rewards.js';
+import { PRIZES } from './prizes.js';
 
 /* ----------------------------------------------------------------- random */
 export function makeRng(seed = Date.now()) {
@@ -454,6 +456,7 @@ export function newProfile({ name, grade, gloves }) {
     missed: {},        // item key -> how many more rights it needs
     misses: [],        // recent misses for the coach's corner
     fights: 0, wins: 0,
+    rewards: newRewards(),   // prizes: every 3 wins at their grade or above
   };
 }
 
@@ -482,9 +485,10 @@ export function recordAnswer(profile, q, correct) {
 /* A fight is over: move the ladder on and hand out a belt if one was won. */
 export function finishFight(profile, grade, idx, won) {
   profile.fights++;
-  const out = { belt: null, gradeChamp: false, nextUnlocked: null };
+  const out = { belt: null, gradeChamp: false, nextUnlocked: null, reward: { counted: false, prize: null } };
   if (!won) return out;
   profile.wins++;
+  out.reward = recordWin(profile, grade, PRIZES);
   const p = progressFor(profile, grade);
   if (idx + 1 > p.next) {
     p.next = Math.min(FIGHTERS.length, idx + 1);

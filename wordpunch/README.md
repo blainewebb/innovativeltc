@@ -84,6 +84,22 @@ question builders from this folder. Anything changed in `js/data.js` or the
 question part of `js/engine.js` changes both games, so run both test suites
 after editing.
 
+## Prizes
+
+Every 3 wins earns a prize, in a fixed order: a boxer card, then gear, then
+a playable boxer, then round again (24 in all). Only wins at the boxer's own
+grade or higher count, and losses never take progress away. The hub shows a
+Prize Room bar with a 3-dot meter.
+
+- **Boxer cards** (8): made-up boxers for the card album.
+- **Gear** (8): golden, flame or galaxy gloves, neon or gold ring ropes, and
+  knockout celebrations (victory dance, glove spin, flex). One per slot.
+- **Playable boxers** (8): pick one and they box for you, with their own
+  gloves and headwear.
+
+The counting rules are in `js/rewards.js` (Word Kick uses the same file) and
+the prize list is in `js/prizes.js`.
+
 ## Learning from misses
 
 Every miss is logged against the specific word or sentence. Missed items come

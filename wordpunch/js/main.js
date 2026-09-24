@@ -8,7 +8,9 @@ import {
 } from './engine.js';
 import { load, save } from './storage.js';
 import { sfx, setEnabled as setSound, speak, stopSpeaking, canSpeak } from './sfx.js';
-import { fighterSVG, faceSVG, playerSVG, beltSVG } from './art.js';
+import { fighterSVG, faceSVG, playerSVG, beltSVG, gearSVG } from './art.js';
+import { PRIZES } from './prizes.js';
+import { WINS_PER_PRIZE, winsToNext, toggleEquip, equipped, hasPrize } from './rewards.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -125,6 +127,7 @@ function hub() {
         <button class="btn small ghost" id="coach">Coach's Corner</button>
       </div>
     </header>
+    ${prizeBar(b)}
     <div class="grade-tabs" role="tablist">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => {
       const belts = (b.progress[n]?.belts || []).length;
       return `<button class="gtab${n === g ? ' on' : ''}" data-g="${n}">Gr ${n}${belts ? `<i class="pips">${'&#9679;'.repeat(belts)}</i>` : ''}</button>`;
@@ -145,6 +148,7 @@ function hub() {
   on('#go', () => intro(g, allBeaten ? FIGHTERS.length - 1 : prog.next));
   on('#coach', coach);
   on('#switch', title);
+  on('#prizes', prizeRoom);
 }
 
 /* ================================================================ intro == */
@@ -178,6 +182,7 @@ function hpClass(hp) { return hp > 50 ? 'ok' : hp > 25 ? 'mid' : 'low'; }
 
 function fight(grade, idx) {
   const b = me();
+  const look = myLook(b);
   const f = FIGHTERS[idx];
   const F = createFight(grade, idx);
   const used = new Set();
@@ -186,16 +191,16 @@ function fight(grade, idx) {
 
   view(`<div class="fight">
     <div class="hud">
-      <div class="hp hp-you"><span class="nm">${esc(b.name)}</span><div class="bar"><i></i></div><span class="downs" aria-label="knockdowns"></span></div>
+      <div class="hp hp-you"><span class="nm">${esc(look.name)}</span><div class="bar"><i></i></div><span class="downs" aria-label="knockdowns"></span></div>
       <div class="stars" aria-label="stars"></div>
       <div class="hp hp-opp"><span class="nm">${esc(f.name)}</span><div class="bar"><i></i></div><span class="downs"></span></div>
     </div>
     <div class="ring">
       <div class="crowd"></div>
-      <div class="ropes"><i></i><i></i><i></i></div>
+      <div class="ropes">${[0, 1, 2].map(i => `<i${look.ropes ? ` style="background:${i === 1 ? look.ropes.b : look.ropes.a}"` : ''}></i>`).join('')}</div>
       <div class="opp idle">${fighterSVG(f)}</div>
       <div class="fx"></div>
-      <div class="player">${playerSVG(b.gloves)}</div>
+      <div class="player">${playerSVG(look.gloves, look.look, look.gloveStyle)}</div>
       <div class="banner"></div>
       <button class="quit" id="quit" aria-label="Leave fight">&#10005;</button>
     </div>
@@ -474,6 +479,7 @@ function fight(grade, idx) {
     persist();
     if (F.result === 'win') {
       sfx.cheer();
+      celebrate(look.celebration);
       await banner('K.O.!', 'gold huge', 1400);
     } else {
       sfx.lose();
@@ -481,6 +487,18 @@ function fight(grade, idx) {
     }
     if (!live()) return;
     result(grade, idx, F, outcome);
+  }
+
+  /* After a knockout: the celebration from the Prize Room, if there is one. */
+  function celebrate(move) {
+    if (!move) return;
+    const base = 'translateX(-50%)';
+    const frames = {
+      dance: [{ transform: base }, { transform: `${base} translate(-12%, -6%) rotate(-6deg)` }, { transform: `${base} translate(12%, -6%) rotate(6deg)` }, { transform: `${base} translate(-8%, -4%) rotate(-4deg)` }, { transform: base }],
+      spin: [{ transform: base }, { transform: `${base} translateY(-10%) rotate(180deg) scale(.9)` }, { transform: `${base} rotate(360deg)` }],
+      flex: [{ transform: base }, { transform: `${base} translateY(-14%) scale(1.08)` }, { transform: `${base} translateY(-10%) scale(1.04)` }, { transform: `${base} translateY(-14%) scale(1.08)` }, { transform: base }],
+    }[move];
+    if (frames) playerEl.animate(frames, { duration: Math.max(1, 1300 * SPEED), easing: 'ease-in-out' });
   }
 
   if (TEST) window.__wp.fight = F;
@@ -508,7 +526,9 @@ function result(grade, idx, F, outcome) {
     ${F.misses.length ? `<details class="review" ${won ? '' : 'open'}><summary>Words to practice (${F.misses.length})</summary>
       <ul>${F.misses.map(m => `<li><b>${esc(m.answer)}</b> <span>${esc(m.explain)}</span></li>`).join('')}</ul></details>` : ''}
     ${next ? `<p class="unlock">Next up: <b>${esc(next.name)}</b></p>` : ''}
+    ${won ? prizeNote(me(), outcome.reward) : ''}
     <div class="result-btns">
+      ${outcome.reward?.prize ? '<button class="btn big prize" id="prize">&#9733; Open your prize!</button>' : ''}
       ${outcome.belt ? `<button class="btn big punch" id="belt">Claim your belt!</button>` : ''}
       ${!outcome.belt && won && next ? `<button class="btn big punch" id="nextf">Fight ${esc(next.name)}</button>` : ''}
       ${!won ? `<button class="btn big punch" id="again">Rematch!</button>` : ''}
@@ -516,6 +536,8 @@ function result(grade, idx, F, outcome) {
     </div>
   </div>`, won ? 'bg-win' : 'bg-lose');
   if (won) sfx.win();
+  on('#prize', () => prizeReveal(outcome.reward.prize,
+    () => result(grade, idx, F, { ...outcome, reward: { ...outcome.reward, prize: null, opened: true } })));
   on('#belt', () => beltScreen(grade, outcome.belt, outcome.gradeChamp));
   on('#nextf', () => intro(grade, outcome.nextUnlocked));
   on('#again', () => fight(grade, idx));
@@ -546,6 +568,121 @@ function beltScreen(grade, circuit, gradeChamp) {
     hub();
   });
   on('#hub', hub);
+}
+
+/* =============================================================== prizes == */
+/* How the player shows up in a fight: their own gloves, or the boxer they
+   picked, plus any gear switched on. */
+function myLook(b) {
+  const ch = equipped(b, PRIZES, 'character');
+  const gl = equipped(b, PRIZES, 'gloves');
+  return {
+    name: ch ? ch.name : b.name,
+    gloves: ch ? ch.gloves : b.gloves,
+    look: ch ? ch.look : {},
+    gloveStyle: gl ? { a: gl.a, b: gl.b } : null,
+    ropes: equipped(b, PRIZES, 'ropes'),
+    celebration: equipped(b, PRIZES, 'celebration')?.move,
+  };
+}
+
+const meterHTML = n => `<span class="meter">${Array.from({ length: WINS_PER_PRIZE }, (_, i) =>
+  `<i class="${i < WINS_PER_PRIZE - n ? 'on' : ''}"></i>`).join('')}</span>`;
+
+function prizeBar(b) {
+  const n = winsToNext(b, PRIZES);
+  return `<button class="prize-bar" id="prizes">
+    <span class="pb-title">&#9733; Prize Room <small>${b.rewards.earned.length} of ${PRIZES.length}</small></span>
+    ${n == null ? '<span class="pb-meta">You got them all!</span>'
+      : `<span class="pb-meta">${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} to your next prize</span>`}
+  </button>`;
+}
+
+function prizeNote(b, reward) {
+  if (!reward || reward.prize || reward.opened) return '';
+  if (!reward.counted) return `<p class="prize-note muted">Wins at Grade ${b.grade} or higher count toward prizes.</p>`;
+  const n = winsToNext(b, PRIZES);
+  return n == null ? '' : `<p class="prize-note">${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} to your next prize!</p>`;
+}
+
+const KIND_TITLE = { card: 'NEW BOXER CARD!', gear: 'NEW GEAR!', character: 'NEW BOXER!' };
+const SLOT_NAME = { gloves: 'Gloves', ropes: 'Ring ropes', celebration: 'Knockout celebration' };
+
+function prizeArt(prize) {
+  if (prize.kind === 'gear') return gearSVG(prize);
+  if (prize.kind === 'card') return fighterSVG(prize);
+  return playerSVG(prize.gloves, prize.look);
+}
+
+function prizeCardHTML(prize, { big = false } = {}) {
+  const sub = prize.kind === 'card' ? `${esc(prize.from)} &middot; ${esc(prize.record)}`
+    : prize.kind === 'gear' ? SLOT_NAME[prize.slot] : 'Playable boxer';
+  return `<div class="pcard ${prize.kind}${big ? ' big' : ''}">
+    <div class="pcard-art">${prizeArt(prize)}</div>
+    <b class="pcard-name">${esc(prize.name)}</b>
+    <small class="pcard-sub">${sub}</small>
+    ${big ? `<p class="pcard-text">${esc(prize.fact || prize.desc)}</p>` : ''}
+  </div>`;
+}
+
+function prizeReveal(prize, done) {
+  const b = me();
+  const usable = prize.kind !== 'card';
+  const confetti = Array.from({ length: 30 }, (_, i) =>
+    `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 10) * 0.12}s;background:${['#facc15', '#ef4444', '#3b82f6', '#22c55e', '#ec4899'][i % 5]}"></i>`).join('');
+  view(`<div class="screen reveal">
+    <div class="confetti">${confetti}</div>
+    <h1 class="reveal-title">${KIND_TITLE[prize.kind]}</h1>
+    <div class="reveal-card">${prizeCardHTML(prize, { big: true })}</div>
+    ${usable ? `<button class="btn big punch" id="use">${prize.kind === 'character' ? `Box as ${esc(prize.name)}` : 'Use it now'}</button>` : ''}
+    <button class="btn ${usable ? 'ghost' : 'big punch'}" id="done">${usable ? 'Maybe later' : 'Put it in my album'}</button>
+  </div>`, 'bg-belt');
+  sfx.star();
+  sfx.cheer();
+  on('#use', () => {
+    if (equipped(b, PRIZES, prize.kind === 'character' ? 'character' : prize.slot)?.id !== prize.id) toggleEquip(b, prize);
+    persist();
+    done();
+  });
+  on('#done', done);
+}
+
+function prizeRoom() {
+  const b = me();
+  const n = winsToNext(b, PRIZES);
+  const earnedOf = kind => PRIZES.filter(x => x.kind === kind && hasPrize(b, x.id));
+  const lockedOf = kind => PRIZES.filter(x => x.kind === kind && !hasPrize(b, x.id)).length;
+  const isOn = x => equipped(b, PRIZES, x.kind === 'character' ? 'character' : x.slot)?.id === x.id;
+  const tile = x => `<button class="ptile${isOn(x) ? ' on' : ''}" data-id="${x.id}">${prizeCardHTML(x)}${isOn(x) ? '<span class="ptag">ON</span>' : ''}</button>`;
+  const locked = k => Array.from({ length: k }, () => '<div class="ptile locked"><span>?</span></div>').join('');
+  const noChar = !equipped(b, PRIZES, 'character');
+  view(`<div class="screen prize-room">
+    <h2>Prize Room</h2>
+    <p class="muted">${n == null ? 'You collected every prize. Legend!' : `${meterHTML(n)} ${n} more win${n === 1 ? '' : 's'} at Grade ${b.grade} or higher to your next prize.`}</p>
+    <section><h3>Boxers <small>Tap to box as them</small></h3>
+      <div class="pgrid">
+        <button class="ptile${noChar ? ' on' : ''}" id="me-tile"><div class="pcard"><div class="pcard-art">${playerSVG(b.gloves)}</div>
+          <b class="pcard-name">${esc(b.name)}</b><small class="pcard-sub">That's you!</small></div>${noChar ? '<span class="ptag">ON</span>' : ''}</button>
+        ${earnedOf('character').map(tile).join('')}${locked(lockedOf('character'))}
+      </div></section>
+    <section><h3>Gear <small>Tap to switch on or off</small></h3>
+      <div class="pgrid">${earnedOf('gear').map(tile).join('')}${locked(lockedOf('gear'))}</div></section>
+    <section><h3>Card album <small>${earnedOf('card').length} of ${PRIZES.filter(x => x.kind === 'card').length}</small></h3>
+      <div class="pgrid">${earnedOf('card').map(x => `<button class="ptile" data-card="${x.id}">${prizeCardHTML(x)}</button>`).join('')}${locked(lockedOf('card'))}</div></section>
+    <button class="btn big" id="back">Back</button>
+  </div>`, 'bg-hub');
+  on('.ptile[data-id]', (e, el) => { toggleEquip(b, PRIZES.find(x => x.id === el.dataset.id)); persist(); prizeRoom(); });
+  on('#me-tile', () => { delete b.rewards.equip.character; persist(); prizeRoom(); });
+  on('.ptile[data-card]', (e, el) => cardView(PRIZES.find(x => x.id === el.dataset.card)));
+  on('#back', hub);
+}
+
+function cardView(card) {
+  view(`<div class="screen reveal">
+    <div class="reveal-card">${prizeCardHTML(card, { big: true })}</div>
+    <button class="btn big" id="back">Back to the album</button>
+  </div>`, 'bg-hub');
+  on('#back', prizeRoom);
 }
 
 /* ================================================================ coach == */

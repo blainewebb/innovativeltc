@@ -26,6 +26,23 @@ loaded. Several kids can share one device with separate players.
   given at the very end of the clock (last 15% to 30%, shown as a striped zone
   on the timer). With the clock turned off this never happens.
 
+## Prizes
+
+Every 3 wins earns a prize, in a fixed order: a star player card, then gear,
+then a playable character, then round again (24 in all). Only wins at the
+player's own grade or higher count, so replaying an easy grade can't farm
+prizes. Losses never take progress away. The main screen shows a Prize Room
+bar with a 3-dot meter.
+
+- **Star cards** (8): made-up players for the sticker album.
+- **Gear** (8): golden or neon boots, fire or gold balls, lava keeper gloves,
+  and goal celebrations (knee slide, backflip, airplane). One per slot.
+- **Characters** (8): made-up star players. Pick one in the Prize Room and
+  they take your kicks and play in goal, in their own colors.
+
+The counting rules live in `../wordpunch/js/rewards.js`, shared with Word
+Punch. The prize list is `js/prizes.js`. Every player is made up.
+
 ## One grade easier than Word Punch
 
 | player grade | questions from | notes |

@@ -3,7 +3,7 @@
    up on the next load, and the cache only answers when there is no network.
    (Cache-first for scripts once left another app in this repo running
    months-old code behind a fresh page.) Bump CACHE with VERSION in data.js. */
-const CACHE = 'wordkick-v2';
+const CACHE = 'wordkick-v3';
 const SHELL = [
   './',
   './index.html',
@@ -18,10 +18,12 @@ const SHELL = [
   './js/storage.js',
   './js/sfx.js',
   './js/art.js',
+  './js/prizes.js',
   // Word Kick borrows Word Punch's questions and read-aloud.
   '../wordpunch/js/engine.js',
   '../wordpunch/js/data.js',
   '../wordpunch/js/sfx.js',
+  '../wordpunch/js/rewards.js',
 ];
 
 self.addEventListener('install', e => {

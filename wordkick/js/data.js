@@ -3,7 +3,7 @@
    there is one copy to fix. Pure data. No DOM, no storage. */
 
 /* Shown on the title screen. Bump it alongside CACHE in sw.js. */
-export const VERSION = '2026-09-24.2';
+export const VERSION = '2026-09-24.3';
 
 export const GRADES = [1, 2, 3, 4, 5, 6, 7, 8];
 

@@ -95,6 +95,11 @@ try {
   res = await playMatch(page, 1);
   ok('Adjective Athletic beaten', res === 'win');
   ok('trophy is offered', await page.isVisible('#cup'));
+  ok('third win offers a prize', await page.isVisible('#prize'));
+  await page.click('#prize');
+  ok('prize reveal shows a star card', (await page.textContent('.reveal-title')).includes('CARD'));
+  await page.click('#done');
+  ok('back on the result after the prize', await page.isVisible('#cup') && !(await page.isVisible('#prize')));
   await page.click('#cup');
   ok('trophy screen shows the Local Cup', (await page.textContent('.trophy-screen h2')).includes('Local Cup'));
   await page.click('#hub');
@@ -105,6 +110,32 @@ try {
   await page.waitForSelector('.tcard');
   ok('reload goes straight to the hub', await page.isVisible('.tcard.next[data-i="3"]'));
   ok('trophy survives a reload', (await page.$$('.trophy-slot.won')).length === 1);
+  ok('hub shows prize progress', (await page.textContent('.prize-bar')).includes('1 of 24'));
+
+  // Give this player some prizes and check they show up in a match.
+  await page.evaluate(() => {
+    const p = window.__wk.state().players[0];
+    p.rewards.wins = 9;
+    p.rewards.earned = ['c-rosa', 'g-gold-boots', 'p-lu'];
+    localStorage.setItem('wordkick-v1', JSON.stringify({ players: window.__wk.state().players, current: p.id }));
+  });
+  await page.reload();
+  await page.click('#prizes');
+  ok('prize room lists the character', (await page.$$('.ptile[data-id="p-lu"]')).length === 1);
+  await page.click('.ptile[data-id="p-lu"]');
+  await page.click('.ptile[data-id="g-gold-boots"]');
+  ok('picked character and gear are switched on', (await page.$$('.ptile.on')).length === 2);
+  const eq = await page.evaluate(() => window.__wk.state().players[0].rewards.equip);
+  ok('choices are saved', eq.character === 'p-lu' && eq.boots === 'g-gold-boots');
+  await page.click('#back');
+  await page.click('#go');
+  await page.click('#play');
+  await page.waitForSelector('.choice:not(:disabled), .tok:not(:disabled)');
+  ok('the character plays in the match', (await page.textContent('.sb-you .nm')) === 'Lu');
+  ok('gold boots show on the striker', (await page.innerHTML('.shooter')).includes('#facc15'));
+  page.once('dialog', d => d.accept());
+  await page.click('#quit');
+  await page.waitForSelector('.tcard');
 
   // Stars: three right in a row, then use it.
   await page.click('#go');

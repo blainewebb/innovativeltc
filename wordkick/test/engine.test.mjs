@@ -8,6 +8,7 @@ import {
 } from '../js/engine.js';
 import { makeRng, poolFor } from '../../wordpunch/js/engine.js';
 import { hydrate, load, save, KEY } from '../js/storage.js';
+import { PRIZES } from '../js/prizes.js';
 
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
@@ -259,6 +260,29 @@ section('storage');
   const bad = { getItem: () => '{nope', setItem: () => {} };
   const r = load(bad);
   ok('unreadable save is left alone and read-only', r.readOnly && !save(r, bad));
+}
+
+/* -------------------------------------------------------------- prizes -- */
+section('prizes');
+{
+  ok('24 prizes', PRIZES.length === 24);
+  ok('prize ids are unique', new Set(PRIZES.map(p => p.id)).size === PRIZES.length);
+  ok('prizes go card, gear, character', PRIZES.every((p, i) => p.kind === ['card', 'gear', 'character'][i % 3]));
+  ok('cards and characters wear real kits', PRIZES.filter(p => p.kind !== 'gear').every(p => KITS.some(k => k.id === p.kit)));
+  ok('gear slots are known', PRIZES.filter(p => p.kind === 'gear').every(g => ['boots', 'ball', 'gloves', 'celebration'].includes(g.slot)));
+  ok('celebrations have a move', PRIZES.filter(p => p.slot === 'celebration').every(g => ['slide', 'flip', 'airplane'].includes(g.move)));
+  ok('every prize has words to show', PRIZES.every(p => p.name && (p.fact || p.desc)));
+
+  const p = newProfile({ name: 'K', grade: 3 });
+  finishMatch(p, 2, 0, true);
+  ok('a win below their grade does not count', p.rewards.wins === 0);
+  finishMatch(p, 3, 0, true);
+  finishMatch(p, 3, 1, false);
+  finishMatch(p, 4, 0, true);
+  const out = finishMatch(p, 3, 1, true);
+  ok('third counted win earns a star card', out.reward.prize?.kind === 'card' && p.rewards.earned.length === 1);
+  const old = hydrate({ players: [{ id: 'x', name: 'Old', grade: 3 }] });
+  ok('players saved before prizes existed load fine', old.players[0].rewards.wins === 0);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
