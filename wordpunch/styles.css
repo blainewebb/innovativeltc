@@ -71,7 +71,10 @@ button:disabled { cursor: default; }
 
 /* ---------------------------------------------------------------- hub -- */
 .hub-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.me { display: flex; align-items: center; gap: 8px; background: none; border: 0; font-weight: 800; font-size: 1.15rem; padding: 0; }
+.hub-top { flex-wrap: wrap; }
+.me { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.15rem; min-width: 0; }
+.hub-actions { display: flex; gap: 8px; margin-left: auto; }
+.btn.switch { background: var(--blue); }
 .grade-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .grade-tabs::-webkit-scrollbar { display: none; }
 .gtab { flex: 0 0 auto; border: 2px solid #34306a; background: var(--panel); border-radius: 999px; padding: .45rem .8rem; font-weight: 700; font-size: .9rem; position: relative; }

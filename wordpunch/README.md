@@ -7,6 +7,9 @@ across three circuits to win the World Championship Belt for your grade.
 Static site, no build step, no accounts, no network calls. Works offline once
 loaded. Several kids can share one device with separate boxers.
 
+To change players, tap **Switch boxer** at the top of the ladder (or at the
+bottom of Coach's Corner). The list that opens also has **Add another boxer**.
+
 ## How a fight works
 
 - Each turn the opponent winds up a punch and a question appears with a clock.

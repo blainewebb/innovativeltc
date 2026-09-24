@@ -137,6 +137,7 @@ try {
   // A second boxer on the same device has their own progress.
   await page.evaluate(() => { location.search = '?test&seed=9'; });
   await page.waitForSelector('.fcard');
+  ok('hub has a labelled switch button', (await page.textContent('#switch')).includes('Switch boxer'));
   await page.click('#switch');
   await page.click('#add');
   await page.fill('#name', 'Sibling');
@@ -144,6 +145,13 @@ try {
   ok('second boxer starts fresh', await page.isVisible('.fcard.next[data-i="0"]'));
   const boxers = await page.evaluate(() => window.__wp.state().boxers.length);
   ok('both boxers are saved', boxers === 2);
+  await page.click('#switch');
+  ok('switch lists both boxers', (await page.$$('.boxer-btn')).length === 2);
+  await page.click('.boxer-btn:has-text("Tester")');
+  ok('switching back loads the first boxer', (await page.textContent('.me')).includes('Tester') && await page.isVisible('.belt-slot.won'));
+  await page.click('#coach');
+  await page.click('#switch2');
+  ok('coach\'s corner can switch boxers too', (await page.$$('.boxer-btn')).length === 2);
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 
