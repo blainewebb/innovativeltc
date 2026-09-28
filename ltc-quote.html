@@ -103,7 +103,12 @@
   .pickrow{display:flex;gap:6px}
   .pickrow input{flex:1;min-width:0}
   .pickrow .picksel{flex:0 0 96px;width:96px;padding:11px 6px;color:#475569;font-weight:600}
-  .pickrow input.dobpick{flex:0 0 150px;width:150px;padding:11px 8px;color:#475569}
+  .pickrow input.dobpick{flex:0 0 118px;width:118px;padding:11px 8px;color:#475569;font-variant-numeric:tabular-nums}
+  .pickrow input.dobpick.bad{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.12)}
+  .pickrow .dobcalbtn{flex:0 0 38px;width:38px;border:1px solid var(--border);background:#fff;border-radius:9px;cursor:pointer;font-size:1rem;padding:0}
+  .pickrow .dobcalbtn:hover{border-color:var(--primary)}
+  .pickrow input.dobcal{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
+  .pickrow{position:relative}
   input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
   .riders{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}
   .riders label{display:flex;align-items:center;gap:7px;font-weight:600;font-size:.85rem;color:#334155}
@@ -312,10 +317,19 @@
   <div class="card" id="qccard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">⚡ Quick Commands</h2>
-      <p class="hint" style="margin:0">Pick a saved plan and run it for this client. Each runs on the carrier it was saved with — NGL, CareScout, or Manhattan Life. Choose <b>Joint (couple)</b> to run a couple plan for two applicants. Build more with “＋ Save as quick command” under any comparison.</p>
+      <p class="hint" style="margin:0">Pick a saved plan and run it for this client — on the carrier it was saved with, or pick another carrier and the same benefits are matched to that carrier’s closest design. Set a <b>health rating</b> for carriers that rate by health. Choose <b>Joint (couple)</b> to run a couple plan for two applicants. Build more with “＋ Save as quick command” under any comparison.</p>
     </div>
     <div class="grid">
       <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
+      <div class="field"><label>Carrier</label><select id="qc_carrier" onchange="qcSyncHealth()">
+        <option value="saved">As saved</option>
+        <option value="ngl">NGL — HonestLTC</option>
+        <option value="carescout">CareScout</option>
+        <option value="omniflex">Manhattan Life — OmniFlex™ STC</option>
+        <option value="moo">Mutual of Omaha — MutualCare Secure</option>
+        <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
+      </select></div>
+      <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
       <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
         <option value="single-female">Single female</option>
         <option value="single-male">Single male</option>
@@ -3344,7 +3358,8 @@ function isCS(o){ return !!o && o.carrier==='carescout'; }
 function isOmni(o){ return !!o && o.carrier==='omniflex'; }
 function isMoo(o){ return !!o && o.carrier==='moo'; }
 function isMooc(o){ return !!o && o.carrier==='mooc'; }
-function oneQuote(o){ return isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : isMoo(o) ? MOO.quote(o) : isMooc(o) ? MOOC.quote(o) : E.quote(o); }
+// CareScout's rate file runs to 70, but the tool sells CareScout at issue ages 40-65 (form, carrier tools) — hold comparisons to the same rule.
+function oneQuote(o){ if(isCS(o) && +o.age>65) throw new Error('CareScout issues ages 40–65.'); return isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : isMoo(o) ? MOO.quote(o) : isMooc(o) ? MOOC.quote(o) : E.quote(o); }
 // A couple/household item (__couple) quotes each spouse and returns the summed premium.
 function anyQuote(o){ if(o && o.__couple){ let mp=0, ap=0; const mode=(o.parts[0]||{}).mode||'monthly';
     for(const part of o.parts){ const q=oneQuote(part); mp+=(q.modalPayment!=null?q.modalPayment:(q.singlePremium||0)); ap+=(q.annualPremium!=null?q.annualPremium:(q.singlePremium||0)); }
@@ -4604,12 +4619,13 @@ function coupleHousehold(op, couple){
   const mkPart=(a,g)=>{ const it=Object.assign({}, op, {age:+a, gender:g});
     if(isOmni(it)) it.spousal=true;             // both applying → Omniflex spousal −10%
     else if(isCS(it)) it.marital='Married';     // CareScout both-applying class
+    else if(isMoo(it)||isMooc(it)){ it.partner=true; it.spousal=false; }   // MoO both applying → partner −15%
     return it; };
   return coupleCombine([mkPart(couple.age1,couple.g1), mkPart(couple.age2,couple.g2)]);
 }
 function showCompare(items, opts){
   opts=opts||{};
-  const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){} return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
+  const rows=items.map(o=>{ let prem='—'; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){ prem='<span style="color:#b45309;font-weight:600;font-size:.78rem;white-space:normal">'+esc(e.message)+'</span>'; } return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋</button></td></tr>'; }).join('');
   const addAll = items.length>1 ? '<button class="addbtn" style="margin:0 0 12px" onclick=\'addAllToTray('+JSON.stringify(items)+')\'>＋ Add all '+items.length+' to comparison</button>' : '';
   show('<div class="config-line">'+(opts.title||'Comparison')+'</div>'+addAll+'<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table><div class="disc">'+DISC+'</div>');
 }
@@ -4838,14 +4854,14 @@ function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of ite
 // Run a saved quick command for an explicit applicant (used by the Quick Commands tab)
 // couple: {age1,g1,age2,g2}. Joint options re-rate to the new couple (NGL joint is
 // rated on the older insured); individual options are quoted for BOTH spouses.
-function execPattern(p, age, gender, couple){
-  age=+age;
+function execPattern(p, age, gender, couple, xf){
+  age=+age; const XF=xf||(o=>o);
   const older = couple ? (((+couple.age1)>=(+couple.age2)) ? {age:+couple.age1,g:couple.g1} : {age:+couple.age2,g:couple.g2}) : null;
   const who = couple ? (couple.age1+' '+gL(couple.g1)+' + '+couple.age2+' '+gL(couple.g2)) : (age+' '+gL(gender));
   const title = 'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+who;
   if(p.options && p.options.length){
     let items=[];
-    for(const op of p.options){
+    for(const op0 of p.options){ const op=XF(op0);
       if(op.joint){ items.push(couple ? withCoupleAges(Object.assign({},op,{age:older.age,gender:older.g}), couple.age1,couple.g1,couple.age2,couple.g2) : Object.assign({},op)); }
       else if(couple){ items.push(coupleHousehold(op, couple)); }
       else { items.push(Object.assign({},op,{age,gender})); }
@@ -4854,23 +4870,79 @@ function execPattern(p, age, gender, couple){
     showCompare(items, {title});
     return;
   }
-  const list=(p.benefits||[]).map(SNAP).slice(0,6);
+  const list=(p.benefits||[]).map(Number).filter(n=>n>0).slice(0,6);
   if(!list.length) return showErr('This quick command has no default benefit amounts — edit it to add some (e.g. 7000, 5000, 4000).');
-  const mk=(mb,a,g)=>({carrier:'ngl', age:+a, gender:g, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
-  let items = couple ? list.map(mb=>coupleHousehold(mk(mb), couple)) : list.map(mb=>mk(mb,age,gender));
+  const mk=(mb,a,g)=>({carrier:'ngl', age:+a, gender:g, monthlyBenefit:SNAP(mb), _rawMb:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
+  let items = couple ? list.map(mb=>coupleHousehold(XF(mk(mb)), couple)) : list.map(mb=>XF(mk(mb,age,gender)));
   if(items.length>6) items=items.slice(0,6);
   showCompare(items, {title});
 }
 function runQuickCommand(){ try{
-  const v=$('qc_pick').value;
-  if(v==='__standard') return runStandard();          // runStandard() already handles the joint case
-  const p=LS.patterns()[+v]; if(!p) return runStandard();
+  const v=$('qc_pick').value, target=($('qc_carrier')||{}).value||'saved', rating=($('qc_health')||{}).value||'saved';
   const joint = $('t_type').value==='joint';
   const couple = joint ? {age1:+$('t_age').value, g1:$('t_g1').value, age2:+$('t_age2').value, g2:$('t_g2').value} : null;
   const gender = $('t_type').value.indexOf('female')>=0 ? 'female' : 'male';
-  execPattern(p, +$('t_age').value, gender, couple);
+  const state = $('t_state').value||null;
+  const xf = op => qcApplyHealth(qcConvert(op, target, state), rating);
+  let p = (v==='__standard') ? null : LS.patterns()[+v];
+  if(!p){   // My Standard ladder: NGL as-is keeps its dedicated view; any other carrier/rating goes through the converter
+    if(target==='saved'||target==='ngl') return runStandard();          // runStandard() already handles the joint case
+    const married=$('t_type').value.indexOf('married')===0;
+    p={trigger:'Standard', name:'3-option ladder', options:E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', monthlyBenefit:op.monthly_benefit, benefitPeriod:op.benefit_period, elimination:String(op.elimination||'90'), inflation:op.inflation||null, pay:'level', mode:'monthly', state:state, riderSharedAdditional:false, maritalDiscount:married, totalBenefitPeriod:op.benefit_period}))};
+  }
+  execPattern(p, +$('t_age').value, gender, couple, xf);
 }catch(e){ showErr(e.message); } }
+/* ---- quick commands on any carrier: match each saved option's benefits to the chosen carrier's
+   closest design (monthly $ <-> daily $, years <-> pool/days, inflation % <-> codes), then apply
+   the chosen health rating where the carrier rates by health. Same closest-match rules as the
+   carrier carry-over. ---- */
+function qcCarrierOf(o){ return isOmni(o)?'omniflex':isCS(o)?'carescout':isMoo(o)?'moo':isMooc(o)?'mooc':'ngl'; }
+function qcCanon(op){
+  if(isOmni(op)) return {mb:(+op.facilityDaily||100)*30, years:(+op.facilityBP||360)/360, pct:op.inflation?5:0, term:op.inflation?'L':'none', spousal:!!op.spousal};
+  if(isCS(op)){ const d=+op.dailyBenefit||100, pc=(!op.inflation||op.inflation==='none')?0:parseFloat(op.inflation)||0;
+    return {mb:d*30, years:(+op.coverageMax||d*365.25*3)/d/365.25, pct:pc, term:pc>0?'L':'none', spousal:op.marital==='Married1buy'}; }
+  if(isMoo(op)){ const c=mooCodeToCanon(MOO.inflCode(op.inflation)); return {mb:+op.monthlyBenefit||3000, years:+op.years||3, pct:c.pct, term:c.term, spousal:!!op.spousal}; }
+  if(isMooc(op)){ const t=op.inflTerm||'none', pc=(t==='none')?0:(+op.inflPct||0); return {mb:+op.monthlyBenefit||3000, years:+op.years||3, pct:pc, term:pc>0?moocTermToCanon(t):'none', spousal:!!op.spousal}; }
+  const bp=parseInt(op.benefitPeriod||op.totalBenefitPeriod||'36')||36, inf=+op.inflation||0;
+  return {mb:+(op._rawMb||op.monthlyBenefit)||4500, years:bp/12, pct:inf*100, term:inf>0?'L':'none', spousal:!!op.maritalDiscount};
+}
+function qcConvert(op, target, state){
+  if(!target||target==='saved') return op;
+  if(qcCarrierOf(op)===target) return state ? Object.assign({}, op, {state}) : op;
+  const c=qcCanon(op), age=op.age, gender=op.gender, st=String(state||op.state||'').toUpperCase()||null, mode='monthly';
+  if(target==='ngl'){ const bp=String(nearestVal(c.years*12,[24,36,48,60,72])), inf=nearestVal(c.pct/100,[0,0.01,0.02,0.03,0.04,0.05]);
+    return {carrier:'ngl', age, gender, monthlyBenefit:SNAP(c.mb), benefitPeriod:bp, elimination:'90', inflation:inf>0?inf:null, pay:'level', mode, state:st, riderSharedAdditional:false, maritalDiscount:c.spousal, totalBenefitPeriod:bp}; }
+  if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
+  if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
+    return {carrier:'mooc', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:mb, years:yrs, policyLimit:mb*12*yrs, elimination:90, inflTerm:c.pct>0?canonToMoocTerm(c.term):'none', inflPct:c.pct>0?nearestVal(c.pct,MOOC_PCTS):0, mode, alfReduction:100, hhcReduction:100, proHHC:false, hhcWaiver:false, nfsbp:false, rop:'none'}; }
+  if(target==='carescout'){ const d=nearestVal(c.mb/30, csDailies(st||''));
+    return {carrier:'carescout', age, gender, uwClass:'Standard', marital:c.spousal?'Married1buy':'Single', dailyBenefit:d, coverageMax:nearestVal(d*c.years*365.25, csPoolsFor(d, st||'')), inflation:c.pct>0?String(nearestVal(c.pct,[1,3,5])):'none', deductible:90, zeroDayHc:false, mode, state:st}; }
+  if(target==='omniflex'){ const S=OMNI_RATES.rates[st]||{}, fd=Math.min(400,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360, omniBPs(st));
+    return {carrier:'omniflex', state:st, age, gender, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, homeCare:true, hcDaily:Math.min(300,fd), hcBP:bp, hcEP:0, rxMax:0, inflation:c.pct>0&&!!S.facility_infl, smoker:false, spousal:c.spousal, hospital:false, hospitalDaily:0, hospitalBP:0}; }
+  return op;
+}
+// Health rating choices follow the carrier; "As saved" offers a combined list mapped per carrier.
+const QC_HEALTH={
+  saved:[['saved','As saved (each carrier’s default)'],['Preferred','Preferred'],['Select','Select (MoO) · Standard (CareScout)'],['Class 1','Class 1 (MoO; CareScout → Standard)'],['Class 2','Class 2 (MoO; CareScout → Standard)']],
+  moo:[['Select','Select'],['Preferred','Preferred'],['Class 1','Class 1'],['Class 2','Class 2']],
+  mooc:[['Select','Select'],['Preferred','Preferred'],['Class 1','Class 1'],['Class 2','Class 2']],
+  carescout:[['Standard','Standard'],['Preferred','Preferred']],
+  ngl:[['saved','Not rated by health class']],
+  omniflex:[['saved','Not rated by health class (unisex rates)']]
+};
+function qcSyncHealth(){ const c=($('qc_carrier')||{}).value||'saved', sel=$('qc_health'); if(!sel) return; const cur=sel.value, list=QC_HEALTH[c]||QC_HEALTH.saved;
+  sel.innerHTML=list.map(o=>'<option value="'+o[0]+'">'+o[1]+'</option>').join('');
+  const want = (c==='carescout') ? (cur==='Preferred'?'Preferred':'Standard') : (c==='moo'||c==='mooc') ? (cur==='Standard'||cur==='saved'||!cur?'Select':cur) : cur;
+  sel.value = list.some(o=>o[0]===want) ? want : list[0][0];
+  sel.disabled = (c==='ngl'||c==='omniflex'); }
+function qcApplyHealth(op, rating){
+  if(!rating||rating==='saved'||!op) return op;
+  if(isMoo(op)||isMooc(op)) return Object.assign({}, op, {uwClass: rating==='Standard'?'Select':rating});
+  if(isCS(op)) return Object.assign({}, op, {uwClass: rating==='Preferred'?'Preferred':'Standard'});
+  return op;   // NGL and OmniFlex don't rate by health class
+}
 function fillQuickPicker(){
+  if($('qc_health') && !$('qc_health').options.length) qcSyncHealth();
   const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
   const ps=LS.patterns();
   sel.innerHTML='<option value="__standard">My Standard — 3-option ladder</option>'+ps.map((p,i)=>'<option value="'+i+'">'+esc(p.trigger)+(p.name?' · '+esc(p.name):'')+'</option>').join('');
@@ -4961,20 +5033,62 @@ function renderTray(){
 
 /* ---------- saved clients ---------- */
 let EDIT_CLIENT=-1, PENDING_ITEMS=null, CLIENT_SORT='az';
-function ageFromDob(dob){ if(!dob) return null; const d=new Date(dob+'T00:00:00'); if(isNaN(d)) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
-// Birthday → age: enter either an age OR pick a birthday, and the birthday fills in the age.
+// Birthdays are typed as MM/DD/YYYY (saved clients store YYYY-MM-DD); both parse here.
+// A 2-digit year resolves to the 1900s unless that would make the person older than 110.
+function parseDob(s){ s=String(s||'').trim(); if(!s) return null; let y,m,d, mm;
+  if((mm=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){ y=+mm[1]; m=+mm[2]; d=+mm[3]; }
+  else if((mm=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/))){ m=+mm[1]; d=+mm[2]; y=+mm[3];
+    if(mm[3].length===2){ const now=new Date().getFullYear(); y=1900+y; if(now-y>110) y+=100; } }
+  else return null;
+  const dt=new Date(y,m-1,d); if(isNaN(dt)||dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d) return null;
+  if(dt>new Date()) return null; return dt; }
+function ageFromDob(dob){ const d=parseDob(dob); if(!d) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
+function fmtDob(dt){ const p=n=>String(n).padStart(2,'0'); return p(dt.getMonth()+1)+'/'+p(dt.getDate())+'/'+dt.getFullYear(); }
+// Birthday → age: enter either an age OR type a birthday, and the birthday fills in the age.
 const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2'];
 function dobToAge(dobEl, ageId){ const a=ageFromDob(dobEl.value); if(a==null) return; const t=$(ageId); if(!t) return; t.value=a; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+// Type-as-you-go mask: digits only become MM/DD/YYYY ("5101962" or "05101962" -> 05/10/1962);
+// typed slashes are respected ("5/10/62"). A month or day that can't start with the typed digit
+// gets its leading zero automatically (e.g. typing 5 gives "05/").
+function dobMask(el){
+  const segs=el.value.replace(/[^\d\/]/g,'').split('/'), max=[2,2,4], out=['','',''];
+  let f=0;
+  for(let si=0; si<segs.length && f<3; si++){
+    for(const ch of segs[si]){
+      if(out[f].length>=max[f]){ f++; if(f>2) break; }                   // field full -> overflow into the next
+      if(!out[f].length && ((f===0&&ch>'1')||(f===1&&ch>'3'))) out[f]='0'+ch;   // 5 -> 05 (month), 7 -> 07 (day)
+      else out[f]+=ch;
+    }
+    if(si<segs.length-1 && f<2 && out[f].length){ if(out[f].length===1) out[f]='0'+out[f]; f++; }  // a typed "/" ends the field
+  }
+  let r=out[0]; if(out[0] && (out[1] || f>=1)) r+='/'+out[1]; if(out[1] && (out[2] || f>=2)) r+='/'+out[2];
+  el.value=r;
+}
+function dobCommit(el, ageId){ const dt=parseDob(el.value); el.classList.toggle('bad', !!el.value && !dt); if(!dt) return; el.value=fmtDob(dt); dobToAge(el, ageId); }
 function attachBirthdayPickers(){
-  const today=new Date().toISOString().slice(0,10);
+  const todayISO=new Date().toISOString().slice(0,10);
   AGE_FIELDS.forEach(id=>{ const inp=document.getElementById(id); if(!inp || inp.closest('.pickrow')) return;
     const field=inp.closest('.field')||inp.parentNode;
     const row=document.createElement('div'); row.className='pickrow';
     inp.parentNode.insertBefore(row, inp); row.appendChild(inp);
-    const dob=document.createElement('input'); dob.type='date'; dob.className='dobpick'; dob.max=today;
-    dob.title='Pick a birthday to fill in the age'; dob.setAttribute('aria-label','Birthday');
-    dob.addEventListener('change', ()=>dobToAge(dob, id));
+    // Typed birthday: click selects everything, so typing always starts fresh at the month.
+    const dob=document.createElement('input'); dob.type='text'; dob.className='dobpick'; dob.placeholder='MM/DD/YYYY';
+    dob.inputMode='numeric'; dob.autocomplete='off'; dob.maxLength=10;
+    dob.title='Type a birthday (MM/DD/YYYY) to fill in the age'; dob.setAttribute('aria-label','Birthday');
+    dob.addEventListener('click', ()=>dob.select());               // every click selects the whole date, so typing starts at the month (tabbing in already selects it)
+    dob.addEventListener('input', ()=>{ dobMask(dob); const dt=/^\d{2}\/\d{2}\/\d{4}$/.test(dob.value)&&parseDob(dob.value); if(dt) dobCommit(dob,id); else dob.classList.remove('bad'); });
+    dob.addEventListener('blur', ()=>dobCommit(dob,id));          // commits 2-digit years too ("05/10/62")
+    dob.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); dobCommit(dob,id); } });
     row.appendChild(dob);
+    // Optional calendar: opens on the client's birth year (from the age already entered), not today.
+    const cal=document.createElement('input'); cal.type='date'; cal.className='dobcal'; cal.max=todayISO; cal.tabIndex=-1; cal.setAttribute('aria-hidden','true');
+    const btn=document.createElement('button'); btn.type='button'; btn.className='dobcalbtn'; btn.textContent='📅'; btn.title='Pick from a calendar';
+    btn.addEventListener('click', ()=>{ const cur=parseDob(dob.value), p=n=>String(n).padStart(2,'0');
+      if(cur) cal.value=cur.getFullYear()+'-'+p(cur.getMonth()+1)+'-'+p(cur.getDate());
+      else { const a=+inp.value||60, y=new Date().getFullYear()-a; cal.value=y+'-01-01'; }
+      try{ cal.showPicker(); }catch(e){ cal.focus(); cal.click(); } });
+    cal.addEventListener('change', ()=>{ const dt=parseDob(cal.value); if(!dt) return; dob.value=fmtDob(dt); dobCommit(dob,id); });
+    row.appendChild(btn); row.appendChild(cal);
     const lbl=field.querySelector('label'); if(lbl && !lbl.dataset.dob){ lbl.insertAdjacentHTML('beforeend', ' <span style="color:var(--muted);font-weight:500">· or 🎂 birthday</span>'); lbl.dataset.dob='1'; }
   });
 }
