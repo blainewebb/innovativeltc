@@ -320,7 +320,7 @@
       <p class="hint" style="margin:0">Pick a saved plan and run it for this client — on the carrier it was saved with, or pick another carrier and the same benefits are matched to that carrier’s closest design. Set a <b>health rating</b> for carriers that rate by health. Choose <b>Joint (couple)</b> to run a couple plan for two applicants. Build more with “＋ Save as quick command” under any comparison.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>Quick command</label><select id="qc_pick" onchange="qcSyncInfl()"></select></div>
+      <div class="field"><label>Quick command</label><select id="qc_pick" onchange="qcSyncInfl();qcSyncShared()"></select></div>
       <div class="field"><label>Carrier</label><select id="qc_carrier" onchange="qcSyncHealth()">
         <option value="saved">As saved</option>
         <option value="ngl">NGL — HonestLTC</option>
@@ -345,6 +345,7 @@
       <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
       <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
       <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
+      <div class="field"><label>Shared care</label><select id="qc_shared"></select></div>
     </div>
     <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
   </div>
@@ -3401,7 +3402,7 @@ function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delet
 // MutualCare Custom — condensed one-liner for the comparison tray
 function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.codeLabel(o.inflTerm,o.inflPct) : 'level'; }
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' · '+(o.state||'TX'); }
+  return o.age+g+' · MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year ('+fmt0(mooEffPool(o))+') · '+(o.elimination||90)+'-day · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+(o.sharedCare?' · Shared Care':'')+(o.jointWaiver?' · Joint Waiver':'')+' · '+(o.state||'TX'); }
 function moocConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
   return o.age+g+' · Mutual of Omaha MutualCare Custom · '+fmt0(o.monthlyBenefit)+'/mo · '+moocYearsNum(mooEffYears(o))+'-year benefit ('+fmt0(mooEffPool(o))+' total) · '+(o.elimination||90)+'-day elimination · '+moocInflLabel(o)+' · '+mooClassLabel(o.uwClass)+' health class'+(o.spousal?' · spousal −5%':'')+' · '+stateFull(o.state)+moocRiderText(o); }
 // MutualCare Secure — condensed one-liner for the comparison tray
@@ -4904,11 +4905,17 @@ function runQuickCommand(){ try{
   const gender = $('t_type').value.indexOf('female')>=0 ? 'female' : 'male';
   const state = $('t_state').value||null;
   const infl = ($('qc_infl')||{}).value||'saved';
-  const xf = op => qcApplyHealth(qcApplyInfl(qcConvert(op, target, state), infl, state), rating);
+  const shared = joint ? (($('qc_shared')||{}).value||'saved') : 'saved';
+  const xf = op0 => { let op=qcConvert(op0, target, state);
+    if(joint) op=qcApplyShared(op, shared==='saved' ? qcIsShared(op0) : shared==='yes');   // couples: shared care as saved, or as picked
+    return qcApplyHealth(qcApplyInfl(op, infl, state), rating); };
   let p = (v==='__standard') ? null : LS.patterns()[+v];
-  if(!p){   // My Standard ladder: NGL as-is keeps its dedicated view; any other carrier/rating/inflation goes through the converter
-    if((target==='saved'||target==='ngl') && infl==='saved') return runStandard();   // runStandard() already handles the joint case
+  if(!p){   // My Standard ladder: NGL as-is keeps its dedicated view; any other carrier/rating/inflation/shared choice goes through the converter
+    if((target==='saved'||target==='ngl') && infl==='saved' && shared==='saved') return runStandard();   // runStandard() already handles the joint case
     const married=$('t_type').value.indexOf('married')===0;
+    if(joint){   // couples: the same joint ladder as the Standard joint view (3-yr each, shared care), so only the picked choices change
+      p={trigger:'Standard', name:'3-option joint ladder', options:E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', joint:true, monthlyBenefit:op.monthly_benefit, benefitPeriod:'36', elimination:String(op.elimination||'90'), inflation:op.inflation||null, pay:'level', mode:'monthly', state:state, riderSharedAdditional:true, totalBenefitPeriod:'36'}))};
+    } else
     p={trigger:'Standard', name:'3-option ladder', options:E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', monthlyBenefit:op.monthly_benefit, benefitPeriod:op.benefit_period, elimination:String(op.elimination||'90'), inflation:op.inflation||null, pay:'level', mode:'monthly', state:state, riderSharedAdditional:false, maritalDiscount:married, totalBenefitPeriod:op.benefit_period}))};
   }
   execPattern(p, +$('t_age').value, gender, couple, xf);
@@ -4987,6 +4994,21 @@ function qcApplyInfl(op, infl, state){
   const inf=nearestVal(pct/100,[0,0.01,0.02,0.03,0.04,0.05]);   // NGL: compound for life
   return Object.assign({}, op, {inflation: inf>0 ? inf : null});
 }
+// Shared care (couples): NGL = Shared Additional Policy Limit rider (a third, shared pool);
+// MutualCare Secure/Custom = Shared Care benefit (+16% each). CareScout and OmniFlex have none.
+function qcIsShared(op){ return !!(op && (op.riderSharedAdditional || op.sharedCare || (op.__couple && op.parts && op.parts.some(x=>x.riderSharedAdditional||x.sharedCare)))); }
+function qcApplyShared(op, on){
+  if(!op) return op;
+  if(isMoo(op)||isMooc(op)) return Object.assign({}, op, {sharedCare:!!on});
+  if(isCS(op)||isOmni(op)) return op;
+  return Object.assign({}, op, {riderSharedAdditional:!!on, totalBenefitPeriod: op.totalBenefitPeriod||op.benefitPeriod});
+}
+function qcSyncShared(){ const sel=$('qc_shared'), pick=$('qc_pick'); if(!sel||!pick) return;
+  let saved;
+  if(pick.value==='__standard') saved=true;   // the Standard joint ladder carries the shared-care rider
+  else { const p=LS.patterns()[+pick.value]; saved = !!p && ((p.options&&p.options.length) ? p.options.some(qcIsShared) : !!p.riderSharedAdditional); }
+  sel.innerHTML='<option value="saved">'+(saved?'Shared':'Not shared')+' (as saved)</option><option value="yes">Shared care — can use each other’s benefits</option><option value="no">Not shared — separate benefits</option>';
+  sel.value='saved'; }
 function fillQuickPicker(){
   if($('qc_health') && !$('qc_health').options.length) qcSyncHealth();
   const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
@@ -4994,6 +5016,7 @@ function fillQuickPicker(){
   sel.innerHTML='<option value="__standard">My Standard — 3-option ladder</option>'+ps.map((p,i)=>'<option value="'+i+'">'+esc(p.trigger)+(p.name?' · '+esc(p.name):'')+'</option>').join('');
   if(cur==='__standard' || (cur!==''&&+cur<ps.length)) sel.value=cur;
   qcSyncInfl();
+  qcSyncShared();
 }
 // --- save the current comparison as a reusable quick command (no typing amounts) ---
 let PENDING_PATTERN_OPTS=null;
