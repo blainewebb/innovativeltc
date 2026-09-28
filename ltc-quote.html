@@ -5346,6 +5346,9 @@ const GROWTH_YEARS=[1,2,3,4,5,6,7,8,9,10,15,20,25,26,30];
 function growthCell(o,e){
   if(isOmni(o)){ const f=omFactorAtElapsed(o,e); let s='$'+Math.round(o.facilityDaily*f)+'/day'; if(o.homeCare) s+='<div class="gc-sub">+$'+Math.round(o.hcDaily*f)+' home</div>'; return s; }
   if(isCS(o)){ const r=csInflRate(o.inflation); return '$'+Math.round(o.dailyBenefit*Math.pow(1+r,e))+'/day'; }
+  // Mutual of Omaha stores inflation as a code ('3L', '320') or a term + percent, so use each
+  // product's own projection (it also stops 10/15/20-year terms from growing past the term).
+  if(isMoo(o)||isMooc(o)){ const s=mooSpecSrc(o); return fmt0(Math.round((isMooc(o)?MOOC:MOO).projBenefit(s,(+s.age)+e)))+'/mo'; }
   return fmt0(Math.round((+o.monthlyBenefit)*(o.inflation?Math.pow(1+o.inflation,e):1)))+'/mo';
 }
 function benefitGrowthSection(items, order){
