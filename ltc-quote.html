@@ -320,7 +320,7 @@
       <p class="hint" style="margin:0">Pick a saved plan and run it for this client — on the carrier it was saved with, or pick another carrier and the same benefits are matched to that carrier’s closest design. Set a <b>health rating</b> for carriers that rate by health. Choose <b>Joint (couple)</b> to run a couple plan for two applicants. Build more with “＋ Save as quick command” under any comparison.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>Quick command</label><select id="qc_pick"></select></div>
+      <div class="field"><label>Quick command</label><select id="qc_pick" onchange="qcSyncInfl()"></select></div>
       <div class="field"><label>Carrier</label><select id="qc_carrier" onchange="qcSyncHealth()">
         <option value="saved">As saved</option>
         <option value="ngl">NGL — HonestLTC</option>
@@ -330,6 +330,7 @@
         <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
+      <div class="field"><label>Inflation</label><select id="qc_infl"></select></div>
       <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
         <option value="single-female">Single female</option>
         <option value="single-male">Single male</option>
@@ -4902,10 +4903,11 @@ function runQuickCommand(){ try{
   const couple = joint ? {age1:+$('t_age').value, g1:$('t_g1').value, age2:+$('t_age2').value, g2:$('t_g2').value} : null;
   const gender = $('t_type').value.indexOf('female')>=0 ? 'female' : 'male';
   const state = $('t_state').value||null;
-  const xf = op => qcApplyHealth(qcConvert(op, target, state), rating);
+  const infl = ($('qc_infl')||{}).value||'saved';
+  const xf = op => qcApplyHealth(qcApplyInfl(qcConvert(op, target, state), infl, state), rating);
   let p = (v==='__standard') ? null : LS.patterns()[+v];
-  if(!p){   // My Standard ladder: NGL as-is keeps its dedicated view; any other carrier/rating goes through the converter
-    if(target==='saved'||target==='ngl') return runStandard();          // runStandard() already handles the joint case
+  if(!p){   // My Standard ladder: NGL as-is keeps its dedicated view; any other carrier/rating/inflation goes through the converter
+    if((target==='saved'||target==='ngl') && infl==='saved') return runStandard();   // runStandard() already handles the joint case
     const married=$('t_type').value.indexOf('married')===0;
     p={trigger:'Standard', name:'3-option ladder', options:E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', monthlyBenefit:op.monthly_benefit, benefitPeriod:op.benefit_period, elimination:String(op.elimination||'90'), inflation:op.inflation||null, pay:'level', mode:'monthly', state:state, riderSharedAdditional:false, maritalDiscount:married, totalBenefitPeriod:op.benefit_period}))};
   }
@@ -4960,12 +4962,38 @@ function qcApplyHealth(op, rating){
   if(isCS(op)) return Object.assign({}, op, {uwClass: rating==='Preferred'?'Preferred':'Standard'});
   return op;   // NGL and OmniFlex don't rate by health class
 }
+// Inflation: starts on what the command was saved with; pick another to re-run every option at that
+// inflation (matched to each carrier's closest filed option, same rules as the carrier carry-over).
+const QC_INFL=[['0|none','No inflation'],['1|L','1% compound'],['2|L','2% compound'],['3|L','3% compound'],['4|L','4% compound'],['5|L','5% compound'],['3|20','3% compound (20-yr)'],['5|20','5% compound (20-yr)']];
+function qcInflLabel(c){ return !(c.pct>0) ? 'No inflation' : (+c.pct)+'% compound'+(c.term&&c.term!=='L'&&c.term!=='none'?' ('+c.term+'-yr)':''); }
+function qcSavedInfl(v){
+  let ops;
+  if(v==='__standard') ops=E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', inflation:op.inflation||null, benefitPeriod:op.benefit_period, monthlyBenefit:op.monthly_benefit}));
+  else { const p=LS.patterns()[+v]; if(!p) return ''; ops = (p.options&&p.options.length) ? p.options : [{carrier:'ngl', inflation:(p.inflation??null)}]; }
+  const labels=[...new Set(ops.map(op=>{ try{ return qcInflLabel(qcCanon(op)); }catch(e){ return ''; } }).filter(Boolean))];
+  return labels.join(' / ');
+}
+function qcSyncInfl(){ const sel=$('qc_infl'), pick=$('qc_pick'); if(!sel||!pick) return;
+  const saved=qcSavedInfl(pick.value);
+  sel.innerHTML='<option value="saved">'+esc(saved?saved+' (as saved)':'As saved')+'</option>'+QC_INFL.map(o=>'<option value="'+o[0]+'">'+o[1]+'</option>').join('');
+  sel.value='saved'; }
+function qcApplyInfl(op, infl, state){
+  if(!infl||infl==='saved'||!op) return op;
+  const [ps,term]=infl.split('|'), pct=+ps;
+  if(isOmni(op)){ const S=OMNI_RATES.rates[String(op.state||state||'').toUpperCase()]||{}; return Object.assign({}, op, {inflation: pct>0 && !!S.facility_infl}); }
+  if(isCS(op))   return Object.assign({}, op, {inflation: pct>0 ? String(nearestVal(pct,[1,3,5])) : 'none'});
+  if(isMoo(op))  return Object.assign({}, op, {inflation: canonToMooCode(pct,term)});
+  if(isMooc(op)) return Object.assign({}, op, {inflTerm: pct>0 ? canonToMoocTerm(term) : 'none', inflPct: pct>0 ? nearestVal(pct,MOOC_PCTS) : 0});
+  const inf=nearestVal(pct/100,[0,0.01,0.02,0.03,0.04,0.05]);   // NGL: compound for life
+  return Object.assign({}, op, {inflation: inf>0 ? inf : null});
+}
 function fillQuickPicker(){
   if($('qc_health') && !$('qc_health').options.length) qcSyncHealth();
   const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
   const ps=LS.patterns();
   sel.innerHTML='<option value="__standard">My Standard — 3-option ladder</option>'+ps.map((p,i)=>'<option value="'+i+'">'+esc(p.trigger)+(p.name?' · '+esc(p.name):'')+'</option>').join('');
   if(cur==='__standard' || (cur!==''&&+cur<ps.length)) sel.value=cur;
+  qcSyncInfl();
 }
 // --- save the current comparison as a reusable quick command (no typing amounts) ---
 let PENDING_PATTERN_OPTS=null;
