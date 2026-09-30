@@ -178,6 +178,7 @@
   .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:.8rem;padding:10px 12px;border-radius:9px;margin-top:14px}
   .client .view{background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe}
   /* quick tools row */
+  .saveagenote{margin-top:4px;font-size:.74rem;line-height:1.35;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:4px 7px}
   .quicktools{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .quicktools .lbl{color:var(--muted);font-size:.8rem;font-weight:600}
   .qtool{background:#eef2ff;border:1px solid #c7d2fe;color:var(--primary-d);border-radius:999px;padding:8px 14px;font-size:.83rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
@@ -3480,6 +3481,10 @@ function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   var sid=CLIENT_STATE[carrier]; if(sid&&CLIENT.state!=null){ var sel=$(sid); if(selHasOption(sel,CLIENT.state) && sel.value!==CLIENT.state){ sel.value=CLIENT.state; try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
   // Birthday pickers, matched to the primary/spouse age fields.
   var ai=CLIENT_AGEIDS[carrier]; if(ai){ if(CLIENT.dob!=null){ var p0=dobPickFor(ai[0]); if(p0) p0.value=CLIENT.dob; } if(ai[1]&&CLIENT.dob2!=null){ var p1=dobPickFor(ai[1]); if(p1) p1.value=CLIENT.dob2; } }
+  // With a birthday on file, re-derive each age under THIS carrier's rule (save age for NGL / Mutual of Omaha,
+  // actual age for CareScout / OmniFlex), so moving between carriers never carries the wrong age.
+  if(CLIENT.dob) (m.age||[]).forEach(function(id){ setAgeFromDob(id, CLIENT.dob, false); });
+  if(CLIENT.dob2) (m.age2||[]).forEach(function(id){ setAgeFromDob(id, CLIENT.dob2, false); });
   applyPlan(carrier); }
 /* ---- Plan carry-over: monthly benefit, benefit period (years) and inflation, mapped to the
    closest option each carrier offers. Carriers store these very differently — monthly $ vs a
@@ -4263,19 +4268,20 @@ function sweetSpotAll(p, includeShared){
   const couple = p.age2 && p.marital==='married-both';
   const out=[];
   for(const c of CARRIERS){
+    const pc=ageForCarrier(c.id, p);   // save age only for carriers that allow it
     if(couple){
-      if(c.sweetSpotCouple){ try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpotCouple(p))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); } }
-      if(includeShared && c.sharedSweetCouple){ try{ const s=c.sharedSweetCouple(p); if(s) out.push(Object.assign({carrier:c.id, kind:'shared'}, s)); }catch(e){} }
+      if(c.sweetSpotCouple){ try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpotCouple(pc))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); } }
+      if(includeShared && c.sharedSweetCouple){ try{ const s=c.sharedSweetCouple(pc); if(s) out.push(Object.assign({carrier:c.id, kind:'shared'}, s)); }catch(e){} }
     } else {
       if(!c.sweetSpot) continue;
-      try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpot(p))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); }
+      try{ out.push(Object.assign({carrier:c.id, kind:'base'}, c.sweetSpot(pc))); }catch(e){ out.push({carrier:c.id, label:c.label, fits:false, note:e.message}); }
     }
   }
   return out;
 }
 function ssObjs(r){ return r.trayObjs || (r.trayObj?[r.trayObj]:[]); }
 function budgetSolveAll(p){ const couple = p.age2 && p.marital==='married-both';
-  return CARRIERS.map(c=>{ try{ return Object.assign({carrier:c.id}, couple? carrierSolveCouple(c,p) : c.solve(p)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
+  return CARRIERS.map(c=>{ const pc=ageForCarrier(c.id, p); try{ return Object.assign({carrier:c.id}, couple? carrierSolveCouple(c,pc) : c.solve(pc)); }catch(e){ return {carrier:c.id, label:c.label, fits:false, note:e.message}; } }); }
 // Household (both-applying) budget solve: the richest design where the COMBINED two-life
 // premium fits the budget. Reuses each carrier's own design helpers; NGL is a real two-life
 // joint policy, the others are two individual policies with the couple/spousal discount.
@@ -4354,7 +4360,7 @@ function openBudgetAll(){ setCarrier('ngl'); $('budgetCard').hidden=false; $('bu
 function baMaritalChange(){ $('ba_spouse').hidden = $('ba_marital').value!=='married-both'; }
 function runBudgetAll(){ try{
   const marital=$('ba_marital').value;
-  const p={budget:+$('ba_budget').value, age:+$('ba_age').value, gender:$('ba_gender').value,
+  const p={budget:+$('ba_budget').value, age:+$('ba_age').value, realAge:realAgeOf('ba_age'), gender:$('ba_gender').value,
     years:+$('ba_years').value, inflation:parseFloat($('ba_infl').value)||0,
     uw:$('ba_uw').value, marital, state:$('ba_state').value||null};
   if(!p.budget||p.budget<20) return showErr('Enter a monthly budget (e.g. 300).');
@@ -4396,10 +4402,10 @@ function swMaritalChange(){
 }
 function runSweetSpot(){ try{
   const marital=$('sw_marital').value;
-  const p={age:+$('sw_age').value, gender:$('sw_gender').value, state:$('sw_state').value||null,
+  const p={age:+$('sw_age').value, realAge:realAgeOf('sw_age'), gender:$('sw_gender').value, state:$('sw_state').value||null,
     marital, inflation:parseFloat($('sw_infl').value)||0};
   if(!p.age) return showErr('Enter an issue age.');
-  if(marital==='married-both'){ p.age2=+$('sw_age2').value; p.gender2=$('sw_gender2').value;
+  if(marital==='married-both'){ p.age2=+$('sw_age2').value; p.realAge2=realAgeOf('sw_age2'); p.gender2=$('sw_gender2').value;
     if(!p.age2) return showErr('Enter the spouse’s age for a joint quote.'); }
   showSweetSpot(p, $('sw_shared').checked);
 }catch(e){ showErr(e.message); } }
@@ -4875,8 +4881,12 @@ function addAllToTray(items){ const a=LS.tray(); let added=0; for(const o of ite
 // Run a saved quick command for an explicit applicant (used by the Quick Commands tab)
 // couple: {age1,g1,age2,g2}. Joint options re-rate to the new couple (NGL joint is
 // rated on the older insured); individual options are quoted for BOTH spouses.
-function execPattern(p, age, gender, couple, xf){
+function execPattern(p, age, gender, couple, xf, real){
   age=+age; const XF=xf||(o=>o);
+  // Save age applies only to NGL / Mutual of Omaha; other carriers get the actual age behind a birthday.
+  const R = op => (real && !SAVE_AGE_CARRIERS.has(qcCarrierOf(op))) ? real : null;
+  const cpl = op => { const r=R(op); return (couple && r) ? Object.assign({}, couple, {age1:r.age1, age2:r.age2}) : couple; };
+  const ag  = op => { const r=R(op); return r ? r.age : age; };
   const older = couple ? (((+couple.age1)>=(+couple.age2)) ? {age:+couple.age1,g:couple.g1} : {age:+couple.age2,g:couple.g2}) : null;
   const who = couple ? (couple.age1+' '+gL(couple.g1)+' + '+couple.age2+' '+gL(couple.g2)) : (age+' '+gL(gender));
   const title = 'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+who;
@@ -4884,8 +4894,8 @@ function execPattern(p, age, gender, couple, xf){
     let items=[];
     for(const op0 of p.options){ const op=XF(op0);
       if(op.joint){ items.push(couple ? withCoupleAges(Object.assign({},op,{age:older.age,gender:older.g}), couple.age1,couple.g1,couple.age2,couple.g2) : Object.assign({},op)); }
-      else if(couple){ items.push(coupleHousehold(op, couple)); }
-      else { items.push(Object.assign({},op,{age,gender})); }
+      else if(couple){ items.push(coupleHousehold(op, cpl(op))); }
+      else { items.push(Object.assign({},op,{age:ag(op),gender})); }
     }
     if(items.length>6) items=items.slice(0,6);
     showCompare(items, {title});
@@ -4894,7 +4904,7 @@ function execPattern(p, age, gender, couple, xf){
   const list=(p.benefits||[]).map(Number).filter(n=>n>0).slice(0,6);
   if(!list.length) return showErr('This quick command has no default benefit amounts — edit it to add some (e.g. 7000, 5000, 4000).');
   const mk=(mb,a,g)=>({carrier:'ngl', age:+a, gender:g, monthlyBenefit:SNAP(mb), _rawMb:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod});
-  let items = couple ? list.map(mb=>coupleHousehold(XF(mk(mb)), couple)) : list.map(mb=>XF(mk(mb,age,gender)));
+  let items = couple ? list.map(mb=>{ const op=XF(mk(mb)); return coupleHousehold(op, cpl(op)); }) : list.map(mb=>{ const op=XF(mk(mb,age,gender)); return R(op) ? Object.assign({}, op, {age:R(op).age}) : op; });
   if(items.length>6) items=items.slice(0,6);
   showCompare(items, {title});
 }
@@ -4918,7 +4928,7 @@ function runQuickCommand(){ try{
     } else
     p={trigger:'Standard', name:'3-option ladder', options:E.STANDARD_SCENARIO.options.map(op=>({carrier:'ngl', monthlyBenefit:op.monthly_benefit, benefitPeriod:op.benefit_period, elimination:String(op.elimination||'90'), inflation:op.inflation||null, pay:'level', mode:'monthly', state:state, riderSharedAdditional:false, maritalDiscount:married, totalBenefitPeriod:op.benefit_period}))};
   }
-  execPattern(p, +$('t_age').value, gender, couple, xf);
+  execPattern(p, +$('t_age').value, gender, couple, xf, {age:realAgeOf('t_age'), age1:realAgeOf('t_age'), age2:realAgeOf('t_age2')});
 }catch(e){ showErr(e.message); } }
 /* ---- quick commands on any carrier: match each saved option's benefits to the chosen carrier's
    closest design (monthly $ <-> daily $, years <-> pool/days, inflation % <-> codes), then apply
@@ -5116,7 +5126,47 @@ function ageFromDob(dob){ const d=parseDob(dob); if(!d) return null; const now=n
 function fmtDob(dt){ const p=n=>String(n).padStart(2,'0'); return p(dt.getMonth()+1)+'/'+p(dt.getDate())+'/'+dt.getFullYear(); }
 // Birthday → age: enter either an age OR type a birthday, and the birthday fills in the age.
 const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2'];
-function dobToAge(dobEl, ageId){ const a=ageFromDob(dobEl.value); if(a==null) return; const t=$(ageId); if(!t) return; t.value=a; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+// Save age: NGL, Mutual of Omaha (and Thrivent, once added) let a client who turned a year older
+// within the last 30 days apply at the younger age (policy dated before the birthday).
+// CareScout and Manhattan Life OmniFlex quote the actual age.
+const SAVE_AGE_DAYS=30, SAVE_AGE_CARRIERS=new Set(['ngl','moo','mooc','thrivent']);
+const SAVE_AGE_LABEL='NGL & Mutual of Omaha';
+// Which carrier each age field quotes ('mixed' = all-carrier tools: shows the save age, keeps the actual age for the others)
+const AGE_FIELD_CARRIER={s_age:'ngl',c_age1:'ngl',c_age2:'ngl',b_age:'ngl',w_age:'ngl',g_age:'ngl',coc_age:'ngl',
+  cs_age:'carescout',om_age:'omniflex',om_age2:'omniflex',moo_age:'moo',moo_age2:'moo',mooc_age:'mooc',mooc_age2:'mooc',
+  ba_age:'mixed',sw_age:'mixed',sw_age2:'mixed',t_age:'mixed',t_age2:'mixed'};
+function dobInfo(dob){ const d=parseDob(dob); if(!d) return null; const age=ageFromDob(dob); if(age==null) return null;
+  const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let last=new Date(now.getFullYear(), d.getMonth(), d.getDate()); if(last>today) last=new Date(now.getFullYear()-1, d.getMonth(), d.getDate());
+  const days=Math.round((today-last)/864e5), save=(age>0 && days<=SAVE_AGE_DAYS);
+  return {age, days, last, save, saveAge: save?age-1:age}; }
+function saveAgeApplies(carrier){ return carrier==='mixed' || SAVE_AGE_CARRIERS.has(carrier); }
+function saveAgeNote(ageId, info){ const t=$(ageId); if(!t) return; const row=t.closest('.pickrow'); if(!row) return;
+  let n=row.parentNode.querySelector('.saveagenote[data-for="'+ageId+'"]');
+  const c=AGE_FIELD_CARRIER[ageId]||'ngl';
+  if(!info || !info.save){ if(n) n.remove(); return; }
+  if(!n){ n=document.createElement('div'); n.className='saveagenote'; n.dataset.for=ageId; row.parentNode.insertBefore(n, row.nextSibling); }
+  const when=fmtDob(info.last).slice(0,5)+' ('+(info.days===0?'today':info.days+' day'+(info.days>1?'s':'')+' ago')+')';
+  n.innerHTML = c==='mixed'
+    ? '🎂 <b>Save age</b> — turned '+info.age+' on '+when+'. '+SAVE_AGE_LABEL+' quote at <b>'+info.saveAge+'</b>; CareScout &amp; Manhattan Life at '+info.age+'.'
+    : saveAgeApplies(c) ? '🎂 <b>Save age</b> — turned '+info.age+' on '+when+'; applying within '+SAVE_AGE_DAYS+' days quotes age <b>'+info.saveAge+'</b>.'
+    : '🎂 Turned '+info.age+' on '+when+' — this carrier doesn’t offer save age, so it quotes '+info.age+'.';
+}
+// Fill an age field from a birthday using that field's carrier rule; remembers the actual age for mixed tools.
+function setAgeFromDob(ageId, dob, fire){ const info=dobInfo(dob), t=$(ageId); if(!info||!t) return;
+  const c=AGE_FIELD_CARRIER[ageId]||'ngl', a=saveAgeApplies(c)?info.saveAge:info.age;
+  t.value = (typeof clampField==='function') ? clampField(ageId, a) : a;
+  t.dataset.realAge=info.age; t.dataset.shownAge=t.value;
+  saveAgeNote(ageId, info);
+  if(fire){ try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+// The actual (not saved) age behind a field, for carriers without save age. Falls back to the field value
+// if the age was typed over after the birthday was entered.
+function realAgeOf(ageId){ const t=$(ageId); if(!t) return null; const v=+t.value;
+  return (t.dataset.realAge && t.dataset.shownAge===t.value) ? +t.dataset.realAge : v; }
+// Per-carrier age for the all-carrier tools: carriers without save age get the actual age.
+function ageForCarrier(cid, p){ if(SAVE_AGE_CARRIERS.has(cid) || (p.realAge==null && p.realAge2==null)) return p;
+  return Object.assign({}, p, p.realAge!=null?{age:p.realAge}:{}, (p.age2 && p.realAge2!=null)?{age2:p.realAge2}:{}); }
+function dobToAge(dobEl, ageId){ setAgeFromDob(ageId, dobEl.value, true); }
 // Type-as-you-go mask: digits only become MM/DD/YYYY ("5101962" or "05101962" -> 05/10/1962);
 // typed slashes are respected ("5/10/62"). A month or day that can't start with the typed digit
 // gets its leading zero automatically (e.g. typing 5 gives "05/").
@@ -5134,7 +5184,9 @@ function dobMask(el){
   let r=out[0]; if(out[0] && (out[1] || f>=1)) r+='/'+out[1]; if(out[1] && (out[2] || f>=2)) r+='/'+out[2];
   el.value=r;
 }
-function dobCommit(el, ageId){ const dt=parseDob(el.value); el.classList.toggle('bad', !!el.value && !dt); if(!dt) return; el.value=fmtDob(dt); dobToAge(el, ageId); }
+function dobCommit(el, ageId){ const dt=parseDob(el.value); el.classList.toggle('bad', !!el.value && !dt);
+  if(!el.value){ const t=$(ageId); if(t){ delete t.dataset.realAge; delete t.dataset.shownAge; } saveAgeNote(ageId, null); }
+  if(!dt) return; el.value=fmtDob(dt); dobToAge(el, ageId); }
 function attachBirthdayPickers(){
   const todayISO=new Date().toISOString().slice(0,10);
   AGE_FIELDS.forEach(id=>{ const inp=document.getElementById(id); if(!inp || inp.closest('.pickrow')) return;
@@ -5150,6 +5202,7 @@ function attachBirthdayPickers(){
     dob.addEventListener('blur', ()=>dobCommit(dob,id));          // commits 2-digit years too ("05/10/62")
     dob.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); dobCommit(dob,id); } });
     row.appendChild(dob);
+    inp.addEventListener('input', e=>{ if(e.isTrusted && inp.dataset.shownAge!==inp.value) saveAgeNote(id, null); });   // age typed over -> the birthday note no longer applies
     // Optional calendar: opens on the client's birth year (from the age already entered), not today.
     const cal=document.createElement('input'); cal.type='date'; cal.className='dobcal'; cal.max=todayISO; cal.tabIndex=-1; cal.setAttribute('aria-hidden','true');
     const btn=document.createElement('button'); btn.type='button'; btn.className='dobcalbtn'; btn.textContent='📅'; btn.title='Pick from a calendar';
