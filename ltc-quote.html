@@ -3433,8 +3433,13 @@ function pickInto(sel, targetId){ const t=$(targetId); if(!t) return; if(sel.val
 let VIEW='quote';
 const QUOTE_CARDS=['manual','cscard','omnicard','moocard','mooccard','budgetCard','sweetCard','sameCard'];
 function setView(v){
+  const prevView=VIEW;
   VIEW = v==='qc' ? 'qc' : 'quote';
   const qc = VIEW==='qc';
+  // The client follows you: entering Quick Commands pulls in the client on the quote form; coming back
+  // carries anything changed in Quick Commands to the carrier form.
+  if(qc && prevView!=='qc'){ try{ qcPullClient(); }catch(e){} }
+  if(!qc && prevView==='qc'){ try{ qcPushClient(); }catch(e){} }
   document.querySelectorAll('#viewTabs .vtab').forEach(t=>t.classList.toggle('on', t.dataset.view===VIEW));
   if($('qccard')) $('qccard').hidden = !qc;
   if($('nameCard')) $('nameCard').hidden = qc;   // client-name box: quote view only
@@ -3452,6 +3457,45 @@ function setView(v){
     if($('mooccard')) $('mooccard').hidden = !mooc;
     if(ngl) setMode(MODE); else if($('manual')) $('manual').hidden=true;
   }
+}
+// ---- Quote form <-> Quick Commands: same client (age / birthday, gender, state, married, spouse) ----
+function nglCoupleActive(){ const t=document.querySelector('.tab.active'); return CARRIER==='ngl' && MODE==='manual' && !!t && t.dataset.mode==='couple'; }
+function formMarriedAlone(){ const ck=id=>!!($(id)&&$(id).checked);
+  if(CARRIER==='ngl') return ck('s_marital'); if(CARRIER==='moo') return ck('moo_spousal'); if(CARRIER==='mooc') return ck('mooc_spousal');
+  if(CARRIER==='carescout') return ($('cs_marital')||{}).value==='Married1buy'; if(CARRIER==='omniflex') return ck('om_spousal') && !ck('om_couple');
+  return false; }
+let QC_SNAP=null;   // Quick Commands client fields as pulled in, to spot edits made there
+function qcClientVals(){ const v=id=>($(id)||{}).value||''; return [v('t_type'),v('t_age'),v('t_age2'),v('t_g1'),v('t_g2'),v('t_state'),(dobPickFor('t_age')||{}).value||'',(dobPickFor('t_age2')||{}).value||''].join('|'); }
+function qcPullClient(){
+  if(CARRIER) captureClient(CARRIER);
+  const C=Object.assign({}, CLIENT), set=(id,val)=>{ const el=$(id); if(el && val!=null && val!=='') el.value=val; };
+  // Birthday only if it's still the one behind the age shown on the form (not typed over since)
+  const liveDob=id=>{ const el=$(id), d=dobPickFor(id); return (el && d && d.value && parseDob(d.value) && el.dataset.shownAge===el.value) ? d.value : null; };
+  const ids=(CLIENT_AGEIDS[CARRIER]||[]); C.dob=ids[0]?liveDob(ids[0]):null; C.dob2=ids[1]?liveDob(ids[1]):null;
+  if(nglCoupleActive()){ C.couple=true; C.age=$('c_age1').value; C.gender=$('c_g1').value; C.age2=$('c_age2').value; C.gender2=$('c_g2').value; C.dob=liveDob('c_age1'); }
+  else if(CARRIER==='ngl') C.couple=false;
+  const g=(C.gender==='male'||C.gender==='female') ? C.gender : 'female';
+  if(C.couple && C.age2){
+    $('t_type').value='joint'; set('t_g1', g); set('t_g2', C.gender2||(g==='male'?'female':'male'));
+  } else $('t_type').value=(formMarriedAlone()?'married-':'single-')+g;
+  stdTypeChange();
+  if(C.state && selHasOption($('t_state'), C.state)) $('t_state').value=C.state;
+  const age=(id,a,dob)=>{ const p=dobPickFor(id); if(p) p.value=dob||''; if(dob && parseDob(dob)) setAgeFromDob(id, dob, false); else { set(id, a); saveAgeNote(id, null); } };
+  if(C.age!=null) age('t_age', C.age, C.dob);
+  if(C.couple && C.age2!=null) age('t_age2', C.age2, C.dob2);
+  QC_SNAP=qcClientVals();
+}
+function qcPushClient(){
+  if(QC_SNAP!=null && qcClientVals()===QC_SNAP) return;   // nothing changed in Quick Commands
+  const type=$('t_type').value, joint=type==='joint';
+  CLIENT.age=$('t_age').value; CLIENT.gender= joint ? $('t_g1').value : (type.indexOf('female')>=0?'female':'male');
+  if($('t_state').value) CLIENT.state=$('t_state').value;
+  const d1=dobPickFor('t_age'); CLIENT.dob = d1&&d1.value ? d1.value : null;
+  if(joint){ CLIENT.couple=true; CLIENT.age2=$('t_age2').value; CLIENT.gender2=$('t_g2').value; const d2=dobPickFor('t_age2'); CLIENT.dob2 = d2&&d2.value ? d2.value : null; }
+  else CLIENT.couple=false;
+  if(CLIENT.dob==null) delete CLIENT.dob; if(CLIENT.dob2==null) delete CLIENT.dob2;
+  if(CARRIER){ applyClient(CARRIER); if(CARRIER==='ngl' && $('s_gender')) $('s_gender').value=CLIENT.gender; }
+  QC_SNAP=null;
 }
 // Carry the client's age / gender / spouse across carrier products so switching never loses them.
 var CLIENT={};
@@ -3476,7 +3520,10 @@ function captureClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ for(var i=0;i<m[k].length;i++){ var el=$(m[k][i]); if(el&&el.value!==''&&el.value!=null){ CLIENT[k]=el.value; break; } } });
   var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked;
   var sid=CLIENT_STATE[carrier]; if(sid&&$(sid)&&$(sid).value) CLIENT.state=$(sid).value;   // remember the last state the user set
-  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var d0=dobPickFor(ai[0]); if(d0&&d0.value) CLIENT.dob=d0.value; if(ai[1]){ var d1=dobPickFor(ai[1]); if(d1&&d1.value) CLIENT.dob2=d1.value; } }
+  // A birthday counts only while it's the one behind the age shown (not cleared or typed over since).
+  var live=function(id){ var el=$(id), d=dobPickFor(id); return (el && d && d.value && parseDob(d.value) && el.dataset.shownAge===el.value) ? d.value : null; };
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var v0=live(ai[0]); if(v0) CLIENT.dob=v0; else delete CLIENT.dob;
+    if(ai[1]){ var v1=live(ai[1]); if(v1) CLIENT.dob2=v1; else delete CLIENT.dob2; } }
   capturePlan(carrier); }
 function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ if(CLIENT[k]==null)return; m[k].forEach(function(id){ var el=$(id); if(!el)return;
@@ -3486,7 +3533,8 @@ function applyClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   // otherwise leave the carrier's own default. Fire change so state-driven UI (CS pools, OmniFlex EPs) resyncs.
   var sid=CLIENT_STATE[carrier]; if(sid&&CLIENT.state!=null){ var sel=$(sid); if(selHasOption(sel,CLIENT.state) && sel.value!==CLIENT.state){ sel.value=CLIENT.state; try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
   // Birthday pickers, matched to the primary/spouse age fields.
-  var ai=CLIENT_AGEIDS[carrier]; if(ai){ if(CLIENT.dob!=null){ var p0=dobPickFor(ai[0]); if(p0) p0.value=CLIENT.dob; } if(ai[1]&&CLIENT.dob2!=null){ var p1=dobPickFor(ai[1]); if(p1) p1.value=CLIENT.dob2; } }
+  var ai=CLIENT_AGEIDS[carrier]; if(ai){ var p0=dobPickFor(ai[0]); if(p0){ p0.value=CLIENT.dob||''; if(!CLIENT.dob) saveAgeNote(ai[0], null); }
+    if(ai[1]){ var p1=dobPickFor(ai[1]); if(p1){ p1.value=CLIENT.dob2||''; if(!CLIENT.dob2) saveAgeNote(ai[1], null); } } }
   // With a birthday on file, re-derive each age under THIS carrier's rule (save age for NGL / Mutual of Omaha,
   // actual age for CareScout / OmniFlex), so moving between carriers never carries the wrong age.
   if(CLIENT.dob) (m.age||[]).forEach(function(id){ setAgeFromDob(id, CLIENT.dob, false); });
