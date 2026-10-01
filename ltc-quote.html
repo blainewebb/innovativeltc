@@ -332,6 +332,7 @@
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
       <div class="field"><label>Inflation</label><select id="qc_infl"></select></div>
+      <div class="field"><label>Shared care</label><select id="qc_shared" onchange="qcSharedChange()"></select></div>
       <div class="field"><label>Applicant type</label><select id="t_type" onchange="stdTypeChange()">
         <option value="single-female">Single female</option>
         <option value="single-male">Single male</option>
@@ -346,7 +347,6 @@
       <div class="field"><label>Applicant 1 — gender</label><select id="t_g1"><option value="male">Male</option><option value="female">Female</option></select></div>
       <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
       <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
-      <div class="field"><label>Shared care</label><select id="qc_shared"></select></div>
     </div>
     <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
   </div>
@@ -438,12 +438,18 @@
     <div class="pane" data-pane="waiting" hidden>
       <p class="hint" style="margin-top:0">What does delaying cost? Premiums rise because they’re older, and care costs grow ~3%/yr — so they’ll need a bigger monthly benefit to keep pace.</p>
       <div class="grid">
-        <div class="field"><label>Issue age (today)</label><input id="w_age" type="number" value="60" min="18" max="79"></div>
+        <div class="field"><label>Who’s applying</label><select id="w_type" onchange="wTypeChange()"><option value="single">One person</option><option value="couple">Couple — both applying (joint)</option></select></div>
+        <div class="field"><label id="w_agelbl">Issue age (today)</label><input id="w_age" type="number" value="60" min="18" max="79"></div>
         <div class="field"><label>Gender</label><select id="w_gender"><option value="female">Female</option><option value="male">Male</option></select></div>
         <div class="field"><label>Monthly benefit today ($)</label><div class="pickrow"><select class="picksel" onchange="pickInto(this,'w_benefit')"><option value="">Pick…</option><option value="1500">$1,500</option><option value="3000">$3,000</option><option value="4500">$4,500</option><option value="6000">$6,000</option><option value="7500">$7,500</option><option value="9000">$9,000</option><option value="10500">$10,500</option><option value="12000">$12,000</option></select><input id="w_benefit" type="number" value="4500" step="300"></div></div>
         <div class="field"><label>Benefit period</label><select id="w_bp"><option value="24">2 years</option><option value="36" selected>3 years</option><option value="48">4 years</option><option value="60">5 years</option><option value="72">6 years</option></select></div>
         <div class="field"><label>Inflation protection</label><select id="w_infl"><option value="0">None (level)</option><option value="0.02">2% compound</option><option value="0.03" selected>3% compound</option><option value="0.05">5% compound</option></select></div>
         <div class="field"><label>State</label><select id="w_state" class="statesel"></select></div>
+      </div>
+      <div class="grid" id="w_couple" hidden>
+        <div class="field"><label>Spouse — age (today)</label><input id="w_age2" type="number" value="58" min="18" max="79"></div>
+        <div class="field"><label>Spouse — gender</label><select id="w_gender2"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>&nbsp;</label><label style="font-weight:600"><input type="checkbox" id="w_shared" checked> Shared care (Shared Additional rider)</label></div>
       </div>
       <p class="hint">Not sure what care costs in their area? Look it up: <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a></p>
       <div class="actions"><button class="run" onclick="runWaiting()">Show the cost of waiting</button></div>
@@ -4527,7 +4533,7 @@ function poolMonths(o){ if(o.benefitPeriod==='lifetime') return null; const m=pa
 function poolYearsLabel(o){ if(o.benefitPeriod==='lifetime') return 'lifetime'; const pm=poolMonths(o); return (pm/12)+'-yr'+(o.riderSharedAdditional?' ('+SHARED_POOLS+' shared pools)':''); }
 function addBtn(o){ return '<button class="addbtn" onclick=\'addToTray('+JSON.stringify(o)+')\'>＋ Add to comparison</button>'; }
 function waitBtn(o){ return '<button class="waitbtn" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 Cost of waiting on this</button>'; }
-function costOfWaitingFor(o){ try{ showWaiting(computeWaiting(+o.age, o.gender, SNAP(o.monthlyBenefit), o.benefitPeriod, o.inflation||null, o.state||null)); }catch(e){ showErr(e.message); } }
+function costOfWaitingFor(o){ try{ showWaitingItem(computeWaitingItem(o)); }catch(e){ showErr(e.message); } }
 
 function growthLine(o){
   const pa = Math.max(+o.age, Math.min(100, Math.round(+($('s_projage')||{}).value||80)));
@@ -4639,7 +4645,9 @@ function showStandardJoint(age1,g1,age2,g2,state){
     return '<tr><td><b>'+op.name.replace(/\/\s*4-yr/,'/ 3-yr')+'</b>'+(fdc?'<div style="font-size:.72rem;color:#15803d;font-weight:700">+ zero-day home care</div>':'')+'</td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(BP)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
-function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; }
+function qcSharedChange(){ const sel=$('qc_shared'); if(!sel) return;
+  if(sel.value==='add'){ $('t_type').value='joint'; stdTypeChange(); sel.value='yes'; const a2=$('t_age2'); if(a2){ a2.focus(); a2.select&&a2.select(); } } }
+function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; if(typeof qcSyncShared==='function') qcSyncShared(true); }
 // Build a combined-household item for a couple from one individual option: two spouse
 // policies (each with its carrier's couple discount) summed into a single household item.
 function coupleHousehold(op, couple){
@@ -4717,6 +4725,47 @@ function showWaiting(d){
     '<div class="disc">Waiting costs twice: premiums rise because they’re older, and the cost of care grows ~3%/yr — so the monthly benefit they’ll need grows with it (rounded to NGL’s $300 increments). Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a> guide. '+DISC+'</div>');
 }
 
+/* ---------- cost of waiting on ANY quoted plan: single, couple household, joint/shared, every carrier ----------
+   Each year of waiting, everyone on the plan is a year older and the benefit grows ~3%/yr with care costs
+   (rounded to that carrier's benefit increments). Couples are re-priced as the same household plan — both
+   spouses older, shared care kept — so the premium shown always covers both. */
+function waitGrow(o, yr){ const g=Math.pow(1.03, yr);
+  if(o.__couple) return coupleCombine(o.parts.map(x=>waitGrow(x, yr)));
+  const x=Object.assign({}, o, {age:+o.age+yr}); if(o._ages) x._ages=o._ages.map(a=>+a+yr);
+  if(isCS(o)){ const st=o.state||'', d0=+o.dailyBenefit||100, d=nearestVal(d0*g, csDailies(st)), yrs=(+o.coverageMax||d0*365.25*3)/d0/365.25;
+    x.dailyBenefit=d; x.coverageMax=nearestVal(d*yrs*365.25, csPoolsFor(d, st)); }
+  else if(isOmni(o)){ const fd=Math.min(400, Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10)); x.facilityDaily=fd;
+    if(o.homeCare) x.hcDaily=Math.min(300, fd, Math.max(10, Math.round((+o.hcDaily||fd)*g/10)*10)); }
+  else if(isMoo(o)){ x.monthlyBenefit=Math.min(12000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/100)*100)); }
+  else if(isMooc(o)){ const mb=Math.min(15000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/50)*50)); x.monthlyBenefit=mb; x.policyLimit=mb*12*(+o.years||3); }
+  else { x.monthlyBenefit=SNAP(+(o._rawMb||o.monthlyBenefit)*g); delete x._rawMb; }
+  return x; }
+function waitBenText(o){ const b=o.__couple?o.parts[0]:o, each=isCoupleItem(o)?' each':'';
+  if(isCS(b)) return '$'+b.dailyBenefit+'/day'+each; if(isOmni(b)) return '$'+b.facilityDaily+'/day'+each; return fmt0(b.monthlyBenefit)+'/mo'+each; }
+function waitAgesText(o){ return (o._ages && o._ages.length>1) ? o._ages.join(' &amp; ') : String(o.age); }
+function waitWho(o){ if(o._ages && o._ages.length>1) return o._ages.map((a,i)=>a+' '+gL((o._genders||[])[i]||'')).join(' + ');
+  return o.age+(isOmni(o)?'':' '+gL(o.gender)); }
+function computeWaitingItem(o){
+  const price=it=>{ const q=anyQuote(it); return {prem:(q.modalPayment!=null?q.modalPayment:q.singlePremium), mode:q.mode||it.mode||'monthly'}; };
+  let now=null, mode='monthly'; try{ const p0=price(o); now=p0.prem; mode=p0.mode; }catch(e){ throw new Error('Can’t price this plan today: '+e.message); }
+  const rows=[0,1,3,5,10].map(yr=>{ const it=waitGrow(o, yr); let prem=null, why='';
+    try{ prem=price(it).prem; }catch(e){ why=e.message; }
+    return {yr, it, prem, why, elig:prem!=null, delta:(prem!=null)?prem-now:null, pct:(prem!=null&&now)?(prem/now-1):null}; });
+  return {o, now, mode, rows, couple:isCoupleItem(o), shared:qcIsShared(o)};
+}
+function showWaitingItem(d){ const o=d.o, per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[d.mode]||'/mo';
+  const rows=d.rows.map(r=>{ const label=r.yr===0?'Buy now':('Wait '+r.yr+' yr'+(r.yr>1?'s':''));
+    if(!r.elig) return '<tr><td><b>'+label+'</b></td><td>age '+waitAgesText(r.it)+'</td><td class="b">'+waitBenText(r.it)+'</td><td class="p" style="color:#b91c1c" title="'+esc(r.why)+'">may be uninsurable</td><td></td></tr>';
+    const dv=r.yr===0?'—':'<span style="color:#b91c1c;font-weight:800">+'+fmt(r.delta)+per+' ('+(r.pct*100).toFixed(0)+'%)</span>';
+    const add='<button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(r.it)+')\'>＋</button>';
+    return '<tr><td><b>'+label+'</b></td><td>age '+waitAgesText(r.it)+'</td><td class="b">'+waitBenText(r.it)+'</td><td class="p">'+fmt(r.prem)+per+'</td><td style="text-align:right">'+dv+' '+add+'</td></tr>'; }).join('');
+  const kind = d.couple ? ' (couple'+(d.shared?', shared care':'')+')' : '';
+  show(resultBrand('The Cost of Waiting')+printBtn()+'<div class="config-line">The <b>cost of waiting</b> &middot; '+waitWho(o)+kind+' &middot; '+carrierLabel(qcCarrierOf(o.__couple?o.parts[0]:o))+'</div>'+
+    '<div class="config-line" style="font-weight:500">Today: '+cfgTextAny(o)+'</div>'+
+    '<table class="opts"><tr><th>When they buy</th><th>Issue age'+(d.couple?'s':'')+'</th><th>Coverage needed</th><th style="text-align:right">'+(d.couple?'Household premium':'Premium')+'</th><th style="text-align:right">vs. buying now</th></tr>'+rows+'</table>'+
+    '<div class="disc">Waiting costs twice: premiums rise because '+(d.couple?'both spouses are':'they’re')+' older, and the cost of care grows ~3%/yr — so the benefit they’ll need grows with it (rounded to this carrier’s benefit increments).'+(d.couple?' Each row re-prices the same couple plan'+(d.shared?' with shared care':'')+' for both spouses, so the premium covers the whole household.':'')+' Health can also change and make coverage unavailable at any point. See real local care costs in the <a href="https://www.carescout.com/cost-of-care" target="_blank" rel="noopener" style="color:var(--primary-d);font-weight:700">Cost of Care ↗</a> guide. '+DISC+'</div>');
+}
+
 /* ---------- manual tabs ---------- */
 function singleOpts(){ return {age:+$('s_age').value, gender:$('s_gender').value, monthlyBenefit:SNAP($('s_benefit').value), benefitPeriod:$('s_bp').value, elimination:$('s_ep').value, inflation:parseFloat($('s_infl').value)||null, pay:$('s_pay').value, mode:$('s_mode').value, state:$('s_state').value||null, riderSharedAdditional:$('s_sba').checked, totalBenefitPeriod:$('s_bp').value, riderFirstDayHccs:$('s_fdc').checked, riderShortenedBenefit:$('s_sbn').checked, maritalDiscount:$('s_marital').checked}; }
 function runSingle(){ try{ if($('s_benefit')) $('s_benefit').value=SNAP($('s_benefit').value); showSingle(singleOpts()); }catch(e){ showErr(e.message); } }
@@ -4729,7 +4778,13 @@ function runStandard(){ try{
   const married = type.indexOf('married')===0;
   showStandard(age, gender, state, married);
 }catch(e){ showErr(e.message); } }
-function runWaiting(){ try{ showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
+function wTypeChange(){ const c=$('w_type').value==='couple'; $('w_couple').hidden=!c; $('w_agelbl').textContent = c ? 'Applicant 1 — age (today)' : 'Issue age (today)'; }
+function runWaiting(){ try{
+  if($('w_type') && $('w_type').value==='couple'){   // NGL joint (two-life) policy, rated on the older spouse — same as the couple quote
+    const a1=+$('w_age').value, g1=$('w_gender').value, a2=+$('w_age2').value, g2=$('w_gender2').value, bp=$('w_bp').value;
+    const older = a1>=a2 ? {age:a1,gender:g1} : {age:a2,gender:g2};
+    return costOfWaitingFor(withCoupleAges(Object.assign({joint:true, monthlyBenefit:SNAP($('w_benefit').value), benefitPeriod:bp, elimination:'90', inflation:parseFloat($('w_infl').value)||null, pay:'level', mode:'monthly', state:$('w_state').value||null, riderSharedAdditional:$('w_shared').checked, totalBenefitPeriod:bp}, older), a1,g1,a2,g2)); }
+  showWaiting(computeWaiting(+$('w_age').value, $('w_gender').value, SNAP($('w_benefit').value), $('w_bp').value, parseFloat($('w_infl').value)||null, $('w_state').value||null)); }catch(e){ showErr(e.message); } }
 function openGrowth(){ setMode('manual'); activateTab('growth'); $('manual').scrollIntoView({behavior:'smooth',block:'start'}); }
 function computeGrowth(age, benefit, inflation, benefitPeriod, endAge){
   benefit = SNAP(benefit);                         // starting benefit is a real sold amount (≤ $12,000)
@@ -4864,7 +4919,9 @@ function runPattern(p, raw){
   if(p.options && p.options.length){
     if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
     if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
-    const items=p.options.map(op=> op.joint ? Object.assign({},op) : Object.assign({}, op, {age:+age, gender}));
+    // One age + gender typed → one applicant: joint / couple / shared-care options run as a one-person policy.
+    const married=/\bmarried\b/i.test(t);
+    const items=p.options.map(op=> Object.assign({}, qcSingle(op, married||qcSavedMarried(op)), {age:+age, gender}));
     setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+items.length+' option'+(items.length>1?'s':'')+'.');
     showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
     return;
@@ -4873,7 +4930,7 @@ function runPattern(p, raw){
   if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
   if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
   if(!list.length) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — give me one or more benefit amounts, e.g. “7000 5000 4000”.');
-  const items=list.map(mb=>({age:+age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:!!p.riderSharedAdditional, maritalDiscount:!!p.maritalDiscount, totalBenefitPeriod:p.benefitPeriod}));
+  const items=list.map(mb=>({age:+age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:false, maritalDiscount:!!p.maritalDiscount||/\bmarried\b/i.test(t), totalBenefitPeriod:p.benefitPeriod}));
   setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+list.map(fmt0).join(', ')+'.');
   showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+bpL(p.benefitPeriod)+' · '+pctL(p.inflation??null)+(p.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')});
 }
@@ -4916,7 +4973,10 @@ function runQuickCommand(){ try{
   const state = $('t_state').value||null;
   const infl = ($('qc_infl')||{}).value||'saved';
   const shared = joint ? (($('qc_shared')||{}).value||'saved') : 'saved';
-  const xf = op0 => { let op=qcConvert(op0, target, state);
+  const married1 = $('t_type').value.indexOf('married')===0;
+  const xf = op0 => {
+    // One applicant: run every saved option as a one-person policy (no joint / couple / shared care), whatever it was saved as.
+    let op = joint ? qcConvert(qcTemplate(op0), target, state) : qcSingle(qcConvert(qcSingle(op0, married1), target, state), married1);
     if(joint) op=qcApplyShared(op, shared==='saved' ? qcIsShared(op0) : shared==='yes');   // couples: shared care as saved, or as picked
     return qcApplyHealth(qcApplyInfl(op, infl, state), rating); };
   let p = (v==='__standard') ? null : LS.patterns()[+v];
@@ -5013,12 +5073,29 @@ function qcApplyShared(op, on){
   if(isCS(op)||isOmni(op)) return op;
   return Object.assign({}, op, {riderSharedAdditional:!!on, totalBenefitPeriod: op.totalBenefitPeriod||op.benefitPeriod});
 }
-function qcSyncShared(){ const sel=$('qc_shared'), pick=$('qc_pick'); if(!sel||!pick) return;
+// A saved option as a one-person design: a couple household becomes its first policy, a joint (two-life)
+// NGL policy becomes an individual one, couple-only riders come off (NGL Shared Additional, MoO Shared Care /
+// Joint Waiver / partner discount, OmniFlex & CareScout both-applying discounts), and the marital
+// discounts follow the applicant type (married, spouse not applying → the carrier's spousal discount).
+function qcTemplate(op){ if(!op || !op.__couple) return op; const t=Object.assign({}, op.parts&&op.parts[0]||op); delete t.__couple; delete t.parts; delete t._ages; delete t._genders; return t; }
+function qcSingle(op, married){ const o=Object.assign({}, qcTemplate(op)); delete o.joint; delete o._ages; delete o._genders; delete o.__couple; delete o.parts;
+  if(isMoo(o)||isMooc(o)){ o.sharedCare=false; o.jointWaiver=false; o.partner=false; o.spousal=!!married; }
+  else if(isCS(o)){ o.marital = married ? 'Married1buy' : 'Single'; }
+  else if(isOmni(o)){ if(!married) o.spousal=false; }
+  else { o.riderSharedAdditional=false; o.maritalDiscount=!!married; }
+  return o; }
+// Was this option saved with a spouse-not-applying discount? (typed commands keep it)
+function qcSavedMarried(op){ const o=qcTemplate(op)||{}; return !!(o.maritalDiscount || ((isMoo(o)||isMooc(o)) && o.spousal && !o.partner) || (isCS(o) && o.marital==='Married1buy')); }
+function qcSyncShared(keep){ const sel=$('qc_shared'), pick=$('qc_pick'); if(!sel||!pick) return;
+  const cur=sel.value;
+  if(($('t_type')||{}).value!=='joint'){   // one applicant: shared care needs a spouse, so it's off — or pick it to add one
+    sel.innerHTML='<option value="one">Not shared — one applicant</option><option value="add">＋ Add shared care (enter spouse’s age)</option>';
+    sel.value='one'; return; }
   let saved;
   if(pick.value==='__standard') saved=true;   // the Standard joint ladder carries the shared-care rider
   else { const p=LS.patterns()[+pick.value]; saved = !!p && ((p.options&&p.options.length) ? p.options.some(qcIsShared) : !!p.riderSharedAdditional); }
   sel.innerHTML='<option value="saved">'+(saved?'Shared':'Not shared')+' (as saved)</option><option value="yes">Shared care — can use each other’s benefits</option><option value="no">Not shared — separate benefits</option>';
-  sel.value='saved'; }
+  sel.value = (keep && (cur==='yes'||cur==='no')) ? cur : 'saved'; }   // switching applicant type keeps a shared choice already made
 function fillQuickPicker(){
   if($('qc_health') && !$('qc_health').options.length) qcSyncHealth();
   const sel=$('qc_pick'); if(!sel) return; const cur=sel.value;
@@ -5105,7 +5182,7 @@ function renderTray(){
   const a=LS.tray(); $('trayCard').hidden = a.length===0; $('traycount').textContent = a.length?('('+a.length+' of 6)'):'';
   if(!a.length){ $('tray').innerHTML=''; $('traydisc').textContent=''; return; }
   const rows=a.map((o,i)=>{ let prem; try{ const q=anyQuote(o); prem=premText(o,q); }catch(e){ prem='—'; }
-    const waitBtn = (isCS(o)||isOmni(o)) ? '' : '<button class="rm" style="background:#fff7ed;color:#9a3412;margin-right:6px" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 waiting</button>';
+    const waitBtn = '<button class="rm" style="background:#fff7ed;color:#9a3412;margin-right:6px" onclick=\'costOfWaitingFor('+JSON.stringify(o)+')\'>📉 waiting</button>';
     return '<tr><td class="b">'+cfgTextAny(o)+'</td><td class="p">'+prem+'</td><td style="text-align:right;white-space:nowrap">'+waitBtn+'<button class="rm" onclick="rmTray('+i+')">remove</button></td></tr>'; }).join('');
   $('tray').innerHTML='<table class="opts"><tr><th>Option</th><th style="text-align:right">Premium</th><th></th></tr>'+rows+'</table>';
   $('traydisc').textContent=DISC;
@@ -5125,7 +5202,7 @@ function parseDob(s){ s=String(s||'').trim(); if(!s) return null; let y,m,d, mm;
 function ageFromDob(dob){ const d=parseDob(dob); if(!d) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
 function fmtDob(dt){ const p=n=>String(n).padStart(2,'0'); return p(dt.getMonth()+1)+'/'+p(dt.getDate())+'/'+dt.getFullYear(); }
 // Birthday → age: enter either an age OR type a birthday, and the birthday fills in the age.
-const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2'];
+const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','w_age2','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2'];
 // Save age: NGL, Mutual of Omaha (and Thrivent, once added) let a client who turned a year older
 // within the last 30 days apply at the younger age (policy dated before the birthday).
 // CareScout and Manhattan Life OmniFlex quote the actual age.
@@ -5134,7 +5211,7 @@ const SAVE_AGE_LABEL='NGL & Mutual of Omaha';
 // Which carrier each age field quotes ('mixed' = all-carrier tools: shows the save age, keeps the actual age for the others)
 const AGE_FIELD_CARRIER={s_age:'ngl',c_age1:'ngl',c_age2:'ngl',b_age:'ngl',w_age:'ngl',g_age:'ngl',coc_age:'ngl',
   cs_age:'carescout',om_age:'omniflex',om_age2:'omniflex',moo_age:'moo',moo_age2:'moo',mooc_age:'mooc',mooc_age2:'mooc',
-  ba_age:'mixed',sw_age:'mixed',sw_age2:'mixed',t_age:'mixed',t_age2:'mixed'};
+  w_age2:'ngl',ba_age:'mixed',sw_age:'mixed',sw_age2:'mixed',t_age:'mixed',t_age2:'mixed'};
 function dobInfo(dob){ const d=parseDob(dob); if(!d) return null; const age=ageFromDob(dob); if(age==null) return null;
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   let last=new Date(now.getFullYear(), d.getMonth(), d.getDate()); if(last>today) last=new Date(now.getFullYear()-1, d.getMonth(), d.getDate());
