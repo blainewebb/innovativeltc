@@ -5775,7 +5775,7 @@ function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
 // Build a self-contained, print-ready HTML document from the given content.
 function buildPrintDoc(innerHTML, title, bodyClass, autoprint){
   let css=''; document.querySelectorAll('style').forEach(s=>{ css+=s.textContent+'\n'; });
-  const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
+  const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar,.qs-customizer,.colmove{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
   const onload = autoprint ? ' onload="setTimeout(function(){try{window.print()}catch(e){}},350)"' : '';
   return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+'</head><body class="'+(bodyClass||'')+'"'+onload+'>'+innerHTML+'</body></html>';
 }
@@ -5819,7 +5819,11 @@ function showPrintHelp(){
   }
   el.classList.add('show');
 }
-function printSheet(){ printDoc('<div class="qsheet">'+$('sheet').outerHTML+'</div>', 'Quote — Innovative LTC', ''); }
+// Print only the client-facing sheet: strip the Customize panel and on-screen editing controls first,
+// so the PDF never includes them (some browsers/app windows ignore print-only CSS).
+function printSheet(){ const c=$('sheet').cloneNode(true);
+  c.querySelectorAll('.qs-customizer, .colmove, .noprint, .qs-toolbar, button').forEach(el=>el.remove());
+  printDoc('<div class="qsheet">'+c.outerHTML+'</div>', 'Quote — Innovative LTC', ''); }
 // Print just the current result card (Inflation Growth / Cost of Waiting / comparison)
 function printResult(){ printDoc('<div class="wrap"><div class="card" id="resultCard">'+$('result').innerHTML+'</div></div>', 'Quote — Innovative LTC', 'print-result'); }
 function resultBrand(title){ return '<div class="printonly res-brand">Innovative <span>LTC</span> — '+title+'<small>Blaine Webb · Innovative LTC · blaine@innovativeltc.com</small></div>'; }
