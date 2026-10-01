@@ -178,6 +178,9 @@
   .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:.8rem;padding:10px 12px;border-radius:9px;margin-top:14px}
   .client .view{background:#eef2ff;color:var(--primary-d);border:1px solid #c7d2fe}
   /* quick tools row */
+  .tenpay{font-size:.74rem;font-weight:700;color:#7c3aed;white-space:nowrap;margin-top:2px}
+  .tenpay span{font-weight:500;color:var(--muted)}
+  .tenpaybox-wrap{font-weight:600;font-size:.85rem}
   .saveagenote{margin-top:4px;font-size:.74rem;line-height:1.35;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:4px 7px}
   .quicktools{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .quicktools .lbl{color:var(--muted);font-size:.8rem;font-weight:600}
@@ -348,7 +351,8 @@
       <div class="field"><label>Applicant 2 — age</label><input id="t_age2" type="number" value="60" min="18" max="79"></div>
       <div class="field"><label>Applicant 2 — gender</label><select id="t_g2"><option value="female">Female</option><option value="male">Male</option></select></div>
     </div>
-    <div class="actions"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button></div>
+    <div class="actions" style="align-items:center;gap:14px"><button class="run" onclick="runQuickCommand()">▶ Run quick command</button>
+      <label class="tenpaybox-wrap" title="Shows NGL’s 10-pay premium next to the regular lifetime premium — the plan itself is unchanged"><input type="checkbox" class="tenpaybox" onchange="setShowTenPay(this.checked)"> Show NGL 10-pay too</label></div>
   </div>
 
   <div class="card ask" id="askCard">
@@ -402,6 +406,7 @@
         <div class="field"><label>Show benefit growth to age</label><input id="s_projage" type="number" value="80" min="70" max="100" step="1"></div>
       </div>
       <div class="riders">
+        <label title="Shows the 10-pay premium next to the regular lifetime premium on NGL quotes and the printed quote — the plan itself is unchanged"><input type="checkbox" class="tenpaybox" onchange="setShowTenPay(this.checked)"> <span style="color:#7c3aed">Show 10-pay too</span></label>
         <label><input type="checkbox" id="s_sba"> Shared-care rider</label>
         <label><input type="checkbox" id="s_fdc"> First-day home care rider (waives elimination for home care)</label>
         <label><input type="checkbox" id="s_sbn"> Shortened benefit rider</label>
@@ -3393,7 +3398,26 @@ function anyQuote(o){ if(o && o.__couple){ let mp=0, ap=0; const mode=(o.parts[0
     for(const part of o.parts){ const q=oneQuote(part); mp+=(q.modalPayment!=null?q.modalPayment:(q.singlePremium||0)); ap+=(q.annualPremium!=null?q.annualPremium:(q.singlePremium||0)); }
     return {modalPayment:Math.round(mp*100)/100, annualPremium:Math.round(ap*100)/100, mode, pay:'Level', __couple:true}; }
   return oneQuote(o); }
-function premText(o,q){ if(isCS(o)||isOmni(o)||isMoo(o)||isMooc(o)||(o&&o.__couple)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
+function premText(o,q){ return premText0(o,q)+tenPayLine(o); }
+function premText0(o,q){ if(isCS(o)||isOmni(o)||isMoo(o)||isMooc(o)||(o&&o.__couple)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
+// ---- NGL 10-Pay, shown NEXT TO the regular (level, lifetime) premium when "Show 10-pay too" is ticked ----
+// Same plan, premiums paid for 10 years and then it's paid up. Display only — the plan itself stays level-pay.
+let SHOW_TENPAY=false; try{ SHOW_TENPAY = localStorage.getItem('ltc_show10')==='1'; }catch(e){}
+function setShowTenPay(on){ SHOW_TENPAY=!!on; try{ localStorage.setItem('ltc_show10', on?'1':'0'); }catch(e){}
+  document.querySelectorAll('.tenpaybox').forEach(b=>{ b.checked=SHOW_TENPAY; });
+  try{ renderTray(); }catch(e){} try{ if($('qsheet')&&$('qsheet').classList.contains('show')) renderSheet(); }catch(e){} }
+function isNglPlan(o){ return !!o && (o.__couple ? (o.parts||[]).every(isNglItem) : isNglItem(o)); }
+function tenPayQuote(o){ if(!isNglPlan(o)) return null; const lvl=x=>!x.pay||x.pay==='level';
+  try{
+    if(o.__couple){ if(!o.parts.every(lvl)) return null; let m=0,a=0,mode='monthly';
+      for(const p of o.parts){ const q=oneQuote(Object.assign({}, p, {pay:'10pay'})); m+=q.modalPayment; a+=q.annualPremium; mode=q.mode||mode; }
+      return {modalPayment:Math.round(m*100)/100, annualPremium:Math.round(a*100)/100, mode}; }
+    if(!lvl(o)) return null;
+    return oneQuote(Object.assign({}, o, {pay:'10pay'}));
+  }catch(e){ return null; } }
+function tenPayLine(o){ if(!SHOW_TENPAY) return ''; const q=tenPayQuote(o); if(!q) return '';
+  const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo';
+  return '<div class="tenpay">10-pay: '+fmt(q.modalPayment)+per+' <span>· paid up in 10 yrs</span></div>'; }
 // Combine spouse policies (same design, different age/gender) into one household item.
 function coupleCombine(parts){ const older=parts.reduce((a,b)=> (+b.age>+a.age)?b:a, parts[0]);
   return Object.assign({}, older, {__couple:true, parts:parts.map(x=>Object.assign({},x)), _ages:parts.map(x=>+x.age), _genders:parts.map(x=>x.gender)}); }
@@ -4648,7 +4672,7 @@ function showPayCompare(o){
 }
 function showSingle(o){
   const q=E.quote(o);
-  show('<div class="res-head">'+priceHead(q)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+growthLine(o)+valueMetrics(o,q)+whatIf(o)+'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+compareBtns(o)+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
+  show('<div class="res-head">'+priceHead(q)+tenPayLine(o)+'</div><div class="config-line">'+cfgText(o).replace(/·/g,'&middot;')+'</div>'+growthLine(o)+valueMetrics(o,q)+whatIf(o)+'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+compareBtns(o)+stepsBlock(q.steps)+'<div class="disc">'+DISC+'</div>');
 }
 function showCouple(a1,g1,a2,g2,opts){
   const r=E.quoteCouple(a1,g1,a2,g2,opts.monthlyBenefit,opts); const c=r.combined_joint;
@@ -4657,7 +4681,7 @@ function showCouple(a1,g1,a2,g2,opts){
   // joint household policy as a tray object (rated on the older insured) so it can be added/saved/printed
   const older = (+a1>=+a2) ? {age:+a1,gender:g1} : {age:+a2,gender:g2};
   const trayObj = withCoupleAges(Object.assign({}, opts, older, {joint:true, monthlyBenefit:opts.monthlyBenefit}), a1,g1,a2,g2);
-  show('<div class="res-head">'+priceHead(c)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
+  show('<div class="res-head">'+priceHead(c)+tenPayLine(trayObj)+'<div style="color:var(--muted);font-weight:600">joint policy, both insured</div></div>'+
     '<div class="config-line">'+fmt0(opts.monthlyBenefit)+'/mo each &middot; '+bpL(opts.benefitPeriod)+' &middot; '+opts.elimination+'-day &middot; '+pctL(opts.inflation)+(opts.riderSharedAdditional?' &middot; shared-care':'')+'</div>'+
     '<table class="opts"><tr><th>Survivor premium</th><th style="text-align:right">Monthly</th></tr>'+rows+'</table>'+
     '<div class="resbtns">'+addBtn(trayObj)+'</div>'+stepsBlock(c.steps)+'<div class="disc">'+DISC+'</div>');
@@ -4677,7 +4701,7 @@ function showStandard(age,gender,state,married){
   STD_LAST=()=>showStandard(age,gender,state,married); const fdc=STD_FDC;
   const body=E.STANDARD_SCENARIO.options.map(op=>{
     const cfg={age:+age,gender,monthlyBenefit:op.monthly_benefit,benefitPeriod:op.benefit_period,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:false,maritalDiscount:!!married,totalBenefitPeriod:op.benefit_period,riderFirstDayHccs:fdc};
-    let prem; try{ prem=fmt(E.quote(cfg).modalPayment)+'/mo'; }catch(e){ prem='—'; }
+    let prem; try{ prem=fmt(E.quote(cfg).modalPayment)+'/mo'+tenPayLine(cfg); }catch(e){ prem='—'; }
     return '<tr><td><b>'+op.name+'</b>'+(fdc?'<div style="font-size:.72rem;color:#15803d;font-weight:700">+ zero-day home care</div>':'')+'</td><td class="b">'+fmt0(op.monthly_benefit)+'/mo, '+bpL(op.benefit_period)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(cfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard comparison &middot; '+age+' '+gL(gender)+(married?' &middot; married (spousal −'+(MARITAL_DISCOUNT*100)+'%)':'')+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care benefits pay from day one, with no elimination-period wait. ':'')+(married?'Married applicant applying alone — NGL spousal discount applied. ':'')+DISC+'</div>');
 }
@@ -4690,6 +4714,7 @@ function showStandardJoint(age1,g1,age2,g2,state){
     let prem; try{ prem=fmt(E.quoteCouple(+age1,g1,+age2,g2,op.monthly_benefit,kw).combined_joint.modalPayment)+'/mo'; }catch(e){ prem='—'; }
     // joint opts for the tray — the combined premium is the joint rate at the older insured's age
     const jointCfg=withCoupleAges({age:older.age,gender:older.g,joint:true,monthlyBenefit:op.monthly_benefit,benefitPeriod:BP,elimination:String(op.elimination||'90'),inflation:op.inflation||null,pay:'level',mode:'monthly',state:state||null,riderSharedAdditional:true,totalBenefitPeriod:BP,riderFirstDayHccs:fdc}, age1,g1,age2,g2);
+    if(prem!=='—') prem+=tenPayLine(jointCfg);
     return '<tr><td><b>'+op.name.replace(/\/\s*4-yr/,'/ 3-yr')+'</b>'+(fdc?'<div style="font-size:.72rem;color:#15803d;font-weight:700">+ zero-day home care</div>':'')+'</td><td class="b">'+fmt0(op.monthly_benefit)+'/mo each, '+bpL(BP)+', '+pctL(op.inflation||null)+'</td><td class="p">'+prem+'</td><td style="text-align:right"><button class="rm" style="background:#eef2ff;color:var(--primary-d)" onclick=\'addToTray('+JSON.stringify(jointCfg)+')\'>＋</button></td></tr>'; }).join('');
   show('<div class="config-line">Standard <b>joint</b> comparison &middot; '+age1+' '+gL(g1)+' + '+age2+' '+gL(g2)+' &middot; 3-yr each, shared-care rider on all'+(fdc?' &middot; zero-day home care':'')+'</div><table class="opts"><tr><th>Option</th><th>Coverage</th><th style="text-align:right">Combined premium</th><th></th></tr>'+body+'</table>'+stdBubble(fdc)+'<div class="disc">'+(fdc?'Zero-day (First-Day) Home Care rider applied to all three — home care pays from day one, no elimination wait. ':'')+'Joint (two-life) policy rated on the older insured, all at a 3-year benefit period with the Shared Additional Policy Limit rider (3-year shared pool). '+DISC+'</div>');
 }
@@ -5549,6 +5574,7 @@ const QCATS = {
   marital:  {label:'Marital',              v:(o)=> o.__couple ? 'Couple — combined household'+(isOmni(o)||(o.parts&&o.parts.some(x=>isOmni(x)))?' (spousal −10%)':((isMoo(o)||isMooc(o))||(o.parts&&o.parts.some(x=>isMoo(x)||isMooc(x)))?' (partner −15%)':'')) : (o._ages&&o._ages.length>1) ? 'Joint — both insured' : isOmni(o) ? (o.spousal?'spousal −10%':'—') : isCS(o) ? csMaritalLabel(o.marital) : (isMoo(o)||isMooc(o)) ? (o.partner?'partner −15%':'—') : (o.maritalDiscount?((MARITAL_DISCOUNT*100)+'% applied'):'—')},
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
+  tenpay:   {label:'10-Pay premium',       v:(o)=>{ const q=tenPayQuote(o); if(!q) return '—'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+' · 10 years, then paid up</div>'; }},
   carrier:  {label:'Carrier',              v:(o)=> isOmni(o) ? 'Manhattan Life' : isCS(o) ? 'CareScout' : (isMoo(o)||isMooc(o)) ? 'Mutual of Omaha' : 'NGL'},
 };
 const QLAYOUTS = {
@@ -5557,7 +5583,7 @@ const QLAYOUTS = {
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
 // Customize mode: every available line item, and which are on by default.
-const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','optbenefits','rxbenefit','fast50','restoration','marital','annual','premium'];
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','optbenefits','rxbenefit','fast50','restoration','marital','annual','premium','tenpay'];
 const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,optbenefits:false,rxbenefit:false,fast50:false,restoration:false,marital:false,annual:true,premium:true};
 function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
   let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
@@ -5845,6 +5871,10 @@ function renderSheet(){
     const anyShared = items.some(o=>o.riderSharedAdditional || o.sharedCare || (o.__couple && o.parts && o.parts.some(x=>x.riderSharedAdditional||x.sharedCare)));
     if(anyShared && !rows.includes('sharedcare')){ const ii=rows.indexOf('inflation'); rows.splice(ii<0?rows.indexOf('premium'):ii+1, 0, 'sharedcare'); }
     else if(!anyShared) rows = rows.filter(k=>k!=='sharedcare');
+    // NGL 10-Pay row right under the premium when "Show 10-pay too" is on and an NGL level-pay option is on the sheet
+    const anyTen = SHOW_TENPAY && items.some(o=>tenPayQuote(o));
+    if(anyTen && !rows.includes('tenpay')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi+1, 0, 'tenpay'); }
+    else if(!anyTen) rows = rows.filter(k=>k!=='tenpay');
     // Mutual of Omaha optional benefits (ROP, Pro HHC, HHC Waiver, NF-SBP, ALF/HHC reduction) → list row when any are selected
     const anyMooOpt = items.some(o=>mooSheetOpts(o));
     if(QSHEET.layout!=='essentials' && anyMooOpt && !rows.includes('optbenefits')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'optbenefits'); }
@@ -5910,6 +5940,7 @@ csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
 omniInitStates(); omniSyncState();   // OmniFlex state picker + filed-states text from the rate data
 if(typeof moocFillPct==='function') moocFillPct();   // populate MutualCare Custom inflation-percent dropdown
 attachBirthdayPickers();   // add a birthday date-picker beside every age field (either/or entry)
+document.querySelectorAll('.tenpaybox').forEach(b=>{ b.checked=SHOW_TENPAY; });   // remembered "Show 10-pay too" choice
 setCarrier('ngl');   // start on NGL; switch carriers from the header
 </script>
 </body>
