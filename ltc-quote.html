@@ -5575,6 +5575,7 @@ const QCATS = {
   annual:   {label:'Annual premium',       v:(o,q)=> !q?'—':(q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.annualPremium)+'/yr')},
   premium:  {label:'Premium',              v:(o,q)=>{ if(!q) return '—'; if(q.pay==='Single-Pay') return fmt(q.singlePremium)+'<div class="pu">one-time</div>'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+'</div>'; }},
   tenpay:   {label:'10-Pay premium',       v:(o)=>{ const q=tenPayQuote(o); if(!q) return '—'; const per={monthly:'per month',quarterly:'per quarter',semiannual:'per 6 mo',annual:'per year'}[q.mode]||'per month'; return fmt(q.modalPayment)+'<div class="pu">'+per+' · 10 years, then paid up</div>'; }},
+  tenpayAnnual:{label:'10-Pay annual premium', v:(o)=>{ const q=tenPayQuote(o); if(!q) return '—'; return fmt(q.annualPremium)+'<div class="pu">per year · 10 years, then paid up</div>'; }},
   carrier:  {label:'Carrier',              v:(o)=> isOmni(o) ? 'Manhattan Life' : isCS(o) ? 'CareScout' : (isMoo(o)||isMooc(o)) ? 'Mutual of Omaha' : 'NGL'},
 };
 const QLAYOUTS = {
@@ -5583,7 +5584,7 @@ const QLAYOUTS = {
   detailed:    ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','annual','premium'],
 };
 // Customize mode: every available line item, and which are on by default.
-const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','optbenefits','rxbenefit','fast50','restoration','marital','annual','premium','tenpay'];
+const ALL_CATS = ['applicant','benefit','period','pool','projMonthly','projPool','elim','inflation','shared','sharedcare','optbenefits','rxbenefit','fast50','restoration','marital','annual','premium','tenpay','tenpayAnnual'];
 const DEFAULT_CUSTOM_ON = {applicant:false,benefit:true,period:true,pool:true,projMonthly:true,projPool:true,elim:true,inflation:true,shared:false,sharedcare:false,optbenefits:false,rxbenefit:false,fast50:false,restoration:false,marital:false,annual:true,premium:true};
 function getCustom(){ const s=LS.sheetCustom()||{}; const on=Object.assign({}, DEFAULT_CUSTOM_ON, s.on||{});
   let order=(s.order||ALL_CATS.slice()).filter(k=>ALL_CATS.includes(k)); ALL_CATS.forEach(k=>{ if(!order.includes(k)) order.push(k); }); return {order, on}; }
