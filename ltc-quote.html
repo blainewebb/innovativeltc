@@ -3442,7 +3442,7 @@ function setView(v){
   if(!qc && prevView==='qc'){ try{ qcPushClient(); }catch(e){} }
   document.querySelectorAll('#viewTabs .vtab').forEach(t=>t.classList.toggle('on', t.dataset.view===VIEW));
   if($('qccard')) $('qccard').hidden = !qc;
-  if($('nameCard')) $('nameCard').hidden = qc;   // client-name box: quote view only
+  if($('nameCard')) $('nameCard').hidden = false;   // client-name box: on both views (prints on the quote either way)
   if(qc){
     if($('askCard')) $('askCard').style.display='none';
     QUOTE_CARDS.forEach(id=>{ const e=$(id); if(e) e.hidden=true; });
@@ -4695,7 +4695,7 @@ function showStandardJoint(age1,g1,age2,g2,state){
 }
 function qcSharedChange(){ const sel=$('qc_shared'); if(!sel) return;
   if(sel.value==='add'){ $('t_type').value='joint'; stdTypeChange(); sel.value='yes'; const a2=$('t_age2'); if(a2){ a2.focus(); a2.select&&a2.select(); } } }
-function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; if(typeof qcSyncShared==='function') qcSyncShared(true); }
+function stdTypeChange(){ const joint=$('t_type').value==='joint'; $('t_couple').hidden = !joint; if($('t_agelbl')) $('t_agelbl').textContent = joint ? 'Applicant 1 — age' : 'Issue age'; if(typeof qcSyncShared==='function') qcSyncShared(true); if(joint && typeof spouseNameAuto==='function') spouseNameAuto(true); }   // couple → reveal spouse name boxes
 // Build a combined-household item for a couple from one individual option: two spouse
 // policies (each with its carrier's couple discount) summed into a single household item.
 function coupleHousehold(op, couple){
