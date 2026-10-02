@@ -5772,12 +5772,33 @@ function viewTrayQuote(){ const items=LS.tray(); if(!items.length){ alert('Add a
   QSHEET={client:{name:nd.display, names:{n1:nd.c1,n2:nd.c2}, items:items.slice(), savedAt:new Date().toLocaleDateString()}, adhoc:true, layout:'recommended', projAge:(QSHEET.projAge||80), colOrder:null}; renderSheet(); $('qsheet').classList.add('show'); }
 function closeSheet(){ $('qsheet').classList.remove('show'); }
 function setSheetLayout(l){ QSHEET.layout=l; renderSheet(); }
+// Fit-to-page for printed quote sheets: Letter, 0.4in margins. The quote (everything before the first
+// growth / shared-care page) is scaled to fit ONE page — width and height — so 5–6 options never get cut
+// off; each extra page is scaled to fit the page width. Many columns also get a tighter table first.
+const PRINT_FIT_CSS='<style>@page{size:letter portrait;margin:0.4in} @media print{html,body{margin:0!important;padding:0!important}}'+
+  ' .sheet.pf-many table.qtab th,.sheet.pf-many table.qtab td{padding:7px 6px!important;font-size:.8rem!important}'+
+  ' .sheet.pf-many table.qtab tr.prem td{font-size:1.05rem!important} .sheet.pf-many table.qtab th .cbadge,.sheet.pf-many table.qtab th span{white-space:normal}</style>';
+const PRINT_FIT_JS='<script>(function(){try{'+
+  'var sh=document.querySelector(".sheet"); if(!sh) return;'+
+  'var PW=739, PH=979;'+                                                  // 7.7in x 10.2in printable at 96px/in
+  'var cols=0, t=sh.querySelector("table.qtab"); if(t&&t.rows[0]) cols=t.rows[0].cells.length-1;'+
+  'if(cols>=5) sh.classList.add("pf-many");'+
+  'sh.style.maxWidth="none"; sh.style.boxSizing="border-box"; sh.style.margin="0"; sh.style.padding="0"; sh.style.width=PW+"px";'+
+  'var w=Math.max(sh.scrollWidth, t?t.scrollWidth:0); if(w>PW){ sh.style.width=w+"px"; w=Math.max(sh.scrollWidth, t?t.scrollWidth:0); }'+
+  // wrap the quote (before the first extra page) so it can be fitted on its own
+  'var first=document.createElement("div"); first.className="pf-first"; var kids=[].slice.call(sh.childNodes);'+
+  'for(var i=0;i<kids.length;i++){ var k=kids[i]; if(k.nodeType===1 && k.classList.contains("growth-page")) break; first.appendChild(k); }'+
+  'sh.insertBefore(first, sh.firstChild);'+
+  'var h=first.scrollHeight, z=Math.min(1, PW/w, (PH-4)/h); if(z<1) first.style.zoom=z;'+
+  '[].forEach.call(sh.querySelectorAll(".growth-page"), function(g){ var gw=Math.max(g.scrollWidth, w); var gz=Math.min(1, PW/gw); if(gz<1) g.style.zoom=gz; });'+
+  'sh.style.width=PW+"px";'+
+'}catch(e){}})();<\/script>';
 // Build a self-contained, print-ready HTML document from the given content.
 function buildPrintDoc(innerHTML, title, bodyClass, autoprint){
   let css=''; document.querySelectorAll('style').forEach(s=>{ css+=s.textContent+'\n'; });
   const extra='<style>@media screen{body{background:#fff;margin:0}} .noprint,.resprint,.qs-toolbar,.qs-customizer,.colmove{display:none!important} .qsheet{position:static!important;display:block!important;background:#fff!important;padding:0!important} .sheet{box-shadow:none!important;max-width:820px!important;margin:0 auto!important}</style>';
   const onload = autoprint ? ' onload="setTimeout(function(){try{window.print()}catch(e){}},350)"' : '';
-  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+'</head><body class="'+(bodyClass||'')+'"'+onload+'>'+innerHTML+'</body></html>';
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>'+css+'</style>'+extra+PRINT_FIT_CSS+'</head><body class="'+(bodyClass||'')+'"'+onload+'>'+innerHTML+PRINT_FIT_JS+'</body></html>';
 }
 // window.print() is silently ignored inside claude.ai's sandboxed artifact frame, so:
 // 1) open a real browser tab and print there (works in the downloaded file / non-sandboxed views);
