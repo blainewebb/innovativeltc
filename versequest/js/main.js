@@ -36,6 +36,19 @@ const $$ = sel => [...app.querySelectorAll(sel)];
 function on(sel, fn) { $$(sel).forEach(el => el.addEventListener('click', e => { sfx.tap(); fn(e, el); })); }
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
+/* "Are you sure?" shown on the page itself. Browser pop-ups (confirm) are
+   blocked when the game runs inside some app views, so never rely on them. */
+function askFirst(msg, yes, fn) {
+  $('.ask')?.remove();
+  const box = document.createElement('div');
+  box.className = 'ask';
+  box.innerHTML = `<p>${esc(msg)}</p><div class="ask-row"><button class="btn danger" id="ask-yes">${esc(yes)}</button><button class="btn primary" id="ask-no">Keep going</button></div>`;
+  $('.screen').prepend(box);
+  box.querySelector('#ask-yes').addEventListener('click', () => { sfx.tap(); fn(); });
+  box.querySelector('#ask-no').addEventListener('click', () => { sfx.tap(); box.remove(); });
+  window.scrollTo(0, 0);
+}
+
 /* ------------------------------------------------------------------ art -- */
 const ICON = {
   flame: c => `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path fill="${c}" d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3-1-3 0-6 1-9.5z"/></svg>`,
@@ -227,7 +240,7 @@ function exercise(ex, verse, ctx, meta) {
     else if (ex.type === 'next') exNext(ex, verse, ui);
     else if (ex.type === 'ref') exRef(ex, verse, ui);
     on('#quit', () => {
-      if (confirm('Stop this lesson? Your progress on this step will not be saved.')) { ctx.quit = true; resolve(); }
+      askFirst('Stop this lesson? This step will not be saved.', 'Stop', () => { ctx.quit = true; resolve(); });
     });
     wireSpeak();
   });
@@ -457,7 +470,7 @@ function trivia(cat = null) {
     wireSpeak();
     if (p.settings.readAloud) speak(q.q);
     if (TEST) window.__vq.ex = { type: 'trivia', right: `.choice[data-i="${choices.findIndex(c => c.correct)}"]`, wrong: `.choice[data-i="${choices.findIndex(c => !c.correct)}"]` };
-    on('#quit', () => { if (!i || confirm('Stop this trivia round?')) home(); });
+    on('#quit', () => (i ? askFirst('Stop this trivia round?', 'Stop', home) : home()));
     $$('.choice').forEach(el => el.addEventListener('click', () => {
       const k = Number(el.dataset.i);
       const ok = choices[k].correct;
@@ -602,11 +615,12 @@ function grownups() {
   on('#switch', title);
   on('#add', () => newPlayer(false));
   on('#del', () => {
-    if (!confirm(`Delete ${p.name} and all of their progress? This cannot be undone.`)) return;
-    state.players = state.players.filter(x => x.id !== p.id);
-    state.current = state.players[0]?.id ?? null;
-    persist();
-    title();
+    askFirst(`Delete ${p.name} and all of their progress? This cannot be undone.`, 'Delete', () => {
+      state.players = state.players.filter(x => x.id !== p.id);
+      state.current = state.players[0]?.id ?? null;
+      persist();
+      title();
+    });
   });
   on('#home', home);
 }

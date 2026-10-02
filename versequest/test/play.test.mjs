@@ -50,7 +50,7 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('dialog', d => d.accept());
+  page.on('dialog', d => { errors.push(`unexpected pop-up: ${d.message()}`); d.dismiss(); });
 
   // Day 1 ------------------------------------------------------------------
   await page.goto(url('2026-10-05'));
@@ -146,6 +146,22 @@ try {
   ok('second player starts fresh', (await page.textContent('#stars')) === '0');
   await page.click('#who');
   ok('both players listed', (await page.$$('.player-btn')).length === 2);
+
+  // Stopping and deleting ask on the page, not with a browser pop-up.
+  await page.click('.player-btn:nth-child(2)');
+  await page.click('[data-act="start"]');
+  await page.click('#quit');
+  ok('stop asks first', await page.isVisible('.ask'));
+  await page.click('#ask-no');
+  ok('keep going stays in the lesson', !(await page.isVisible('.ask')) && await page.isVisible('#go'));
+  await page.click('#quit');
+  await page.click('#ask-yes');
+  ok('stop goes home', await page.isVisible('.goal'));
+  await page.click('#grown');
+  await page.click('#del');
+  ok('delete asks first', (await page.textContent('.ask')).includes('Delete Eli'));
+  await page.click('#ask-yes');
+  ok('delete removes the player', (await page.$$('.player-btn')).length === 1);
 
   ok('no console errors', errors.length === 0, errors.join(' | '));
 } finally {
