@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Criatura">
+<meta name="theme-color" content="#8fd3ff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Mundo Criatura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: one-screen game column (max 520px), sky above, blocky grass-and-dirt panels below. Single deliberate daytime look. */
+:root{
+  --sky:#8fd3ff; --sky2:#d9f2ff; --grass:#5bbf4a; --grass-dk:#3d8f33; --dirt:#8a5a36; --dirt-dk:#6b4428;
+  --panel:#fffdf5; --ink:#23262f; --ink-soft:#5d6273; --line:#e3dccb;
+  --gold:#ffc83d; --good:#2fa84f; --bad:#e2483d; --blue:#2f6fdf;
+  --display:"Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --body:"Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+html,body{height:100%}
+html{background:var(--sky2)}
+body{margin:0;background:linear-gradient(180deg,var(--sky) 0%,var(--sky2) 70%);background-attachment:fixed;color:var(--ink);font-family:var(--body);font-weight:600;font-size:17px;-webkit-tap-highlight-color:transparent}
+#app{max-width:520px;margin:0 auto;padding-inline:16px;padding-block:calc(12px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px));min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:.3px}
+h1{font-size:2.4rem;line-height:1}
+h2{font-size:1.6rem}
+h3{font-size:1.2rem}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+body{overscroll-behavior-y:none}
+button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.btn{font-family:var(--display);font-size:1.15rem;padding:12px 18px;border-radius:12px;background:var(--gold);color:var(--ink);box-shadow:0 4px 0 #c98f12;transition:transform .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #c98f12}
+.btn.green{background:var(--grass);color:#fff;box-shadow:0 4px 0 var(--grass-dk)}
+.btn.blue{background:var(--blue);color:#fff;box-shadow:0 4px 0 #1d4ea8}
+.btn.plain{background:var(--panel);box-shadow:0 4px 0 var(--line)}
+.btn.small{font-size:.95rem;padding:8px 12px}
+.btn[disabled]{opacity:.5;cursor:default}
+.panel{background:var(--panel);border-radius:16px;padding:16px;box-shadow:0 5px 0 rgba(0,0,0,.12)}
+.ground{background:linear-gradient(180deg,var(--grass) 0 14px,var(--dirt) 14px);border-radius:14px;padding:22px 14px 14px;color:#fff;box-shadow:0 5px 0 var(--dirt-dk)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.col{display:flex;flex-direction:column;gap:10px}
+.muted{color:var(--ink-soft)}
+.en{color:var(--ink-soft);font-size:.9rem}
+.hint{font-size:.85rem;color:var(--ink-soft);font-style:italic}
+.logo{text-align:center;padding-top:10px}
+.logo h1{color:#fff;font-size:3rem;text-shadow:0 4px 0 var(--grass-dk),0 7px 0 rgba(0,0,0,.15)}
+.logo p{margin-top:6px;font-weight:800;color:#1d5a8a}
+.slot{display:flex;gap:12px;align-items:center;text-align:left;width:100%}
+.slot .who{flex:1;min-width:0}
+.avatar{width:72px;height:72px;flex:none}
+.topbar{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.9rem;box-shadow:0 3px 0 rgba(0,0,0,.1)}
+.navrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.navrow .btn{font-size:1rem;padding:10px 6px}
+.zone{display:flex;gap:12px;align-items:center;text-align:left;width:100%}
+.zone .info{flex:1;min-width:0}
+.zone .info h3{color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.zone .sub{font-size:.9rem;opacity:.95}
+.zone.locked{filter:grayscale(.8);opacity:.75;cursor:default}
+.bar{height:10px;background:rgba(0,0,0,.25);border-radius:6px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--gold);border-radius:6px}
+.bar.light{background:var(--line)}
+.bar.light i{background:var(--good)}
+.zonepic{width:64px;height:64px;flex:none}
+.boss{margin-top:8px}
+/* battle */
+.arena{position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(180deg,var(--sky2),#fff 55%,var(--grass) 55%,var(--grass-dk));padding:12px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:4px;min-height:250px}
+.foe{grid-column:2;grid-row:1;text-align:center}
+.foecard{grid-column:1;grid-row:1;align-self:start}
+.me{grid-column:1;grid-row:2;text-align:center}
+.mecard{grid-column:2;grid-row:2;align-self:end}
+.card{background:rgba(255,253,245,.94);border-radius:10px;padding:8px 10px;font-weight:800;font-size:.9rem}
+.card .nm{font-family:var(--display);font-size:1.1rem;font-weight:400}
+.sprite{width:120px;height:120px;max-width:100%}
+.hearts{font-size:1.1rem;letter-spacing:2px}
+.hp{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:4px}
+.hp i{display:block;height:100%;background:var(--good);transition:width .4s}
+.q{display:flex;flex-direction:column;gap:12px}
+.prompt{text-align:center}
+.prompt .word{font-family:var(--display);font-size:2.6rem;line-height:1.1}
+.prompt .big{font-family:var(--display);font-size:4rem;line-height:1}
+.say{display:inline-flex;align-items:center;gap:8px;background:var(--blue);color:#fff;border-radius:999px;padding:8px 16px;font-weight:900;box-shadow:0 3px 0 #1d4ea8}
+.say.huge{font-size:1.3rem;padding:16px 26px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{background:var(--panel);border-radius:14px;min-height:84px;padding:10px;box-shadow:0 4px 0 var(--line);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;font-family:var(--display);font-size:2.2rem;border:3px solid transparent}
+.opt.txt{font-size:1.5rem}
+.opt.right{border-color:var(--good);background:#e4f7e8}
+.opt.wrong{border-color:var(--bad);background:#fde7e5}
+.swatch{width:54px;height:54px;border-radius:10px;border:2px solid rgba(0,0,0,.2)}
+.swatch.big{width:96px;height:96px;margin:0 auto}
+.emoji{font-size:2.6rem;line-height:1;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+.emoji.big{font-size:4.4rem}
+.feedback{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.feedback .yay{font-family:var(--display);font-size:1.6rem;color:var(--good)}
+.feedback .oops{font-family:var(--display);font-size:1.6rem;color:var(--bad)}
+.shake{animation:shake .35s}
+.hit{animation:hit .45s}
+.bounce{animation:bounce 1.6s ease-in-out infinite}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes hit{30%{transform:translateX(12px);filter:brightness(2)}}
+@keyframes bounce{50%{transform:translateY(-6px)}}
+@keyframes pop{0%{transform:scale(.2);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes flash{0%,100%{filter:brightness(1)}50%{filter:brightness(0) invert(1)}}
+.pop{animation:pop .6s both}
+.evolving{animation:flash .5s 5}
+.center{text-align:center}
+.bigsprite{width:180px;height:180px;margin:0 auto;display:block}
+/* team / dex / book */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--panel);border-radius:12px;padding:8px;text-align:center;box-shadow:0 3px 0 var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.tile svg{width:78px;height:78px}
+.tile .nm{font-family:var(--display);font-size:1rem}
+.tile.active{outline:3px solid var(--gold)}
+.tile.unknown svg{filter:brightness(0);opacity:.25}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{padding:6px 12px;border-radius:999px;background:var(--panel);font-weight:800;font-size:.9rem;box-shadow:0 2px 0 var(--line)}
+.tab.on{background:var(--ink);color:#fff}
+.words{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.wordtile{background:var(--panel);border-radius:12px;padding:10px;box-shadow:0 3px 0 var(--line);display:flex;gap:10px;align-items:center;text-align:left;min-width:0}
+.wordtile .vis{flex:none;width:52px;display:flex;justify-content:center;font-family:var(--display);font-size:1.8rem}
+.wordtile .vis .swatch{width:40px;height:40px}
+.wordtile .vis .emoji{font-size:2rem}
+.wordtile .es{font-family:var(--display);font-size:1.15rem}
+.wordtile .txt{min-width:0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.d-new{background:var(--line)} .d-learn{background:var(--gold)} .d-known{background:var(--good)} .d-trouble{background:var(--bad)}
+.stat{display:flex;flex-direction:column}
+.stat b{font-family:var(--display);font-size:1.6rem;font-weight:400;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wchips{display:flex;flex-wrap:wrap;gap:6px}
+.wchip{font-size:.85rem;padding:3px 9px;border-radius:999px;font-weight:800}
+.wchip.new{background:#efeadd;color:var(--ink-soft)} .wchip.learn{background:#fff1c6} .wchip.known{background:#d8f2df} .wchip.trouble{background:#fcd9d5}
+input[type=text],input[type=number]{font:inherit;font-size:1.2rem;padding:10px 12px;border-radius:10px;border:2px solid var(--line);width:100%;box-sizing:border-box;background:#fff;color:var(--ink)}
+.colors{display:flex;gap:8px;flex-wrap:wrap}
+.colors button{width:40px;height:40px;border-radius:50%;border:3px solid transparent}
+.colors button.on{border-color:var(--ink)}
+.starters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.banner{background:var(--gold);border-radius:12px;padding:10px 14px;font-weight:800}
+.toolbar{display:flex;gap:8px;justify-content:flex-end}
+.iconbtn{background:var(--panel);border-radius:10px;padding:6px 10px;font-weight:800;font-size:.85rem;box-shadow:0 3px 0 rgba(0,0,0,.1)}
+@media (max-width:380px){.opt{min-height:72px;font-size:1.9rem}.prompt .word{font-size:2.1rem}.sprite{width:96px;height:96px}.stats{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+/* ---------------- Data ---------------- */
+const LINES = [
+  {el:'fire',    body:'round', names:[['Chispa','spark'],['Llama','flame'],['Volcán','volcano']]},
+  {el:'water',   body:'tall',  names:[['Gota','drop'],['Río','river'],['Océano','ocean']]},
+  {el:'plant',   body:'block', names:[['Semilla','seed'],['Hoja','leaf'],['Árbol','tree']]},
+  {el:'electric',body:'round', names:[['Nube','cloud'],['Trueno','thunder'],['Rayo','lightning']]},
+  {el:'rock',    body:'block', names:[['Piedra','stone'],['Roca','rock'],['Montaña','mountain']]},
+  {el:'ice',     body:'tall',  names:[['Copo','snowflake'],['Hielo','ice'],['Glaciar','glacier']]},
+  {el:'wind',    body:'round', names:[['Pluma','feather'],['Ala','wing'],['Huracán','hurricane']]},
+  {el:'star',    body:'tall',  names:[['Estrella','star'],['Luna','moon'],['Galaxia','galaxy']]},
+];
+const PAL = {
+  fire:['#ff7a3d','#ffd08a','#ffd23f'], water:['#3fa7ff','#c9ecff','#1e5fbf'], plant:['#5cc46a','#dcf5b8','#2f8a3c'],
+  electric:['#ffd23f','#fff4bd','#ff9f1c'], rock:['#a89080','#e0d4c8','#6b5a4e'], ice:['#9fe3ff','#ffffff','#3fa2cc'],
+  wind:['#b9a7ff','#eee8ff','#7b61ff'], star:['#4a4fa8','#9aa0ee','#ffe066'],
+};
+const NUM = [
+  ['cero','SEH-roh'],['uno','OO-noh'],['dos','dohs'],['tres','trehs'],['cuatro','KWAH-troh'],['cinco','SEEN-koh'],
+  ['seis','sayss'],['siete','see-EH-teh'],['ocho','OH-choh'],['nueve','NWEH-veh'],['diez','dee-EHS'],
+  ['once','OHN-seh'],['doce','DOH-seh'],['trece','TREH-seh'],['catorce','kah-TOHR-seh'],['quince','KEEN-seh'],
+  ['dieciséis','dee-eh-see-SAYSS'],['diecisiete','dee-eh-see-see-EH-teh'],['dieciocho','dee-eh-see-OH-choh'],
+  ['diecinueve','dee-eh-see-NWEH-veh'],['veinte','BAYN-teh']];
+const EN_NUM = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty'];
+const COLORS = [
+  ['rojo','ROH-hoh','red','#e53935'],['azul','ah-SOOL','blue','#1e63d6'],['verde','BEHR-deh','green','#2e9d4a'],
+  ['amarillo','ah-mah-REE-yoh','yellow','#ffd600'],['naranja','nah-RAHN-hah','orange','#ff8a00'],['morado','moh-RAH-doh','purple','#7b3fbf'],
+  ['rosa','ROH-sah','pink','#ff7eb6'],['negro','NEH-groh','black','#1a1a1a'],['blanco','BLAHN-koh','white','#ffffff'],
+  ['gris','grees','gray','#9a9a9a'],['café','kah-FEH','brown','#7a4a22']];
+const ANIMALS = [
+  ['el perro','el PEH-rroh','dog','🐶'],['el gato','el GAH-toh','cat','🐱'],['el pájaro','el PAH-hah-roh','bird','🐦'],
+  ['el pez','el pehs','fish','🐟'],['el caballo','el kah-BAH-yoh','horse','🐴'],['la vaca','lah BAH-kah','cow','🐮'],
+  ['el cerdo','el SEHR-doh','pig','🐷'],['el pato','el PAH-toh','duck','🦆'],['el oso','el OH-soh','bear','🐻'],
+  ['el ratón','el rah-TOHN','mouse','🐭'],['el conejo','el koh-NEH-hoh','rabbit','🐰'],['el león','el leh-OHN','lion','🦁']];
+const LETTERS = [
+  ['A','a','ah'],['B','be','beh'],['C','ce','seh'],['D','de','deh'],['E','e','eh'],['F','efe','EH-feh'],['G','ge','heh'],
+  ['H','hache','AH-cheh'],['I','i','ee'],['J','jota','HOH-tah'],['K','ka','kah'],['L','ele','EH-leh'],['M','eme','EH-meh'],
+  ['N','ene','EH-neh'],['Ñ','eñe','EHN-yeh'],['O','o','oh'],['P','pe','peh'],['Q','cu','koo'],['R','erre','EH-rreh'],
+  ['S','ese','EH-seh'],['T','te','teh'],['U','u','oo'],['V','uve','OO-beh'],['W','uve doble','OO-beh DOH-bleh'],
+  ['X','equis','EH-kees'],['Y','ye','yeh'],['Z','zeta','SEH-tah']];
+
+const WORDS = {
+  n1: NUM.slice(0,11).map((w,i)=>({k:'n'+i,es:w[0],say:w[1],en:EN_NUM[i],kind:'num',v:String(i)})),
+  n2: NUM.slice(11).map((w,j)=>{const i=j+11;return {k:'n'+i,es:w[0],say:w[1],en:EN_NUM[i],kind:'num',v:String(i)}}),
+  col: COLORS.map(c=>({k:'c_'+c[2],es:c[0],say:c[1],en:c[2],kind:'color',v:c[3]})),
+  ani: ANIMALS.map(a=>({k:'a_'+a[2],es:a[0],say:a[1],en:a[2],kind:'animal',v:a[3]})),
+  let: LETTERS.map(l=>({k:'l_'+l[0],es:l[1],say:l[2],en:'letter '+l[0],kind:'letter',v:l[0]})),
+};
+const ZONES = [
+  {id:'n1', words:'n1', es:'Pradera de los Números', en:'Number Meadow · 0 to 10', lines:[0,1,2,3], lvl:2, sky:'#5bbf4a', icon:'7'},
+  {id:'n2', words:'n2', es:'Colinas del Veinte', en:'Twenty Hills · 11 to 20', lines:[4,3,6], lvl:5, sky:'#7aa64a', icon:'15'},
+  {id:'col', words:'col', es:'Cueva de Colores', en:'Color Cave', lines:[5,4,7], lvl:7, sky:'#6c5fb8', icon:'color'},
+  {id:'ani', words:'ani', es:'Bosque de Animales', en:'Animal Forest', lines:[2,6,1], lvl:9, sky:'#2f7d45', icon:'🦁'},
+  {id:'let', words:'let', es:'Montaña del Abecedario', en:'Alphabet Mountain', lines:[7,5,0], lvl:11, sky:'#8a6a54', icon:'Ñ'},
+];
+const AVATAR_COLORS = ['#ff7a3d','#3fa7ff','#5cc46a','#b9a7ff','#ff7eb6','#ffd23f'];
+const YAY = [['¡Muy bien!','Very good!'],['¡Excelente!','Excellent!'],['¡Correcto!','Correct!'],['¡Súper!','Super!'],['¡Genial!','Awesome!']];
+
+/* ---------------- Storage ---------------- */
+const SLOTS = ['p1','p2','p3'];
+const LS_KEY = 'mundo-criatura-v1';
+let players = {p1:null,p2:null,p3:null};
+let db = null;
+const writeChain = {};
+function loadLocal(){ try{ const raw = localStorage.getItem(LS_KEY); if(raw){ const o = JSON.parse(raw); if(o && typeof o==='object') players = Object.assign(players,o);} }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(players)); }catch(e){} }
+function save(slot){
+  const p = players[slot]; if(!p) return;
+  p.updatedAt = Date.now();
+  saveLocal();
+  if(db){
+    const body = JSON.parse(JSON.stringify(p));
+    writeChain[slot] = (writeChain[slot]||Promise.resolve()).then(()=>db.doc('players/'+slot).set(body)).catch(()=>{});
+  }
+}
+function removePlayer(slot){
+  players[slot] = null; saveLocal();
+  if(db){ writeChain[slot] = (writeChain[slot]||Promise.resolve()).then(()=>db.doc('players/'+slot).delete()).catch(()=>{}); }
+}
+async function connectDb(){
+  try{ db = window.claude && window.claude.use ? await window.claude.use('db') : null; }catch(e){ db = null; }
+  if(!db) return;
+  for(const slot of SLOTS){
+    try{
+      const snap = await db.doc('players/'+slot).get();
+      const local = players[slot];
+      if(snap.exists){
+        const remote = JSON.parse(JSON.stringify(snap.data()));
+        if(!local || (remote.updatedAt||0) >= (local.updatedAt||0)) players[slot] = remote;
+        else save(slot);
+      } else if(local){ save(slot); }
+    }catch(e){}
+  }
+  saveLocal();
+  if(screen.name==='title') render();
+}
+
+/* ---------------- Helpers ---------------- */
+const $app = document.getElementById('app');
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rand = n => Math.floor(Math.random()*n);
+const pick = a => a[rand(a.length)];
+const shuffle = a => { a=a.slice(); for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]]} return a; };
+const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const stageOf = lvl => lvl>=10?3:lvl>=5?2:1;
+const xpNeed = lvl => 3+lvl;
+const cname = (line,stage) => LINES[line].names[stage-1][0];
+const cmean = (line,stage) => LINES[line].names[stage-1][1];
+function allWords(){ return Object.values(WORDS).flat(); }
+function wordStat(p,k){ return p.words[k] || {c:0,w:0,s:0}; }
+function wordState(p,k){ const s=p.words[k]; if(!s) return 'new'; if(s.s>=2) return 'known'; if(s.w>=2 && s.s<2) return 'trouble'; return 'learn'; }
+function zoneKnown(p,z){ const ws=WORDS[z.words]; return ws.filter(w=>wordStat(p,w.k).s>=2).length; }
+function zoneUnlocked(p,i){ if(i===0) return true; const prev=ZONES[i-1]; return zoneKnown(p,prev) >= Math.ceil(WORDS[prev.words].length*0.7); }
+function activeMon(p){ return p.team.find(m=>m.line===p.active) || p.team[0]; }
+
+/* ---------------- Sound + speech ---------------- */
+let actx = null, muted = false, slow = true, esVoice = null;
+try{ muted = localStorage.getItem('mc-muted')==='1'; slow = localStorage.getItem('mc-slow')!=='0'; }catch(e){}
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  const vs = speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));
+  const pref = ['es-MX','es-US','es-419','es-CO','es-ES'];
+  for(const p of pref){ const v = vs.find(v=>v.lang.replace('_','-').toLowerCase()===p.toLowerCase()); if(v){ esVoice=v; return; } }
+  esVoice = vs[0] || null;
+}
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text){
+  if(muted || !('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = esVoice ? esVoice.lang : 'es-MX';
+    if(esVoice) u.voice = esVoice;
+    u.rate = slow ? 0.75 : 0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function tone(notes){
+  if(muted) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    let t = actx.currentTime;
+    for(const [f,d,type] of notes){
+      const o=actx.createOscillator(), g=actx.createGain();
+      o.type = type||'square'; o.frequency.value=f; g.gain.setValueAtTime(.08,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+d); t+=d*0.9;
+    }
+  }catch(e){}
+}
+const sfx = {
+  good:()=>tone([[660,.1],[880,.16]]),
+  bad:()=>tone([[220,.18,'sawtooth'],[160,.22,'sawtooth']]),
+  catch:()=>tone([[523,.1],[659,.1],[784,.1],[1047,.3]]),
+  level:()=>tone([[392,.1],[523,.1],[659,.1],[784,.25]]),
+  evolve:()=>tone([[262,.15],[330,.15],[392,.15],[523,.15],[659,.15],[784,.15],[1047,.4]]),
+};
+
+/* ---------------- Creature art ---------------- */
+let svgId = 0;
+function creatureSVG(line, stage, shiny, cls){
+  const L = LINES[line], [body,belly,acc] = PAL[L.el];
+  const id = 'f'+(svgId++);
+  const s = [0,22,28,33][stage];
+  const cx=50, cy=62;
+  let shapes = '';
+  // element features behind body
+  if(L.el==='wind'){ const n=stage; for(let i=0;i<n;i++){ const off=i*6; shapes+=`<ellipse cx="${cx-s-4-off}" cy="${cy-8-off}" rx="${10+stage*2}" ry="${6+stage}" fill="${belly}" stroke="${acc}" stroke-width="2" transform="rotate(-25 ${cx-s-4-off} ${cy-8-off})"/><ellipse cx="${cx+s+4+off}" cy="${cy-8-off}" rx="${10+stage*2}" ry="${6+stage}" fill="${belly}" stroke="${acc}" stroke-width="2" transform="rotate(25 ${cx+s+4+off} ${cy-8-off})"/>`; } }
+  if(L.el==='fire' && stage>=2){ shapes+=`<path d="M${cx+s-4} ${cy+10} q18 -4 16 -24 q-6 8 -10 4 q2 -10 -6 -16 q0 14 -8 20 z" fill="${acc}" stroke="${body}" stroke-width="2"/>`; }
+  if(L.el==='water' && stage>=2){ shapes+=`<path d="M${cx+s-6} ${cy+8} l18 -10 l-2 22 z" fill="${acc}"/>`; }
+  if(L.el==='rock'){ for(let i=0;i<stage+1;i++){ const x=cx-s+8+i*(2*s-16)/Math.max(1,stage); shapes+=`<path d="M${x-7} ${cy-s+8} l7 -${12+stage*3} l7 ${12+stage*3} z" fill="${acc}"/>`; } }
+  if(L.el==='star' && stage===3){ shapes+=`<ellipse cx="${cx}" cy="${cy-s-6}" rx="18" ry="5" fill="none" stroke="${acc}" stroke-width="3"/>`; }
+  // feet
+  shapes += `<ellipse cx="${cx-s*0.5}" cy="${cy+s-2}" rx="${s*0.3}" ry="${s*0.18}" fill="${acc}"/><ellipse cx="${cx+s*0.5}" cy="${cy+s-2}" rx="${s*0.3}" ry="${s*0.18}" fill="${acc}"/>`;
+  // body
+  if(L.body==='round') shapes += `<circle cx="${cx}" cy="${cy}" r="${s}" fill="${body}"/>`;
+  else if(L.body==='tall') shapes += `<ellipse cx="${cx}" cy="${cy-2}" rx="${s*0.85}" ry="${s*1.08}" fill="${body}"/>`;
+  else shapes += `<rect x="${cx-s}" y="${cy-s}" width="${2*s}" height="${2*s}" rx="${s*0.3}" fill="${body}"/>`;
+  shapes += `<ellipse cx="${cx}" cy="${cy+s*0.35}" rx="${s*0.55}" ry="${s*0.45}" fill="${belly}"/>`;
+  // head features
+  const top = L.body==='tall' ? cy-2-s*1.08 : cy-s;
+  if(L.el==='fire'){ shapes+=`<path d="M${cx-8} ${top+4} q-2 -14 8 -${14+stage*4} q2 10 8 10 q2 -6 0 -10 q10 10 -2 ${14+stage*4-6} z" fill="${acc}"/>`; if(stage===3){ shapes+=`<path d="M${cx-s+6} ${cy-s+10} l-8 -14 l14 8 z M${cx+s-6} ${cy-s+10} l8 -14 l-14 8 z" fill="${acc}"/>`; } }
+  if(L.el==='water'){ shapes+=`<path d="M${cx} ${top-6-stage*3} q10 12 0 ${10+stage*3} q-10 -2 0 -${10+stage*3} z" fill="${acc}"/>`; if(stage===3) shapes+=`<path d="M${cx-s*0.9} ${cy} q-12 -6 -8 -16 q6 6 8 4 z M${cx+s*0.9} ${cy} q12 -6 8 -16 q-6 6 -8 4 z" fill="${acc}"/>`; }
+  if(L.el==='plant'){ shapes+=`<path d="M${cx} ${top+2} l0 -10" stroke="${acc}" stroke-width="3"/><ellipse cx="${cx+7}" cy="${top-10}" rx="8" ry="4" fill="${acc}" transform="rotate(-30 ${cx+7} ${top-10})"/>`; if(stage>=2) shapes+=`<ellipse cx="${cx-7}" cy="${top-10}" rx="8" ry="4" fill="${acc}" transform="rotate(30 ${cx-7} ${top-10})"/>`; if(stage===3) shapes+=`<circle cx="${cx}" cy="${top-14}" r="6" fill="#ff7eb6"/><circle cx="${cx}" cy="${top-14}" r="2.5" fill="#ffd23f"/>`; }
+  if(L.el==='electric'){ const h=10+stage*5; shapes+=`<path d="M${cx-s*0.6} ${top+8} l-6 -${h} l8 4 l-2 -${h*0.6} l6 ${h+2} z M${cx+s*0.6} ${top+8} l6 -${h} l-8 4 l2 -${h*0.6} l-6 ${h+2} z" fill="${acc}"/>`; }
+  if(L.el==='ice'){ for(let i=0;i<stage;i++){ const x=cx+(i-(stage-1)/2)*12; shapes+=`<path d="M${x} ${top-8-(i===Math.floor(stage/2)?6:0)} l5 10 l-5 8 l-5 -8 z" fill="${belly}" stroke="${acc}" stroke-width="2"/>`; } }
+  if(L.el==='star'){ const r=5+stage*2, sy=cy-s*0.55; let d=''; for(let i=0;i<10;i++){ const a=Math.PI/5*i-Math.PI/2, rr=i%2?r*0.45:r; d+=(i?'L':'M')+(cx+Math.cos(a)*rr).toFixed(1)+' '+(sy+Math.sin(a)*rr).toFixed(1); } shapes+=`<path d="${d}z" fill="${acc}"/>`; }
+  if(L.el==='wind' && stage>=2){ shapes+=`<path d="M${cx-6} ${top+4} q6 -${10+stage*3} 12 0" fill="none" stroke="${acc}" stroke-width="4" stroke-linecap="round"/>`; }
+  // face
+  const ey = L.el==='star' ? cy-s*0.12 : cy-s*0.2, ex = s*0.36, er = 3.5+stage;
+  shapes += `<ellipse cx="${cx-ex}" cy="${ey}" rx="${er}" ry="${er*1.2}" fill="#fff"/><ellipse cx="${cx+ex}" cy="${ey}" rx="${er}" ry="${er*1.2}" fill="#fff"/>`;
+  shapes += `<circle cx="${cx-ex+1}" cy="${ey+1}" r="${er*0.62}" fill="#23262f"/><circle cx="${cx+ex+1}" cy="${ey+1}" r="${er*0.62}" fill="#23262f"/>`;
+  shapes += `<circle cx="${cx-ex+2}" cy="${ey-1}" r="${er*0.22}" fill="#fff"/><circle cx="${cx+ex+2}" cy="${ey-1}" r="${er*0.22}" fill="#fff"/>`;
+  shapes += `<path d="M${cx-5} ${ey+er+5} q5 5 10 0" fill="none" stroke="#23262f" stroke-width="2.2" stroke-linecap="round"/>`;
+  shapes += `<ellipse cx="${cx-ex-4}" cy="${ey+er+4}" rx="3.5" ry="2" fill="#ff7eb6" opacity=".55"/><ellipse cx="${cx+ex+4}" cy="${ey+er+4}" rx="3.5" ry="2" fill="#ff7eb6" opacity=".55"/>`;
+  let sparkle = '';
+  if(shiny){ sparkle = [[14,20],[86,26],[20,80],[84,78]].map(([x,y])=>`<path d="M${x} ${y-6} L${x+2} ${y-2} L${x+6} ${y} L${x+2} ${y+2} L${x} ${y+6} L${x-2} ${y+2} L${x-6} ${y} L${x-2} ${y-2} Z" fill="#ffc83d"/>`).join(''); }
+  const filt = shiny ? `<defs><filter id="${id}"><feColorMatrix type="hueRotate" values="70"/></filter></defs>` : '';
+  return `<svg class="${cls||''}" viewBox="0 0 100 100" role="img" aria-label="${esc(cname(line,stage))}">${filt}<ellipse cx="50" cy="${cy+s+2}" rx="${s}" ry="4" fill="rgba(0,0,0,.15)"/><g ${shiny?`filter="url(#${id})"`:''}>${shapes}</g>${sparkle}</svg>`;
+}
+function cubeSVG(){ // capture cube: a blocky crate, not a ball
+  return `<svg viewBox="0 0 100 100" class="bigsprite pop" role="img" aria-label="Capture cube"><path d="M50 10 L88 30 L88 72 L50 92 L12 72 L12 30 Z" fill="#8a5a36"/><path d="M50 10 L88 30 L50 50 L12 30 Z" fill="#5bbf4a"/><path d="M50 50 L88 30 L88 72 L50 92 Z" fill="#6b4428"/><path d="M50 50 L50 92" stroke="#3d2a18" stroke-width="2"/><circle cx="50" cy="62" r="8" fill="#ffc83d" stroke="#23262f" stroke-width="3"/></svg>`;
+}
+
+/* ---------------- Visual for a word ---------------- */
+function visual(w, big){
+  if(w.kind==='num') return big ? `<div class="big">${esc(w.v)}</div>` : esc(w.v);
+  if(w.kind==='color') return `<div class="swatch${big?' big':''}" style="background:${w.v}" aria-label="${esc(w.en)}"></div>`;
+  if(w.kind==='animal') return `<div class="emoji${big?' big':''}" aria-label="${esc(w.en)}">${w.v}</div>`;
+  if(w.kind==='letter') return big ? `<div class="big">${esc(w.v)} ${esc(w.v.toLowerCase())}</div>` : `${esc(w.v)}${esc(w.v.toLowerCase())}`;
+}
+
+/* ---------------- State / screens ---------------- */
+let screen = {name:'title'};
+let cur = null; // current slot
+let sessionStart = 0, breakShown = false, lastAnswerAt = 0;
+
+function go(name, extra){ screen = Object.assign({name}, extra||{}); render(); window.scrollTo(0,0); }
+function P(){ return players[cur]; }
+
+function newPlayer(name, color, starter){
+  return {name, color, active:starter, team:[{line:starter, lvl:3, xp:0, shiny:false}], seen:{[starter]:1}, words:{}, days:{}, medals:{}, zoneWins:{}, caught:1, battles:0, updatedAt:Date.now()};
+}
+
+function render(){
+  const fn = SCREENS[screen.name] || SCREENS.title;
+  $app.innerHTML = fn();
+  const after = AFTER[screen.name]; if(after) after();
+}
+
+function toolbar(){
+  return `<div class="toolbar"><button class="iconbtn" data-act="mute">${muted?'Sound: off':'Sound: on'}</button><button class="iconbtn" data-act="slow">${slow?'Voice: slow':'Voice: normal'}</button></div>`;
+}
+
+const SCREENS = {
+title(){
+  const slots = SLOTS.map(slot=>{
+    const p = players[slot];
+    if(!p) return `<button class="panel slot" data-act="new" data-slot="${slot}"><div class="avatar"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#c9c0aa" stroke-width="4" stroke-dasharray="8 8"/><path d="M50 32v36M32 50h36" stroke="#c9c0aa" stroke-width="6" stroke-linecap="round"/></svg></div><div class="who"><h3>Nuevo entrenador</h3><p class="en">New trainer. Tap to start.</p></div></button>`;
+    const m = activeMon(p);
+    const known = allWords().filter(w=>wordStat(p,w.k).s>=2).length;
+    return `<button class="panel slot" data-act="play" data-slot="${slot}"><div class="avatar">${creatureSVG(m.line, stageOf(m.lvl), m.shiny)}</div><div class="who"><h3 style="color:${esc(p.color)}">${esc(p.name)}</h3><p class="en">${p.team.length} creature${p.team.length===1?"":"s"} · ${known} words known · ${Object.keys(p.medals).length} medals</p></div><span class="btn small green">Jugar</span></button>`;
+  }).join('');
+  return `${toolbar()}<div class="logo"><h1>Mundo Criatura</h1><p>Catch creatures. Learn Spanish.</p></div>
+  <div class="row" style="justify-content:center;gap:0">${creatureSVG(0,1,false,'sprite bounce')}${creatureSVG(1,1,false,'sprite bounce')}${creatureSVG(2,1,false,'sprite bounce')}</div>
+  <div class="col">${slots}</div>
+  <p class="row" style="justify-content:center"><button class="iconbtn" data-act="manage">Add or remove players</button><button class="iconbtn" data-act="parents">Parents</button></p>`;
+},
+create(){
+  const st = screen.starter ?? null, col = screen.color || AVATAR_COLORS[0];
+  return `<div class="topbar"><button class="iconbtn" data-act="home">Back</button></div>
+  <div class="panel col"><h2>¡Hola, entrenador!</h2><p class="en">Hello, trainer! What's your name?</p>
+  <input type="text" id="name-input" maxlength="14" placeholder="Your name" value="${esc(screen.nm||'')}" autocomplete="off">
+  <p class="en">Pick your color</p><div class="colors">${AVATAR_COLORS.map(c=>`<button data-act="color" data-c="${c}" class="${c===col?'on':''}" style="background:${c}" aria-label="Color ${c}"></button>`).join('')}</div></div>
+  <div class="panel col"><h3>Pick your first creature</h3><p class="en">Their names are Spanish words, too.</p>
+  <div class="starters">${[0,1,2].map(l=>`<button class="tile ${st===l?'active':''}" data-act="starter" data-l="${l}">${creatureSVG(l,1,false)}<span class="nm">${cname(l,1)}</span><span class="en">"${cmean(l,1)}"</span></button>`).join('')}</div></div>
+  <button class="btn green" data-act="createGo" ${st===null?'disabled':''}>Start my adventure</button>`;
+},
+map(){
+  const p = P(), m = activeMon(p), st = stageOf(m.lvl);
+  const zones = ZONES.map((z,i)=>{
+    const unlocked = zoneUnlocked(p,i), n = WORDS[z.words].length, k = zoneKnown(p,z);
+    const icon = z.icon==='color' ? `<svg viewBox="0 0 64 64" class="zonepic"><rect x="4" y="4" width="26" height="26" rx="5" fill="#e53935"/><rect x="34" y="4" width="26" height="26" rx="5" fill="#1e63d6"/><rect x="4" y="34" width="26" height="26" rx="5" fill="#ffd600"/><rect x="34" y="34" width="26" height="26" rx="5" fill="#2e9d4a"/></svg>`
+      : `<div class="zonepic" style="display:grid;place-items:center;background:rgba(255,255,255,.2);border-radius:12px;font-family:var(--display);font-size:${z.icon.length>1&&!/\p{Emoji_Presentation}/u.test(z.icon)?'1.8rem':'2.2rem'}">${esc(z.icon)}</div>`;
+    const need = i>0 ? Math.ceil(WORDS[ZONES[i-1].words].length*0.7) : 0;
+    const wins = p.zoneWins[z.id]||0, medal = p.medals[z.id];
+    const bossBtn = unlocked && wins>=3 ? `<div class="boss"><span class="btn small ${medal?'plain':'blue'}" data-act="boss" data-z="${i}" role="button" tabindex="0">${medal?'Medal won · Rematch boss':'Boss battle!'}</span></div>` : (unlocked ? `<div class="sub">Catch ${3-wins} more here to face the boss</div>`:'');
+    return `<div class="ground" style="background:linear-gradient(180deg,${z.sky} 0 14px,var(--dirt) 14px)">
+      <button class="zone ${unlocked?'':'locked'}" data-act="${unlocked?'zone':'lockedzone'}" data-z="${i}">${icon}
+      <div class="info"><h3>${esc(z.es)}${medal?' 🏅':''}</h3><div class="sub">${esc(z.en)}</div>
+      ${unlocked?`<div class="bar"><i style="width:${Math.round(k/n*100)}%"></i></div><div class="sub">${k} of ${n} words learned</div>`
+        :`<div class="sub">Locked. Learn ${need} words in ${esc(ZONES[i-1].es)} to open.</div>`}</div></button>${bossBtn}</div>`;
+  }).join('');
+  const brk = screen.breakMsg ? `<div class="banner">You have played about 15 minutes. Great job! This is a good time for a break.</div>` : '';
+  return `<div class="topbar"><button class="iconbtn" data-act="home">Switch player</button>${toolbar().replace('<div class="toolbar">','<div class="row">')}</div>
+  <div class="panel row"><div class="avatar">${creatureSVG(m.line,st,m.shiny,'bounce')}</div><div style="flex:1;min-width:0"><h2 style="color:${esc(p.color)}">${esc(p.name)}</h2><p class="en">Partner: <b>${cname(m.line,st)}</b> · Level ${m.lvl}</p><div class="bar light"><i style="width:${Math.round(m.xp/xpNeed(m.lvl)*100)}%"></i></div></div></div>
+  <div class="navrow"><button class="btn plain" data-act="team">Mi Equipo</button><button class="btn plain" data-act="dex">Criaturas</button><button class="btn plain" data-act="book">Mi Libro</button></div>
+  ${brk}<h3 style="color:#1d5a8a">Where do you want to explore?</h3>${zones}`;
+},
+battle(){
+  const b = screen.b, p = P(), m = activeMon(p), q = b.q;
+  const foeSt = stageOf(b.foe.lvl), meSt = stageOf(m.lvl);
+  const hearts = '❤️'.repeat(b.hearts) + '🤍'.repeat(3-b.hearts);
+  let qhtml = '';
+  if(b.phase==='intro'){
+    qhtml = `<div class="panel center col"><h2>¡Un ${cname(b.foe.line,foeSt)} salvaje apareció!</h2><p class="en">A wild ${cname(b.foe.line,foeSt)} appeared! ${b.boss?'This is the zone boss. Answer 6 questions to win the medal.':'Answer questions to catch it.'}</p><button class="btn green" data-act="startQ">¡Vamos! (Let's go!)</button></div>`;
+  } else {
+    let prompt='', instr='';
+    if(q.type==='read'){ instr='Tap the picture that matches'; prompt=`<div class="word">${esc(q.t.es)}</div><button class="say" data-act="hear">🔊 Hear it</button>`; }
+    else if(q.type==='listen'){ instr='Listen, then tap what you hear'; prompt=`<button class="say huge" data-act="hear">🔊 Tap to listen</button>`; }
+    else { instr='How do you say this in Spanish?'; prompt=visual(q.t,true); }
+    const opts = q.opts.map((o,i)=>{
+      let cls='opt'+(q.type==='reverse'?' txt':'');
+      if(b.answered){ if(o.k===q.t.k) cls+=' right'; else if(i===b.chosen) cls+=' wrong'; }
+      const inner = q.type==='reverse' ? esc(o.es) : visual(o,false);
+      return `<button class="${cls}" data-act="ans" data-i="${i}" ${b.answered?'disabled':''} aria-label="${esc(q.type==='reverse'?o.es:o.en)}">${inner}</button>`;
+    }).join('');
+    let fb = '';
+    if(b.answered){
+      if(b.ok){ const y=b.yay; fb=`<div class="feedback"><div class="yay">${y[0]}</div><div class="en">${y[1]} ${esc(q.t.es)} = ${esc(q.t.en)}</div></div>`; }
+      else fb=`<div class="feedback"><div class="oops">¡Casi! (Almost!)</div><div>It's <b>${esc(q.t.es)}</b> <span class="hint">(say it: ${esc(q.t.say)})</span> = ${esc(q.t.en)}</div><div class="row" style="justify-content:center"><button class="say" data-act="hearT">🔊 Hear it again</button><button class="btn green small" data-act="next">Keep going</button></div></div>`;
+    }
+    qhtml = `<div class="panel q"><p class="en center">${instr}</p><div class="prompt">${prompt}</div><div class="opts">${opts}</div>${fb}</div>`;
+  }
+  return `<div class="topbar"><button class="iconbtn" data-act="flee">Run away</button><span class="chip">${esc(ZONES[b.zone].es)}</span></div>
+  <div class="arena">
+    <div class="foecard card"><div class="nm">${cname(b.foe.line,foeSt)}${b.foe.shiny?' ✨':''}</div><div>Lv ${b.foe.lvl}</div><div class="hp"><i style="width:${Math.round(b.foeHp/b.foeMax*100)}%"></i></div></div>
+    <div class="foe" id="foe">${creatureSVG(b.foe.line,foeSt,b.foe.shiny,'sprite')}</div>
+    <div class="me" id="me">${creatureSVG(m.line,meSt,m.shiny,'sprite')}</div>
+    <div class="mecard card"><div class="nm">${cname(m.line,meSt)}</div><div>Lv ${m.lvl}</div><div class="hearts" aria-label="${b.hearts} hearts left">${hearts}</div></div>
+  </div>${qhtml}`;
+},
+result(){
+  const r = screen.r;
+  let top = '';
+  if(r.won && !r.boss){
+    top = `${cubeSVG()}<h2>¡Lo atrapaste!</h2><p class="en">You caught it!</p><div>${creatureSVG(r.foe.line,stageOf(r.foe.lvl),r.foe.shiny,'bigsprite pop')}</div>
+      <h3>${cname(r.foe.line,stageOf(r.foe.lvl))}${r.foe.shiny?' ✨ (shiny!)':''}</h3><p class="en">"${cname(r.foe.line,stageOf(r.foe.lvl))}" means "${cmean(r.foe.line,stageOf(r.foe.lvl))}" in Spanish.</p>
+      <p>${r.isNew?'<b>New creature!</b> It joined your team.':`You already have this one, so your ${cname(r.foe.line, stageOf(r.dupLvl))} got <b>+3 XP</b>.`}</p>`;
+  } else if(r.won && r.boss){
+    top = `<div class="bigsprite pop" style="display:grid;place-items:center;font-size:7rem">🏅</div><h2>¡Ganaste la medalla!</h2><p class="en">You won the ${esc(ZONES[r.zone].es)} medal!</p>`;
+  } else if(r.fled){
+    top = `<h2>¡Adiós!</h2><p class="en">You ran away safely.</p>`;
+  } else {
+    top = `<div>${creatureSVG(r.foe.line,stageOf(r.foe.lvl),r.foe.shiny,'bigsprite')}</div><h2>¡Se escapó!</h2><p class="en">It got away. Every wrong answer teaches you something. Try again!</p>`;
+  }
+  const lv = r.levels ? `<p class="banner">${esc(r.monName)} reached level ${r.newLvl}!</p>` : '';
+  const stats = r.fled ? '' : `<p class="en">${r.correct} right, ${r.wrong} to practice</p>`;
+  return `<div class="panel center col">${top}${stats}${lv}<button class="btn green" data-act="afterResult">Continue</button></div>`;
+},
+evolve(){
+  const e = screen.e;
+  return `<div class="panel center col"><h2>${e.done?'¡Evolucionó!':'¿Qué pasa?'}</h2><p class="en">${e.done?`Your ${cname(e.line,e.from)} evolved into ${cname(e.line,e.to)}!`:`Your ${cname(e.line,e.from)} is evolving!`}</p>
+  <div id="evo">${creatureSVG(e.line,e.done?e.to:e.from,e.shiny,'bigsprite '+(e.done?'pop':'evolving'))}</div>
+  ${e.done?`<h3>${cname(e.line,e.to)}</h3><p class="en">"${cname(e.line,e.to)}" means "${cmean(e.line,e.to)}"</p><button class="say" data-act="sayName" data-n="${esc(cname(e.line,e.to))}">🔊 Hear the name</button><button class="btn green" data-act="evoDone">¡Genial!</button>`:''}</div>`;
+},
+team(){
+  const p = P();
+  const tiles = p.team.slice().sort((a,b)=>b.lvl-a.lvl).map(m=>{
+    const st = stageOf(m.lvl), nextAt = st===1?5:st===2?10:null;
+    return `<button class="tile ${m.line===p.active?'active':''}" data-act="setActive" data-l="${m.line}">${creatureSVG(m.line,st,m.shiny)}<span class="nm">${cname(m.line,st)}${m.shiny?' ✨':''}</span><span class="en">Lv ${m.lvl}</span><div class="bar light" style="width:100%"><i style="width:${Math.round(m.xp/xpNeed(m.lvl)*100)}%"></i></div><span class="en">${nextAt?`Evolves at Lv ${nextAt}`:'Fully evolved'}</span></button>`;
+  }).join('');
+  return `<div class="topbar"><button class="iconbtn" data-act="map">Back to map</button></div><div class="panel col"><h2>Mi Equipo</h2><p class="en">My team. Tap a creature to make it your battle partner. Your partner gets XP for every right answer.</p><div class="grid3">${tiles}</div></div>`;
+},
+dex(){
+  const p = P();
+  const tiles = LINES.map((L,l)=>[1,2,3].map(st=>{
+    const owned = p.team.find(m=>m.line===l);
+    const seen = (p.seen[l]||0) >= st || (owned && stageOf(owned.lvl)>=st);
+    return `<div class="tile ${seen?'':'unknown'}">${creatureSVG(l,st,false)}<span class="nm">${seen?cname(l,st):'???'}</span><span class="en">${seen?'"'+cmean(l,st)+'"':'Not found yet'}</span></div>`;
+  }).join('')).join('');
+  const count = LINES.reduce((a,L,l)=>{const o=p.team.find(m=>m.line===l); return a+Math.max(p.seen[l]||0, o?stageOf(o.lvl):0);},0);
+  return `<div class="topbar"><button class="iconbtn" data-act="map">Back to map</button><span class="chip">${count} of 24 found</span></div><div class="panel col"><h2>Criaturas</h2><p class="en">Every creature has a Spanish name. Evolve yours or catch stronger ones to fill the book.</p><div class="grid3">${tiles}</div></div>`;
+},
+book(){
+  const p = P(), zi = screen.z ?? 0, z = ZONES[zi];
+  const tabs = ZONES.map((zz,i)=>zoneUnlocked(p,i)?`<button class="tab ${i===zi?'on':''}" data-act="bookTab" data-z="${i}">${esc(zz.en.split(' · ')[0])}</button>`:'').join('');
+  const words = WORDS[z.words].map(w=>{ const s=wordState(p,w.k); return `<button class="wordtile" data-act="sayWord" data-es="${esc(w.es)}"><div class="vis">${visual(w,false)}</div><div class="txt"><div class="es">${esc(w.es)}</div><div class="hint">${esc(w.say)}</div><div class="en"><span class="dot d-${s}"></span>${esc(w.en)}</div></div></button>`; }).join('');
+  return `<div class="topbar"><button class="iconbtn" data-act="map">Back to map</button></div><div class="panel col"><h2>Mi Libro</h2><p class="en">My word book. Tap any word to hear it. Say it out loud with the voice!</p><div class="tabs">${tabs}</div>
+  <p class="en"><span class="dot d-known"></span>learned <span class="dot d-learn"></span>practicing <span class="dot d-trouble"></span>tricky <span class="dot d-new"></span>new</p><div class="words">${words}</div></div>`;
+},
+manage(){
+  const rows = SLOTS.map((slot,i)=>{
+    const p = players[slot];
+    if(!p) return `<div class="panel row spread"><div><h3>Slot ${i+1}</h3><p class="muted">Empty</p></div><button class="btn green small" data-act="new" data-slot="${slot}">Add player</button></div>`;
+    const m = activeMon(p);
+    const confirm = screen.confirmDel===slot
+      ? `<div class="banner">Delete ${esc(p.name)} and all their creatures and progress? This can't be undone.<div class="row" style="margin-top:8px"><button class="btn small" data-act="delYes" data-slot="${slot}" style="background:var(--bad);color:#fff;box-shadow:0 4px 0 #a52a21">Yes, delete</button><button class="btn small plain" data-act="delNo">Cancel</button></div></div>`
+      : '';
+    return `<div class="panel col"><div class="row"><div class="avatar" style="width:56px;height:56px">${creatureSVG(m.line,stageOf(m.lvl),m.shiny)}</div><div style="flex:1;min-width:0"><h3 style="color:${esc(p.color)}">${esc(p.name)}</h3><p class="muted">${p.team.length} creature${p.team.length===1?"":"s"} · ${allWords().filter(w=>wordStat(p,w.k).s>=2).length} words learned</p></div></div>
+      <div class="row"><input type="text" id="rename-${slot}" maxlength="14" value="${esc(p.name)}" aria-label="New name for ${esc(p.name)}" style="flex:1;min-width:0;width:auto"><button class="btn small plain" data-act="rename" data-slot="${slot}">Rename</button></div>
+      ${confirm || `<p><button class="iconbtn" data-act="del" data-slot="${slot}" style="color:var(--bad)">Delete player</button></p>`}</div>`;
+  }).join('');
+  return `<div class="topbar"><button class="iconbtn" data-act="home">Back to game</button></div><div class="panel col"><h2>Players</h2><p class="muted">Up to ${SLOTS.length} players. Each one has their own creatures and progress on this device.</p></div>${rows}`;
+},
+gate(){
+  const g = screen.g;
+  return `<div class="topbar"><button class="iconbtn" data-act="home">Back</button></div><div class="panel col"><h2>Parents only</h2><p class="muted">${g.next==='manage'?'Next: add, rename, or remove players.':'Next: the parent screen.'}</p><p class="muted">Answer to open the parent screen: what is ${g.a} × ${g.b}?</p>
+  <input type="number" id="gate-input" inputmode="numeric" autocomplete="off"><p class="muted" id="gate-msg"></p><button class="btn blue" data-act="gateGo">Open</button></div>`;
+},
+parents(){
+  const blocks = SLOTS.map(slot=>{
+    const p = players[slot];
+    if(!p) return `<div class="panel"><h3>Empty slot</h3><p class="muted">No trainer yet.</p></div>`;
+    const days = Object.entries(p.days||{}).sort((a,b)=>a[0]<b[0]?1:-1);
+    const weekAgo = new Date(Date.now()-6*864e5); const wk = weekAgo.getFullYear()+'-'+String(weekAgo.getMonth()+1).padStart(2,'0')+'-'+String(weekAgo.getDate()).padStart(2,'0');
+    const week = days.filter(([d])=>d>=wk).reduce((a,[,v])=>({q:a.q+v.q,c:a.c+v.c,sec:a.sec+v.sec}),{q:0,c:0,sec:0});
+    const all = days.reduce((a,[,v])=>({q:a.q+v.q,c:a.c+v.c}),{q:0,c:0});
+    const acc = all.q ? Math.round(all.c/all.q*100) : 0;
+    const trouble = allWords().filter(w=>wordState(p,w.k)==='trouble').sort((a,b)=>wordStat(p,b.k).w-wordStat(p,a.k).w);
+    const zones = ZONES.map((z,i)=>{
+      const ws = WORDS[z.words], k = zoneKnown(p,z);
+      return `<div class="col" style="gap:6px"><div class="row spread"><b>${esc(z.en.split(' · ')[0])}</b><span class="muted">${zoneUnlocked(p,i)?`${k} of ${ws.length} learned`:'Locked'}</span></div><div class="wchips">${ws.map(w=>`<span class="wchip ${wordState(p,w.k)}" title="${esc(w.en)}: ${wordStat(p,w.k).c} right, ${wordStat(p,w.k).w} missed">${esc(w.es)}</span>`).join('')}</div></div>`;
+    }).join('');
+    const recent = days.slice(0,7).map(([d,v])=>`<div class="row spread"><span>${d}</span><span class="muted">${Math.max(1,Math.round(v.sec/60))} min · ${v.q} questions · ${v.q?Math.round(v.c/v.q*100):0}% right</span></div>`).join('') || '<p class="muted">No play yet.</p>';
+    return `<div class="panel col"><h2 style="color:${esc(p.color)}">${esc(p.name)}</h2>
+      <div class="stats"><div class="stat"><b>${Math.round(week.sec/60)}</b><span class="muted">min this week</span></div><div class="stat"><b>${allWords().filter(w=>wordStat(p,w.k).s>=2).length}</b><span class="muted">words learned</span></div><div class="stat"><b>${acc}%</b><span class="muted">right overall</span></div><div class="stat"><b>${p.team.length}</b><span class="muted">creatures</span></div></div>
+      <h3>Needs practice</h3>${trouble.length?`<div class="wchips">${trouble.slice(0,12).map(w=>`<span class="wchip trouble">${esc(w.es)} = ${esc(w.en)} (missed ${wordStat(p,w.k).w}×)</span>`).join('')}</div>`:'<p class="muted">Nothing stuck right now.</p>'}
+      <h3>Words by zone</h3><p class="muted" style="font-size:.85rem"><span class="dot d-known"></span>learned (2+ right in a row) <span class="dot d-learn"></span>practicing <span class="dot d-trouble"></span>missed 2+ times, not learned yet <span class="dot d-new"></span>not seen</p>${zones}
+      <h3>Recent days</h3>${recent}
+      ${screen.confirmReset===slot?`<div class="banner">Delete ${esc(p.name)}'s progress for good? <div class="row" style="margin-top:8px"><button class="btn small" data-act="resetYes" data-slot="${slot}" style="background:var(--bad);color:#fff;box-shadow:0 4px 0 #a52a21">Yes, delete</button><button class="btn small plain" data-act="resetNo">Cancel</button></div></div>`:`<p><button class="iconbtn" data-act="reset" data-slot="${slot}">Reset this trainer</button></p>`}</div>`;
+  }).join('');
+  const where = 'Progress is saved in this browser on this device. Each device keeps its own progress.';
+  return `<div class="topbar"><button class="iconbtn" data-act="home">Back to game</button></div><div class="panel col"><h2>Parent screen</h2><p class="muted">A word counts as learned after your child gets it right 2 times in a row. The game brings back missed words more often. New zones open when about 70% of the previous zone's words are learned.</p><p class="muted">${where}</p></div>${blocks}`;
+},
+};
+
+const AFTER = {
+  create(){ const i=document.getElementById('name-input'); if(i) i.addEventListener('input',()=>{screen.nm=i.value;}); },
+  gate(){ const i=document.getElementById('gate-input'); if(i){ i.addEventListener('keydown',e=>{ if(e.key==='Enter') handlers.gateGo(); }); } },
+  evolve(){ if(!screen.e.done){ sfx.evolve(); setTimeout(()=>{ if(screen.name==='evolve'){ screen.e.done=true; render(); speak(cname(screen.e.line,screen.e.to)); } }, 2600); } },
+};
+
+/* ---------------- Battle logic ---------------- */
+function weightedWord(p, words){
+  // Missed words come back more; learned words less. Unseen words are introduced a few at a time.
+  const unseen = words.filter(w=>!p.words[w.k]);
+  const seen = words.filter(w=>p.words[w.k]);
+  const learning = seen.filter(w=>p.words[w.k].s<2).length;
+  const pool = seen.slice();
+  if(learning < 4 || seen.length < 3) pool.push(...unseen.slice(0,2));
+  const list = pool.length ? pool : words;
+  const wts = list.map(w=>{ const s=p.words[w.k]; if(!s) return 4; return Math.max(0.6, 1 + s.w*1.5 - Math.min(s.s,4)*0.6 + (s.s<2?2:0)); });
+  let r = Math.random()*wts.reduce((a,b)=>a+b,0);
+  for(let i=0;i<list.length;i++){ r-=wts[i]; if(r<=0) return list[i]; }
+  return list[list.length-1];
+}
+function makeQ(b){
+  const p = P(), words = WORDS[ZONES[b.zone].words];
+  let t = weightedWord(p, words);
+  if(b.lastK && t.k===b.lastK && words.length>1){ t = weightedWord(p, words); }
+  const s = p.words[t.k];
+  let type;
+  if(!s || s.c===0) type='read';
+  else if(b.boss) type = pick(['listen','listen','reverse','read']);
+  else type = pick(['read','listen','reverse']);
+  const others = shuffle(words.filter(w=>w.k!==t.k)).slice(0,3);
+  return {t, type, opts: shuffle([t,...others])};
+}
+function startBattle(zi, boss){
+  const p = P(), z = ZONES[zi];
+  const line = boss ? z.lines[0] : pick(z.lines);
+  const lvl = boss ? z.lvl+8 : z.lvl + rand(3);
+  const shiny = !boss && Math.random() < 1/12;
+  const foeMax = boss ? 6 : [0,3,4,5][stageOf(lvl)];
+  const b = {zone:zi, boss, foe:{line,lvl,shiny}, foeHp:foeMax, foeMax, hearts:3, phase:'intro', nCorrect:0, nWrong:0, xpGain:0};
+  p.seen[line] = Math.max(p.seen[line]||0, stageOf(lvl));
+  if(!sessionStart) sessionStart = Date.now();
+  go('battle',{b});
+  setTimeout(()=>speak(`¡Un ${cname(line,stageOf(lvl))} salvaje apareció!`), 200);
+}
+function logAnswer(t, ok){
+  const p = P(), d = today();
+  const s = p.words[t.k] || {c:0,w:0,s:0};
+  if(ok){ s.c++; s.s++; } else { s.w++; s.s=0; }
+  p.words[t.k] = s;
+  const now = Date.now();
+  const add = lastAnswerAt ? Math.min(60, (now-lastAnswerAt)/1000) : 10;
+  lastAnswerAt = now;
+  const day = p.days[d] || {q:0,c:0,sec:0};
+  day.q++; if(ok) day.c++; day.sec = Math.round(day.sec + add);
+  p.days[d] = day;
+  const keys = Object.keys(p.days).sort(); while(keys.length>90) delete p.days[keys.shift()];
+}
+function giveXp(mon, n){
+  const before = mon.lvl;
+  mon.xp += n;
+  while(mon.xp >= xpNeed(mon.lvl)){ mon.xp -= xpNeed(mon.lvl); mon.lvl++; }
+  return mon.lvl - before;
+}
+function answer(i){
+  const b = screen.b; if(b.answered) return;
+  const q = b.q, o = q.opts[i], ok = o.k===q.t.k;
+  b.answered = true; b.chosen = i; b.ok = ok; b.lastK = q.t.k;
+  logAnswer(q.t, ok);
+  if(ok){ b.nCorrect++; b.foeHp--; b.xpGain++; b.yay = pick(YAY); sfx.good(); speak(q.t.es); }
+  else { b.nWrong++; b.hearts--; sfx.bad(); setTimeout(()=>speak(q.t.es), 350); }
+  render();
+  const target = document.getElementById(ok?'foe':'me'); if(target) target.classList.add(ok?'hit':'shake');
+  if(ok) setTimeout(()=>{ if(screen.name==='battle' && screen.b===b) nextStep(b); }, 1300);
+}
+function nextStep(b){
+  if(b.foeHp<=0) return endBattle(b, true);
+  if(b.hearts<=0) return endBattle(b, false);
+  b.answered=false; b.chosen=null; b.q = makeQ(b); render();
+  if(b.q.type!=='reverse') setTimeout(()=>speak(b.q.t.es), 250);
+}
+function endBattle(b, won, fled){
+  const p = P(), m = activeMon(p), foeSt = stageOf(b.foe.lvl);
+  const r = {won, fled:!!fled, boss:b.boss, zone:b.zone, foe:b.foe, correct:b.nCorrect, wrong:b.nWrong};
+  const beforeStage = stageOf(m.lvl);
+  let xp = b.xpGain + (won?2:0);
+  const gained = fled ? 0 : giveXp(m, xp);
+  if(gained){ r.levels=true; r.newLvl=m.lvl; r.monName=cname(m.line,stageOf(m.lvl)); }
+  p.battles++;
+  if(won && !b.boss){
+    p.zoneWins[ZONES[b.zone].id] = (p.zoneWins[ZONES[b.zone].id]||0)+1;
+    const have = p.team.find(x=>x.line===b.foe.line);
+    if(!have){ p.team.push({line:b.foe.line, lvl:b.foe.lvl, xp:0, shiny:b.foe.shiny}); r.isNew=true; p.caught++; }
+    else { if(b.foe.lvl>have.lvl){ have.lvl=b.foe.lvl; have.xp=0; } giveXp(have,3); if(b.foe.shiny) have.shiny=true; r.dupLvl=have.lvl; }
+    p.seen[b.foe.line] = Math.max(p.seen[b.foe.line]||0, foeSt);
+    sfx.catch();
+  } else if(won && b.boss){ p.medals[ZONES[b.zone].id] = true; sfx.catch(); }
+  else if(gained) sfx.level();
+  const afterStage = stageOf(m.lvl);
+  r.evolve = afterStage>beforeStage ? {line:m.line, from:beforeStage, to:afterStage, shiny:m.shiny} : null;
+  if(r.evolve) p.seen[m.line] = Math.max(p.seen[m.line]||0, afterStage);
+  save(cur);
+  go('result',{r});
+  if(won && !b.boss) setTimeout(()=>speak('¡Lo atrapaste!'), 300);
+  if(won && b.boss) setTimeout(()=>speak('¡Ganaste la medalla!'), 300);
+}
+
+/* ---------------- Events ---------------- */
+const handlers = {
+  mute(){ muted=!muted; try{localStorage.setItem('mc-muted',muted?'1':'0')}catch(e){} if(muted&&'speechSynthesis' in window) speechSynthesis.cancel(); render(); },
+  slow(){ slow=!slow; try{localStorage.setItem('mc-slow',slow?'1':'0')}catch(e){} render(); speak('uno, dos, tres'); },
+  home(){ go('title'); },
+  map(){ go('map'); },
+  new(el){ cur = el.dataset.slot; go('create',{starter:null,color:AVATAR_COLORS[SLOTS.indexOf(cur)]}); },
+  play(el){ cur = el.dataset.slot; sessionStart = Date.now(); breakShown=false; lastAnswerAt=0; go('map'); },
+  color(el){ screen.color = el.dataset.c; render(); },
+  starter(el){ screen.starter = +el.dataset.l; render(); speak(cname(+el.dataset.l,1)); },
+  createGo(){
+    const nm = (screen.nm||'').trim().slice(0,14) || 'Entrenador';
+    if(screen.starter===null || screen.starter===undefined) return;
+    players[cur] = newPlayer(nm, screen.color||AVATAR_COLORS[0], screen.starter);
+    save(cur); sessionStart = Date.now(); breakShown=false; lastAnswerAt=0; go('map'); speak('¡Hola, '+nm+'!');
+  },
+  zone(el){ startBattle(+el.dataset.z, false); },
+  lockedzone(){ sfx.bad(); },
+  boss(el){ startBattle(+el.dataset.z, true); },
+  startQ(){ const b=screen.b; b.phase='q'; b.q=makeQ(b); render(); if(b.q.type!=='reverse') setTimeout(()=>speak(b.q.t.es),150); },
+  hear(){ speak(screen.b.q.t.es); },
+  hearT(){ speak(screen.b.q.t.es); },
+  ans(el){ answer(+el.dataset.i); },
+  next(){ nextStep(screen.b); },
+  flee(){ const b=screen.b; if(b.phase==='intro'){ save(cur); go('map'); } else endBattle(b,false,true); },
+  afterResult(){
+    const r = screen.r;
+    if(r.evolve) return go('evolve',{e:Object.assign({done:false},r.evolve)});
+    toMap();
+  },
+  evoDone(){ toMap(); },
+  sayName(el){ speak(el.dataset.n); },
+  team(){ go('team'); },
+  dex(){ go('dex'); },
+  book(){ go('book',{z:0}); },
+  bookTab(el){ go('book',{z:+el.dataset.z}); },
+  sayWord(el){ speak(el.dataset.es); },
+  setActive(el){ P().active = +el.dataset.l; save(cur); render(); const m=activeMon(P()); speak(cname(m.line,stageOf(m.lvl))); },
+  parents(){ const a=6+rand(7), b=6+rand(7); go('gate',{g:{a,b,next:'parents'}}); },
+  manage(){ const a=6+rand(7), b=6+rand(7); go('gate',{g:{a,b,next:'manage'}}); },
+  rename(el){ const slot=el.dataset.slot, i=document.getElementById('rename-'+slot), nm=(i.value||'').trim().slice(0,14); if(!nm||!players[slot]) return; players[slot].name=nm; save(slot); render(); },
+  del(el){ screen.confirmDel = el.dataset.slot; render(); },
+  delNo(){ screen.confirmDel = null; render(); },
+  delYes(el){ removePlayer(el.dataset.slot); screen.confirmDel=null; render(); },
+  gateGo(){ const i=document.getElementById('gate-input'); if(+i.value===screen.g.a*screen.g.b) go(screen.g.next||'parents'); else { document.getElementById('gate-msg').textContent='Not quite. Try again.'; i.value=''; } },
+  reset(el){ screen.confirmReset = el.dataset.slot; render(); },
+  resetNo(){ screen.confirmReset = null; render(); },
+  resetYes(el){ removePlayer(el.dataset.slot); screen.confirmReset=null; render(); },
+};
+function toMap(){
+  const mins = sessionStart ? (Date.now()-sessionStart)/60000 : 0;
+  if(mins>=15 && !breakShown){ breakShown=true; go('map',{breakMsg:true}); }
+  else go('map');
+}
+$app.addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]'); if(!el || el.disabled) return;
+  const h = handlers[el.dataset.act]; if(h){ e.preventDefault(); h(el); }
+});
+$app.addEventListener('keydown', e=>{
+  if((e.key==='Enter'||e.key===' ') && e.target.matches('[role=button][data-act]')){ e.preventDefault(); e.target.click(); }
+});
+
+loadLocal();
+render();
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+</script>
+
+</body>
+</html>
