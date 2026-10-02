@@ -1,14 +1,25 @@
 /* Verse Quest engine tests: the content itself, exercise building, the
    learning schedule, streaks, trivia picking, and saves. Pure Node, no browser.
    Run: node test/engine.test.mjs */
-import { VERSES, TRIVIA, CATEGORIES, BADGES, NIV_NOTICE } from '../js/data.js';
-import {
-  makeRng, tokenize, chunks, norm, wordPool, buildLesson, buildReview, allowance, newProfile, startVerse,
-  plan, stepsLeftToday, finishLesson, finishReview, finishTrivia, recordTrivia, countActivity, currentStreak,
-  pickTrivia, triviaChoices, addDays, daysBetween, masteredIds, summary,
-  STEPS, STEPS_PER_DAY, MAX_ACTIVE, INTERVALS, GOLD_BOX,
-} from '../js/engine.js';
-import { hydrate, load, save, KEY } from '../js/storage.js';
+
+import { readFileSync } from 'node:fs';
+
+// The rules live in ../index.html between the @engine markers, with no page
+// code, so they load straight into Node.
+const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const code = html.slice(html.indexOf('// @engine-begin'), html.indexOf('// @engine-end'));
+const NAMES = ['VERSES', 'TRIVIA', 'CATEGORIES', 'BADGES', 'NIV_NOTICE', 'makeRng', 'tokenize', 'chunks', 'norm', 'wordPool',
+  'buildLesson', 'buildReview', 'allowance', 'newProfile', 'startVerse', 'plan', 'stepsLeftToday', 'finishLesson',
+  'finishReview', 'finishTrivia', 'recordTrivia', 'countActivity', 'currentStreak', 'pickTrivia', 'triviaChoices',
+  'addDays', 'daysBetween', 'masteredIds', 'summary', 'STEPS', 'STEPS_PER_DAY', 'MAX_ACTIVE', 'MAX_PLAYERS', 'INTERVALS',
+  'GOLD_BOX', 'hydrate', 'load', 'save', 'KEY'];
+const E = new Function(`'use strict';\n${code}\nreturn { ${NAMES.join(', ')} };`)();
+const {
+  VERSES, TRIVIA, CATEGORIES, BADGES, NIV_NOTICE, makeRng, tokenize, chunks, norm, wordPool, buildLesson, buildReview,
+  allowance, newProfile, startVerse, plan, stepsLeftToday, finishLesson, finishReview, finishTrivia, recordTrivia,
+  countActivity, currentStreak, pickTrivia, triviaChoices, addDays, daysBetween, masteredIds, summary,
+  STEPS, STEPS_PER_DAY, MAX_ACTIVE, MAX_PLAYERS, INTERVALS, GOLD_BOX, hydrate, load, save, KEY,
+} = E;
 
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
@@ -213,11 +224,14 @@ section('storage');
     trivia: { q: { right: 'x' } }, days: { bad: 3, [D0]: 2 }, streak: { count: -1, last: 'x', freezes: 9 },
     settings: { goal: 17 }, badges: [1, 'gold'] }], current: 'nobody' });
   const j = junk.players[0];
-  ok('junk players dropped', junk.players.length === 1 && junk.current === 'x');
+  ok('junk players dropped, unknown current cleared', junk.players.length === 1 && junk.current === null);
   ok('junk fields fixed', j.name.length <= 16 && j.color.startsWith('#') && j.settings.goal === 3 && j.streak.freezes === 2 && j.streak.last === null);
   ok('stage clamped, unknown verse dropped', j.verses['gen-1-1'].stage === STEPS && j.verses['gen-1-1'].box === 0 && !j.verses['no-such-verse']);
   ok('bad dates dropped', !('bad' in j.days) && j.days[D0] === 2 && j.verses['gen-1-1'].due === null);
   ok('junk loads into a working plan', Array.isArray(plan(j, D0).reviews));
+  const many = hydrate({ players: [1, 2, 3, 4, 5].map(n => ({ id: 'p' + n, name: 'Kid ' + n })) });
+  ok(`never more than ${MAX_PLAYERS} players`, MAX_PLAYERS === 3 && many.players.length === 3);
+  ok('long dashes split into words', tokenize('faith\u2014and this').map(t => t.c).join() === 'faith,and,this');
   const throws = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
   ok('blocked storage is read-only', load(throws).readOnly === true);
 }

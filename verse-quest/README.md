@@ -5,8 +5,27 @@ minutes a day, short steps, a daily goal and a streak. It also has quick Bible
 trivia rounds. Made for 8 and 9 year olds playing on their own on a phone,
 tablet or computer.
 
-Static site, no build step, no accounts, no network calls. Works offline once
-loaded. Several kids can share one device, each with their own player.
+One page (`index.html`), no build step, no accounts, nothing sent anywhere.
+Works offline once loaded and installs to a phone or tablet home screen. Up to
+3 kids can share one device, each with their own player.
+
+## Players and the grown-ups screen
+
+Kids pick who's playing on the first screen. They can't add, rename or delete
+players. **Grown-ups** (on the first screen and the home screen) sits behind a
+times-table question (6 to 12 times 6 to 12), the same idea as Mundo
+Criatura's. It's a speed bump, not a real lock: a kid who knows their 12s
+can get in.
+
+Behind it:
+
+- **Players:** 3 spots. Add, rename, or delete (with an on-screen "are you
+  sure?"). Deleting the player who was playing sends the game back to
+  "Who's playing?".
+- **Progress for each player:** verses memorized, gold verses, verses in
+  progress, reviews due, streak, trivia accuracy, and trivia they keep
+  missing.
+- **Settings for each player:** sound, read-aloud, and the daily goal.
 
 ## How a verse is learned
 
@@ -65,7 +84,7 @@ shows the right answer, a one-line explanation and where to find it in the
 Bible. Questions a kid has never seen or keeps missing come up most. Ones
 answered right several times show up less.
 
-The **Grown-ups** screen lists the trivia questions a kid keeps missing, as
+The grown-ups screen lists the trivia questions each kid keeps missing, as
 something to talk about together.
 
 ## The verses
@@ -82,14 +101,14 @@ Proverbs 3:5-6, 2 Corinthians 5:17, Micah 6:8, Deuteronomy 31:6, Psalm 136:1,
 Jeremiah 29:11, Galatians 5:22-23, Psalm 23:1), but not every verse. Kids will
 memorize exactly what the game shows, so it is worth comparing each one to
 your own NIV Bible or [BibleGateway](https://www.biblegateway.com/) once. To
-fix or add a verse, edit `VERSES` in `js/data.js`.
+fix or add a verse, edit `VERSES` in `index.html`.
 
 ### NIV permission
 
 Biblica's NIV policy lets you quote up to 500 verses in any form without
 written permission, as long as they are not a complete book of the Bible and
 are not 25% or more of the whole work, and the copyright notice is shown. The
-notice is on the first screen and on the Grown-ups screen. Check the current
+notice is on the first screen and on the grown-ups screen. Check the current
 policy at [biblica.com/permissions](https://www.biblica.com/permissions/)
 before sharing this outside the family, because in a verse game the verses
 are most of the text, and the 25% rule may matter if it is ever published
@@ -97,23 +116,29 @@ widely or sold.
 
 ## Trivia content
 
-All trivia in `js/data.js` is hand-written, each with a Bible reference except
+All trivia in `index.html` (`TRIVIA`) is hand-written, each with a Bible reference except
 a few general questions. Read through it once. "How many books are in the
 Bible?" says 66 and notes that Catholic Bibles have more.
 
-## Running it
+## Installing it
+
+Once merged it's served at `/verse-quest/` on the repo's GitHub Pages site.
+Open that address on the phone or tablet, then:
+
+- **iPhone or iPad (Safari):** Share button, then **Add to Home Screen**.
+- **Android (Chrome):** menu, then **Install app** or **Add to Home screen**.
+
+It works offline after the first load. Progress lives in that browser's
+storage on that device, so a different browser or device starts fresh, and
+clearing the browser's site data erases it.
+
+## Running it locally
 
 ```
-cd versequest
+cd verse-quest
 python3 -m http.server 8126
-# then visit http://127.0.0.1:8126/
+# then visit http://localhost:8126/
 ```
-
-It will not run from `file://` because it uses ES modules. On GitHub Pages it
-installs to a phone or tablet home screen ("Add to Home Screen") and works
-offline after the first load. Progress lives in that browser's
-`localStorage`, so a different browser or device is a different set of
-players, and clearing browser data erases it.
 
 ## Tests
 
@@ -121,24 +146,31 @@ players, and clearing browser data erases it.
 ./test/run.sh
 ```
 
-- `test/engine.test.mjs`: every verse splits into words and rebuilds exactly;
-  thousands of generated exercises each have exactly one right answer per
-  step; trivia answers are distinct; the 5-step schedule, 2-per-day limit,
-  review intervals, gold, streaks and savers; missed trivia comes back more;
-  old or junk saves load safely.
-- `test/play.test.mjs`: plays in Chromium at phone size over four pretend
-  days. Learns Genesis 1:1, fails a step on purpose, plays a perfect trivia
-  round, reloads, passes a review, practices, changes the daily goal, adds a
-  second player, and checks nothing scrolls sideways.
+- `test/engine.test.mjs` loads the rules straight out of `index.html` (the
+  part between the `@engine-begin` and `@engine-end` markers, which has no
+  page code). It checks that every verse splits into words and rebuilds
+  exactly, that thousands of generated exercises each have exactly one right
+  answer per step, that trivia answers are distinct, the 5-step schedule, the
+  2-per-day limit, review timing, gold verses, streaks and savers, that missed
+  trivia comes back more, the 3-player cap, and that old or junk saves load
+  safely.
+- `test/play.test.mjs` plays in Chromium at phone size (390 by 844). A
+  grown-up gets through the gate (a wrong answer first), adds a player, and a
+  kid learns Genesis 1:1 over three pretend days. Along the way it fails a
+  step on purpose, plays a perfect trivia round, reloads, passes a review,
+  and practices. Then the grown-up fills all 3 spots, renames one, changes
+  the daily goal and deletes a player. It also checks the game still opens
+  with the network off, and that nothing scrolls sideways.
 
 ## Files
 
 | file | what it holds |
 | --- | --- |
-| `js/data.js` | verses, trivia, badges, NIV notice |
-| `js/engine.js` | exercises, the learning schedule, streaks, trivia picking |
-| `js/main.js` | every screen |
-| `js/storage.js` | players in localStorage |
-| `js/sfx.js` | WebAudio sounds and read-aloud |
+| `index.html` | the whole game: content, rules, saving, sounds, screens, styles |
+| `sw.js` | offline support |
+| `manifest.webmanifest` | name, colors and icons for installing |
+| `icon-192.png`, `icon-512.png` | app icons |
+| `icon-512-maskable.png` | Android icon with room for round and squircle masks |
+| `apple-touch-icon.png` | iPhone and iPad home screen icon |
 
-Bump `VERSION` in `js/data.js` and `CACHE` in `sw.js` together when shipping.
+Bump `VERSION` in `index.html` and `CACHE` in `sw.js` together when shipping.

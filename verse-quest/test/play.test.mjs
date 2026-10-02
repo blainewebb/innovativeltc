@@ -1,7 +1,8 @@
 /* Verse Quest browser test: plays the game in Chromium on a phone-sized
-   screen. Makes a player, learns a verse over three days, fails a step on
-   purpose, does a review, plays a perfect trivia round, reloads, and adds a
-   second player.
+   screen. A grown-up sets up players behind the gate, a kid learns a verse
+   over three days, fails a step on purpose, does a review, plays a perfect
+   trivia round, and reloads. Then the grown-up adds, renames and deletes
+   players, fills all 3 spots, and the game is checked offline.
    Run: node test/play.test.mjs  (expects a static server on PORT, default 8126) */
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -15,6 +16,8 @@ try { ({ chromium } = require('playwright')); } catch {
 
 const PORT = process.env.PORT || 8126;
 const url = day => `http://127.0.0.1:${PORT}/index.html?test&seed=3&day=${day}`;
+// localhost counts as a secure origin, so the offline worker registers there.
+const LIVE = `http://localhost:${PORT}/`;
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
   if (cond) { passed++; console.log(`  ok  ${name}`); }
@@ -41,6 +44,17 @@ async function play(page, wrong = 0) {
   }
   throw new Error('session never ended');
 }
+/* Passes the grown-ups gate. Optionally answers wrong first. */
+async function openGate(page, wrongFirst = false) {
+  if (wrongFirst) {
+    const ans = await page.evaluate(() => window.__vq.gate);
+    await page.fill('#gate-input', String(ans + 1));
+    await page.click('#gate-go');
+  }
+  const ans = await page.evaluate(() => window.__vq.gate);
+  await page.fill('#gate-input', String(ans));
+  await page.click('#gate-go');
+}
 const noSideScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
 const browser = await chromium.launch();
@@ -49,17 +63,34 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // Google Fonts can't load in an offline test sandbox; the game falls back to system fonts.
+  page.on('console', m => { if (m.type() === 'error' && !/fonts\.g/.test(m.location()?.url || '') && !/fonts\.g/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', d => { errors.push(`unexpected pop-up: ${d.message()}`); d.dismiss(); });
 
   // Day 1 ------------------------------------------------------------------
   await page.goto(url('2026-10-05'));
-  ok('first visit asks for a name', await page.isVisible('#name'));
+  ok('first visit asks a grown-up to set up', await page.isVisible('#setup'));
   ok('NIV notice shows on first screen', (await page.textContent('.notice')).includes('Biblica'));
-  await page.click('#create');
-  ok('empty name is refused', await page.isVisible('#name'));
-  await page.fill('#name', 'Hannah');
-  await page.click('#create');
+  ok('kids cannot add players from the first screen', !(await page.$('#add, [data-add]')));
+  await page.click('#setup');
+  ok('setup is behind the gate', await page.isVisible('#gate-input'));
+  ok('gate fits a phone', await noSideScroll(page));
+  {
+    const ans = await page.evaluate(() => window.__vq.gate);
+    await page.fill('#gate-input', String(ans + 1));
+    await page.click('#gate-go');
+    ok('wrong gate answer is refused', await page.isVisible('#gate-input') && (await page.textContent('#gate-msg')).includes('Not quite'));
+  }
+  await openGate(page);
+  ok('players screen opens after the gate', await page.isVisible('#players'));
+  ok('three empty spots', (await page.$$('[data-add]')).length === 3);
+  await page.click('[data-add="0"]');
+  ok('empty name is refused', (await page.$$('[data-add]')).length === 3);
+  await page.fill('#name-0', 'Hannah');
+  await page.click('[data-add="0"]');
+  ok('player added', (await page.textContent('.okmsg')).includes('Added Hannah') && (await page.$$('[data-add]')).length === 2);
+  ok('players screen fits a phone', await noSideScroll(page));
+  await page.click('#done');
   ok('home shows a new verse card', await page.isVisible('[data-act="start"]'));
   ok('home shows the trivia card', await page.isVisible('[data-act="trivia"]'));
   ok('first verse is Genesis 1:1', (await page.textContent('[data-act="start"] .ctitle')) === 'Genesis 1:1');
@@ -132,23 +163,37 @@ try {
   ok('practice works', (await page.textContent('.big-head')).includes('practice'));
   await page.click('#next');
   await page.click('#grown');
-  ok('grown-ups shows 1 memorized', (await page.textContent('.stats div:first-child b')) === '1');
+  ok('grown-ups is behind the gate', await page.isVisible('#gate-input'));
+  await page.click('#back');
+  ok('back from the gate returns home', await page.isVisible('.goal'));
+  await page.click('#grown');
+  await openGate(page);
+  ok('grown-ups shows 1 memorized', (await page.textContent('.kid .stats div:first-child b')) === '1');
   ok('grown-ups shows the NIV notice', (await page.textContent('.notice')).includes('Biblica'));
-  await page.click('.chip[data-g="5"]');
-  await page.click('#home');
+  await page.click('.kid [data-goal="5"]');
+  ok('grown-ups page fits a phone', await noSideScroll(page));
+
+  // Fill all three spots, rename one, then delete one.
+  await page.fill('#name-1', 'Eli');
+  await page.click('[data-add="1"]');
+  await page.fill('#name-2', 'Ruthie');
+  await page.click('[data-add="2"]');
+  ok('all three spots full, no add left', (await page.$$('[data-add]')).length === 0 && (await page.$$('.kid')).length === 3);
+  await page.fill('#name-1', 'Elijah');
+  await page.click('[data-rename="1"]');
+  ok('rename works', (await page.inputValue('#name-1')) === 'Elijah' && (await page.textContent('.okmsg')).includes('Renamed'));
+  await page.click('#done');
   ok('goal setting applies', (await page.textContent('.goal-top span')).includes('/ 5'));
+  ok('current player is still Hannah', (await page.textContent('#who')).includes('Hannah'));
 
-  // Second player ----------------------------------------------------------
   await page.click('#who');
-  await page.click('#add');
-  await page.fill('#name', 'Eli');
-  await page.click('#create');
-  ok('second player starts fresh', (await page.textContent('#stars')) === '0');
-  await page.click('#who');
-  ok('both players listed', (await page.$$('.player-btn')).length === 2);
-
-  // Stopping and deleting ask on the page, not with a browser pop-up.
+  ok('three players listed, no empty spots', (await page.$$('.player-btn')).length === 3 && (await page.$$('.player-empty')).length === 0);
+  ok('renamed player shows', (await page.textContent('.player-list')).includes('Elijah'));
+  ok('kids cannot add players from the title', !(await page.$('#add, [data-add]')));
   await page.click('.player-btn:nth-child(2)');
+  ok('second player starts fresh', (await page.textContent('#stars')) === '0');
+
+  // Stopping a lesson asks on the page, not with a browser pop-up.
   await page.click('[data-act="start"]');
   await page.click('#quit');
   ok('stop asks first', await page.isVisible('.ask'));
@@ -157,13 +202,37 @@ try {
   await page.click('#quit');
   await page.click('#ask-yes');
   ok('stop goes home', await page.isVisible('.goal'));
+
   await page.click('#grown');
-  await page.click('#del');
-  ok('delete asks first', (await page.textContent('.ask')).includes('Delete Eli'));
+  await openGate(page);
+  await page.click('[data-del="1"]');
+  ok('delete asks first', (await page.textContent('.ask')).includes('Delete Elijah'));
+  await page.click('#ask-no');
+  ok('cancel keeps the player', (await page.$$('[data-del]')).length === 3);
+  await page.click('[data-del="1"]');
   await page.click('#ask-yes');
-  ok('delete removes the player', (await page.$$('.player-btn')).length === 1);
+  ok('delete removes the player', (await page.$$('[data-del]')).length === 2 && (await page.$$('[data-add]')).length === 1);
+  await page.click('#done');
+  ok('deleting the current player goes to the title', (await page.$$('.player-btn')).length === 2 && (await page.$$('.player-empty')).length === 1);
+  await page.reload();
+  ok('deletion survived a reload', (await page.$$('.player-btn')).length === 2);
 
   ok('no console errors', errors.length === 0, errors.join(' | '));
+
+  // Offline: load once at a secure origin, then cut the network and reload.
+  const live = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const lp = await live.newPage();
+  await lp.goto(LIVE);
+  const ready = await lp.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+  ok('offline worker installs', ready);
+  await lp.reload();
+  await lp.waitForSelector('#setup');
+  await live.setOffline(true);
+  await lp.reload();
+  ok('game opens with no network', await lp.isVisible('#setup'));
+  const man = await lp.evaluate(() => fetch('manifest.webmanifest').then(r => r.json()));
+  ok('manifest available offline', man.name === 'Verse Quest' && man.icons.some(i => i.purpose === 'maskable'));
+  await live.close();
 } finally {
   await browser.close();
 }

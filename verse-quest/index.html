@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Verse Quest">
+<meta name="theme-color" content="#fdf8ee">
+<meta name="description" content="Learn Bible verses a few minutes a day and play Bible trivia. Works offline, no accounts.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Verse Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<style>
+/* Verse Quest */
+:root {
+  color-scheme: light;
+  --bg: #fdf8ee;
+  --panel: #ffffff;
+  --line: #e8e1cf;
+  --ink: #1f2a44;
+  --muted: #6b7286;
+  --gold: #f59e0b;
+  --gold-2: #b45309;
+  --blue: #2563eb;
+  --green: #16a34a;
+  --green-bg: #dcfce7;
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --radius: 16px;
+  --font: "Nunito", "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --serif: Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-tap-highlight-color: transparent; }
+body { min-height: 100vh; min-height: 100dvh; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; }
+#app { min-height: 100vh; min-height: 100dvh; }
+h1, h2, h3 { margin: .2rem 0; line-height: 1.2; }
+.muted { color: var(--muted); }
+.small { font-size: .9rem; }
+.center { text-align: center; }
+.warn { color: #7f1d1d; background: var(--red-bg); padding: .6rem .8rem; border-radius: 10px; }
+.ico { width: 1.2em; height: 1.2em; vertical-align: -0.2em; flex: none; }
+
+.screen { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 14px; }
+.center-col { text-align: center; align-items: stretch; padding-top: 32px; }
+.bg-title { background: radial-gradient(ellipse at top, #fde7b0 0%, var(--bg) 55%); }
+.bg-win { background: radial-gradient(ellipse at top, #c7f0d2 0%, var(--bg) 60%); }
+.bg-soft { background: radial-gradient(ellipse at top, #e0e7ff 0%, var(--bg) 60%); }
+
+/* ------------------------------------------------------------ buttons -- */
+.btn { border: 0; border-radius: var(--radius); padding: .8rem 1.1rem; background: #efe8d6; font-weight: 800; font-size: 1rem; box-shadow: 0 4px 0 #d8cfb6; transition: transform .06s; display: inline-flex; gap: .5rem; align-items: center; justify-content: center; }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #d8cfb6; }
+.btn.primary { background: var(--blue); color: #fff; box-shadow: 0 4px 0 #1e40af; }
+.btn.big { font-size: 1.2rem; padding: 1rem 1.2rem; }
+.btn.ghost { background: transparent; border: 2px solid var(--line); box-shadow: none; }
+.btn.danger { color: var(--red); border-color: #fecaca; }
+.iconbtn { border: 0; background: #efe8d6; border-radius: 50%; width: 44px; height: 44px; font-size: 1.5rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none; align-self: center; }
+
+/* -------------------------------------------------------------- title -- */
+.brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 18px; }
+.brand .ico { width: 56px; height: 56px; }
+.brand h1 { font-size: clamp(2.2rem, 10vw, 3rem); color: var(--gold-2); letter-spacing: .01em; }
+.tag { text-align: center; color: var(--muted); margin: 0; }
+.sub { margin: 10px 0 0; }
+.player-list { display: flex; flex-direction: column; gap: 10px; }
+.player-btn { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; text-align: left; background: var(--panel); border: 2px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.player-btn .dot { grid-row: span 2; }
+.pname { font-weight: 800; font-size: 1.15rem; }
+.pmeta { color: var(--muted); font-size: .85rem; }
+.dot { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; color: #fff; font-weight: 900; font-size: 1.2rem; }
+.dot.small { width: 28px; height: 28px; font-size: .9rem; }
+.notice { font-size: .72rem; color: var(--muted); text-align: center; line-height: 1.4; }
+.version { text-align: center; color: #b8b2a0; font-size: .75rem; margin: 0; }
+.field { display: flex; flex-direction: column; gap: 8px; font-weight: 700; }
+.field input { font: inherit; font-size: 1.2rem; padding: .7rem .9rem; border-radius: 12px; border: 2px solid var(--line); background: #fff; color: var(--ink); }
+.swatches, .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; }
+.swatch.on { border-color: var(--ink); }
+.chip { min-width: 48px; padding: .5rem .9rem; border-radius: 999px; border: 2px solid var(--line); background: #fff; font-weight: 800; }
+.chip.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* --------------------------------------------------------------- home -- */
+.bar { display: flex; align-items: center; gap: 8px; }
+.who { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; font-weight: 800; font-size: 1.05rem; padding: 4px 0; margin-right: auto; min-width: 0; }
+.pill { display: inline-flex; align-items: center; gap: 4px; background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 4px 10px; font-weight: 800; }
+.pill.hot { border-color: #fdba74; background: #fff7ed; }
+.goal { background: var(--panel); border: 2px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.goal.done { border-color: #86efac; background: #f0fdf4; }
+.goal-top { display: flex; justify-content: space-between; }
+.meter { height: 14px; border-radius: 999px; background: #efe8d6; overflow: hidden; }
+.meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #fbbf24); border-radius: 999px; transition: width .4s; }
+.goal.done .meter i { background: var(--green); }
+.meter.thin { height: 10px; flex: 1; }
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; border: 0; border-radius: var(--radius); padding: 16px 18px; color: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.18); }
+.card:active { transform: translateY(2px); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+.card.review { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.card.lesson { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.card.new { background: linear-gradient(135deg, #16a34a, #15803d); }
+.card.trivia { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.kicker { text-transform: uppercase; letter-spacing: .06em; font-size: .78rem; font-weight: 800; opacity: .9; }
+.ctitle { font-size: 1.35rem; font-weight: 900; }
+.cmeta { opacity: .92; }
+.steps { display: inline-flex; gap: 6px; }
+.steps i { width: 22px; height: 8px; border-radius: 4px; background: rgba(0,0,0,.18); }
+.steps i.on { background: var(--gold); }
+.card .steps i { background: rgba(255,255,255,.35); }
+.card .steps i.on { background: #fde68a; }
+.nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nav .btn { padding: .7rem .4rem; font-size: .9rem; }
+
+/* ----------------------------------------------------------- exercise -- */
+.stop { display: flex; align-items: center; gap: 12px; }
+.prompt { font-size: 1.25rem; }
+.qrow { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.verse { background: var(--panel); border: 2px solid var(--line); border-radius: var(--radius); padding: 16px 18px; font-family: var(--serif); font-size: 1.25rem; line-height: 1.9; }
+.verse p { margin: 0; }
+.verse.big { font-size: 1.45rem; }
+.verse .ref { font-family: var(--font); font-weight: 800; color: var(--gold-2); font-size: 1rem; margin-top: 8px; }
+.w.got { color: var(--blue); font-weight: 700; }
+.hole { display: inline-block; min-width: 3ch; border-bottom: 3px solid #cbd5e1; line-height: 1.3; font-family: var(--font); color: var(--muted); }
+.hole.letters { font-weight: 800; color: #94a3b8; }
+.hole.cur { border-color: var(--gold); background: #fef3c7; border-radius: 6px 6px 0 0; }
+.built .w { margin-right: .2em; }
+.bank { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.bank.col { flex-direction: column; align-items: stretch; }
+.tile, .choice { border: 2px solid var(--line); background: #fff; border-radius: 14px; padding: .75rem 1rem; font-weight: 800; font-size: 1.15rem; box-shadow: 0 4px 0 var(--line); min-height: 52px; }
+.tile:active, .choice:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--line); }
+.tile.wide { font-family: var(--serif); font-weight: 600; text-align: left; }
+.tile.used { opacity: .25; box-shadow: none; }
+.choices { display: flex; flex-direction: column; gap: 10px; }
+.choices.row { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+.choices.row .choice { flex: 1 1 28%; }
+.choice.long { font-family: var(--serif); font-weight: 600; text-align: left; font-size: 1.05rem; }
+.choice.good { border-color: var(--green); background: var(--green-bg); }
+.choice.bad, .tile.bad { border-color: #fca5a5; background: var(--red-bg); }
+.choice:disabled:not(.good):not(.bad) { opacity: .6; }
+.shake { animation: shake .35s; }
+@keyframes shake { 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+.feedback { border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; animation: pop .25s; }
+.feedback p { margin: 0; }
+.feedback.ok { background: var(--green-bg); }
+.feedback.no { background: #fff7ed; border: 2px solid #fed7aa; }
+.feedback .ref { font-weight: 800; color: var(--gold-2); }
+.feedback .btn { margin-top: 6px; }
+
+/* ------------------------------------------------------------- result -- */
+.big-head { font-size: 2rem; color: var(--gold-2); animation: pop .35s; }
+.score { font-size: 3rem; font-weight: 900; margin: 0; }
+.rewards { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.newbadge { display: flex; gap: 12px; align-items: center; text-align: left; background: #fff; border: 2px solid #fcd34d; border-radius: var(--radius); padding: 10px 14px; animation: pop .4s; }
+.newbadge small { display: block; color: var(--muted); }
+.badge-ico { width: 52px; height: 52px; flex: none; }
+@keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------------------------------------------- players and grown-ups -- */
+.panel { background: var(--panel); border: 2px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel h2, .panel h3, .panel p { margin: 0; }
+.panel h3 { display: flex; align-items: center; gap: 8px; }
+.player-empty { border: 2px dashed var(--line); border-radius: var(--radius); padding: 14px; color: var(--muted); text-align: center; font-size: .9rem; }
+.btn.small { font-size: .9rem; padding: .55rem .8rem; }
+.slots { display: flex; flex-direction: column; gap: 12px; }
+.slot { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; }
+.slot input { font: inherit; font-size: 1.05rem; padding: .55rem .7rem; border-radius: 10px; border: 2px solid var(--line); background: #fff; color: var(--ink); min-width: 0; width: 100%; }
+.slot-btns { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; }
+.ghostdot { background: transparent; border: 2px dashed #c9c0aa; color: var(--muted); }
+.gate-input { font: inherit; font-size: 1.6rem; padding: .6rem .8rem; border-radius: 12px; border: 2px solid var(--line); width: 100%; background: #fff; color: var(--ink); }
+.okmsg { margin: 0; background: var(--green-bg); color: #14532d; border-radius: 10px; padding: .6rem .8rem; font-weight: 700; }
+.kid .stats { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+
+/* ------------------------------------------------------ are you sure -- */
+.ask { background: #fff7ed; border: 2px solid #fdba74; border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; animation: pop .2s; }
+.ask p { margin: 0; font-weight: 700; }
+.ask-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.ask-row .btn { flex: 1; }
+
+/* ------------------------------------------------------- lists, stats -- */
+.vlist { display: flex; flex-direction: column; gap: 8px; }
+.vrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: left; }
+.vref { font-weight: 800; }
+.vstat { font-size: .85rem; color: var(--muted); white-space: nowrap; }
+.vrow.active { border-color: #93c5fd; }
+.vrow.active .vstat { color: var(--blue); }
+.vrow.done { border-color: #86efac; }
+.vrow.done .vstat { color: var(--green); }
+.vrow.gold { border-color: var(--gold); background: #fffbeb; }
+.vrow.gold .vstat { color: var(--gold-2); font-weight: 800; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.bcard { background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; opacity: .7; }
+.bcard.on { opacity: 1; border-color: #fcd34d; }
+.bcard small { color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.stats div { background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
+.stats b { font-size: 1.6rem; }
+.stats small { color: var(--muted); }
+.missed { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px; }
+.toggle { display: flex; gap: 10px; align-items: center; font-weight: 700; }
+.toggle input { width: 22px; height: 22px; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+#app { padding-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px); }
+</style>
+</head>
+<body>
+<div id="app"><div class="screen"><p class="muted">Loading&hellip;</p></div></div>
+<noscript><p style="padding:2rem">Verse Quest needs JavaScript turned on.</p></noscript>
+<script>
+'use strict';
+/* Verse Quest. One file, no build step, no accounts. Progress is saved in
+   this browser's localStorage only.
+
+   Layout of this script:
+   1. Content, rules and saving (between the @engine markers). No page code
+      in here, so test/engine.test.mjs can load it straight into Node.
+   2. Sounds and read-aloud.
+   3. Every screen. */
+
+// @engine-begin
+/* ---- Content: every verse and trivia question in the game.
+
+   VERSES are NIV (2011) text, in the order the path teaches them: short and
+   familiar first, longer ones later. Scripture punctuation is kept exactly as
+   printed, including its dashes and quote marks. The game ignores punctuation
+   and capital letters when checking answers, so kids never lose a point over a
+   comma.
+
+   NIV quoting rule (Biblica): up to 500 verses without written permission, as
+   long as they are not a whole book of the Bible and not 25% or more of the
+   work. This list is well under that. The notice in NIV_NOTICE has to show in
+   the app, and does on the title screen and the grown-ups screen. */
+
+const VERSION = '1.0.0';
+
+const NIV_NOTICE = 'Scripture quotations taken from The Holy Bible, New International Version® NIV® Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ Used by permission. All rights reserved worldwide.';
+
+const VERSES = [
+  { id: 'gen-1-1',     ref: 'Genesis 1:1',            text: 'In the beginning God created the heavens and the earth.' },
+  { id: '1jn-4-19',    ref: '1 John 4:19',            text: 'We love because he first loved us.' },
+  { id: 'ps-56-3',     ref: 'Psalm 56:3',             text: 'When I am afraid, I put my trust in you.' },
+  { id: 'ps-23-1',     ref: 'Psalm 23:1',             text: 'The LORD is my shepherd, I lack nothing.' },
+  { id: 'lk-6-31',     ref: 'Luke 6:31',              text: 'Do to others as you would have them do to you.' },
+  { id: 'heb-13-8',    ref: 'Hebrews 13:8',           text: 'Jesus Christ is the same yesterday and today and forever.' },
+  { id: 'ps-119-105',  ref: 'Psalm 119:105',          text: 'Your word is a lamp for my feet, a light on my path.' },
+  { id: 'rom-3-23',    ref: 'Romans 3:23',            text: 'for all have sinned and fall short of the glory of God,' },
+  { id: 'jn-1-1',      ref: 'John 1:1',               text: 'In the beginning was the Word, and the Word was with God, and the Word was God.' },
+  { id: '1pe-5-7',     ref: '1 Peter 5:7',            text: 'Cast all your anxiety on him because he cares for you.' },
+  { id: 'col-3-20',    ref: 'Colossians 3:20',        text: 'Children, obey your parents in everything, for this pleases the Lord.' },
+  { id: 'ps-46-1',     ref: 'Psalm 46:1',             text: 'God is our refuge and strength, an ever-present help in trouble.' },
+  { id: 'ps-136-1',    ref: 'Psalm 136:1',            text: 'Give thanks to the LORD, for he is good. His love endures forever.' },
+  { id: 'jn-3-16',     ref: 'John 3:16',              text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.' },
+  { id: 'rom-6-23',    ref: 'Romans 6:23',            text: 'For the wages of sin is death, but the gift of God is eternal life in Christ Jesus our Lord.' },
+  { id: 'php-4-13',    ref: 'Philippians 4:13',       text: 'I can do all this through him who gives me strength.' },
+  { id: 'prv-17-17',   ref: 'Proverbs 17:17',         text: 'A friend loves at all times, and a brother is born for a time of adversity.' },
+  { id: 'prv-15-1',    ref: 'Proverbs 15:1',          text: 'A gentle answer turns away wrath, but a harsh word stirs up anger.' },
+  { id: 'eph-4-32',    ref: 'Ephesians 4:32',         text: 'Be kind and compassionate to one another, forgiving each other, just as in Christ God forgave you.' },
+  { id: 'jn-14-6',     ref: 'John 14:6',              text: 'Jesus answered, “I am the way and the truth and the life. No one comes to the Father except through me.' },
+  { id: 'rom-5-8',     ref: 'Romans 5:8',             text: 'But God demonstrates his own love for us in this: While we were still sinners, Christ died for us.' },
+  { id: 'exo-20-12',   ref: 'Exodus 20:12',           text: 'Honor your father and your mother, so that you may live long in the land the LORD your God is giving you.' },
+  { id: 'ps-139-14',   ref: 'Psalm 139:14',           text: 'I praise you because I am fearfully and wonderfully made; your works are wonderful, I know that full well.' },
+  { id: '1jn-1-9',     ref: '1 John 1:9',             text: 'If we confess our sins, he is faithful and just and will forgive us our sins and purify us from all unrighteousness.' },
+  { id: 'mt-5-16',     ref: 'Matthew 5:16',           text: 'In the same way, let your light shine before others, that they may see your good deeds and glorify your Father in heaven.' },
+  { id: '1co-10-31',   ref: '1 Corinthians 10:31',    text: 'So whether you eat or drink or whatever you do, do it all for the glory of God.' },
+  { id: '2co-5-17',    ref: '2 Corinthians 5:17',     text: 'Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!' },
+  { id: 'rom-8-28',    ref: 'Romans 8:28',            text: 'And we know that in all things God works for the good of those who love him, who have been called according to his purpose.' },
+  { id: 'prv-3-5-6',   ref: 'Proverbs 3:5-6',         text: 'Trust in the LORD with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.' },
+  { id: 'eph-2-8-9',   ref: 'Ephesians 2:8-9',        text: 'For it is by grace you have been saved, through faith—and this is not from yourselves, it is the gift of God—not by works, so that no one can boast.' },
+  { id: 'rom-10-9',    ref: 'Romans 10:9',            text: 'If you declare with your mouth, “Jesus is Lord,” and believe in your heart that God raised him from the dead, you will be saved.' },
+  { id: 'jos-1-9',     ref: 'Joshua 1:9',             text: 'Have I not commanded you? Be strong and courageous. Do not be afraid; do not be discouraged, for the LORD your God will be with you wherever you go.' },
+  { id: 'deu-31-6',    ref: 'Deuteronomy 31:6',       text: 'Be strong and courageous. Do not be afraid or terrified because of them, for the LORD your God goes with you; he will never leave you nor forsake you.' },
+  { id: 'mic-6-8',     ref: 'Micah 6:8',              text: 'He has shown you, O mortal, what is good. And what does the LORD require of you? To act justly and to love mercy and to walk humbly with your God.' },
+  { id: '1th-5-16-18', ref: '1 Thessalonians 5:16-18', text: 'Rejoice always, pray continually, give thanks in all circumstances; for this is God’s will for you in Christ Jesus.' },
+  { id: '2ti-3-16',    ref: '2 Timothy 3:16',         text: 'All Scripture is God-breathed and is useful for teaching, rebuking, correcting and training in righteousness,' },
+  { id: 'jer-29-11',   ref: 'Jeremiah 29:11',         text: '“For I know the plans I have for you,” declares the LORD, “plans to prosper you and not to harm you, plans to give you hope and a future.”' },
+  { id: 'php-4-6',     ref: 'Philippians 4:6',        text: 'Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God.' },
+  { id: 'isa-41-10',   ref: 'Isaiah 41:10',           text: 'So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you and help you; I will uphold you with my righteous right hand.' },
+  { id: 'gal-5-22-23', ref: 'Galatians 5:22-23',      text: 'But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control. Against such things there is no law.' },
+];
+
+/* Trivia for ages about 7 to 10. Every story question carries the passage it
+   comes from (`ref`), so a parent can check it or read the story together.
+   A few general questions have no single passage and use null. `a` is the right
+   answer; `wrong` are the other choices (one for true/false, three otherwise).
+   Keep every wrong choice plainly wrong, never "also sort of right". */
+const CATEGORIES = {
+  ot:    'Old Testament',
+  jesus: 'Jesus',
+  nt:    'Church and Letters',
+  books: 'Bible Basics',
+};
+
+const TRIVIA = [
+  // ---------------------------------------------------------- Old Testament
+  { id: 'ot-ark', cat: 'ot', q: 'Who built the ark?', a: 'Noah', wrong: ['Moses', 'Abraham', 'David'], ref: 'Genesis 6:13-14', why: 'God told Noah to build an ark to keep his family and the animals safe from the flood.' },
+  { id: 'ot-days', cat: 'ot', q: 'God made the world, then rested. On which day did he rest?', a: 'The seventh day', wrong: ['The first day', 'The third day', 'The tenth day'], ref: 'Genesis 2:2', why: 'God finished his work of creating and rested on the seventh day.' },
+  { id: 'ot-rainbow', cat: 'ot', q: 'What did God put in the sky as a sign of his promise to Noah?', a: 'A rainbow', wrong: ['A shooting star', 'A full moon', 'A big cloud'], ref: 'Genesis 9:13', why: 'The rainbow is the sign of God\'s promise never again to flood the whole earth.' },
+  { id: 'ot-adam', cat: 'ot', q: 'Who were the first man and woman?', a: 'Adam and Eve', wrong: ['Abraham and Sarah', 'Isaac and Rebekah', 'Mary and Joseph'], ref: 'Genesis 3:20', why: 'God made Adam, then Eve, and put them in the Garden of Eden.' },
+  { id: 'ot-isaac', cat: 'ot', q: 'Abraham was 100 years old when his son was born. What was the son\'s name?', a: 'Isaac', wrong: ['Jacob', 'Joseph', 'Esau'], ref: 'Genesis 21:5', why: 'Isaac was born when Abraham was 100, just as God promised.' },
+  { id: 'ot-jacob', cat: 'ot', q: 'Who tricked his brother Esau to get their father\'s blessing?', a: 'Jacob', wrong: ['Joseph', 'Isaac', 'Abel'], ref: 'Genesis 27:19', why: 'Jacob pretended to be Esau so their father Isaac would bless him.' },
+  { id: 'ot-robe', cat: 'ot', q: 'Who got a fancy robe from his father, which made his brothers jealous?', a: 'Joseph', wrong: ['Benjamin', 'Esau', 'Samuel'], ref: 'Genesis 37:3-4', why: 'Jacob loved Joseph and gave him an ornate robe. His brothers hated him for it.' },
+  { id: 'ot-sold', cat: 'ot', q: 'Whose brothers sold him to traders going to Egypt?', a: 'Joseph', wrong: ['Moses', 'David', 'Jonah'], ref: 'Genesis 37:28', why: 'Joseph\'s brothers sold him for twenty shekels of silver. Later God used him to save many people.' },
+  { id: 'ot-bush', cat: 'ot', q: 'God spoke to Moses from something that was on fire but did not burn up. What was it?', a: 'A bush', wrong: ['A tree', 'A tent', 'A mountain'], ref: 'Exodus 3:2', why: 'The bush was on fire but did not burn up, and God called to Moses from it.' },
+  { id: 'ot-exodus', cat: 'ot', q: 'Who led the Israelites out of Egypt?', a: 'Moses', wrong: ['Joshua', 'Noah', 'Abraham'], ref: 'Exodus 3:10', why: 'God sent Moses to bring his people out of Egypt.' },
+  { id: 'ot-sea', cat: 'ot', q: 'Which sea did God split so the Israelites could walk across on dry ground?', a: 'The Red Sea', wrong: ['The Dead Sea', 'The Sea of Galilee', 'The Black Sea'], ref: 'Exodus 15:4', why: 'God parted the Red Sea for Israel. When Pharaoh\'s army followed, the water came back.' },
+  { id: 'ot-manna', cat: 'ot', q: 'What food did God send every morning for Israel in the desert?', a: 'Manna', wrong: ['Pancakes', 'Apples', 'Rice'], ref: 'Exodus 16:31', why: 'Manna was white like seed and tasted like wafers made with honey.' },
+  { id: 'ot-ten', cat: 'ot', q: 'What did God give Moses on Mount Sinai, written on stone?', a: 'The Ten Commandments', wrong: ['A map to the Promised Land', 'A list of kings', 'The Lord\'s Prayer'], ref: 'Exodus 34:28', why: 'God wrote the Ten Commandments on two stone tablets.' },
+  { id: 'ot-jericho', cat: 'ot', q: 'The Israelites marched around a city and its walls fell down. Which city?', a: 'Jericho', wrong: ['Jerusalem', 'Babylon', 'Nineveh'], ref: 'Joshua 6:20', why: 'When the priests blew the trumpets and the people shouted, Jericho\'s wall collapsed.' },
+  { id: 'ot-samson', cat: 'ot', q: 'Samson was super strong. What was he never supposed to cut?', a: 'His hair', wrong: ['His fingernails', 'His beard only', 'His robe'], ref: 'Judges 16:17', why: 'Samson was set apart to God from birth, and a razor was never used on his head.' },
+  { id: 'ot-ruth', cat: 'ot', q: 'Who said, "Where you go I will go"?', a: 'Ruth', wrong: ['Esther', 'Naomi', 'Mary'], ref: 'Ruth 1:16', why: 'Ruth said this to her mother-in-law Naomi, promising to stay with her.' },
+  { id: 'ot-samuel', cat: 'ot', q: 'Which boy heard God calling his name in the night?', a: 'Samuel', wrong: ['David', 'Daniel', 'Joseph'], ref: '1 Samuel 3:10', why: 'Samuel answered, "Speak, for your servant is listening."' },
+  { id: 'ot-saul', cat: 'ot', q: 'Who was the first king of Israel?', a: 'Saul', wrong: ['David', 'Solomon', 'Samuel'], ref: '1 Samuel 10:1', why: 'Samuel anointed Saul as the first king. David came after him.' },
+  { id: 'ot-sheep', cat: 'ot', q: 'Before he became king, young David took care of what animals?', a: 'Sheep', wrong: ['Camels', 'Horses', 'Pigs'], ref: '1 Samuel 16:11', why: 'David was the youngest son and was out tending the sheep when Samuel came.' },
+  { id: 'ot-goliath', cat: 'ot', q: 'What was the name of the giant David fought?', a: 'Goliath', wrong: ['Pharaoh', 'Herod', 'Haman'], ref: '1 Samuel 17:4', why: 'Goliath was a giant Philistine champion who mocked God\'s army.' },
+  { id: 'ot-sling', cat: 'ot', q: 'What did David use to beat Goliath?', a: 'A sling and a stone', wrong: ['A sword', 'A bow and arrow', 'A spear'], ref: '1 Samuel 17:50', why: 'David trusted God and won with just a sling and a stone.' },
+  { id: 'ot-solomon', cat: 'ot', q: 'Which king asked God for wisdom instead of riches?', a: 'Solomon', wrong: ['Saul', 'Herod', 'Pharaoh'], ref: '1 Kings 3:9-12', why: 'God was pleased and gave Solomon a wise and discerning heart.' },
+  { id: 'ot-elijah', cat: 'ot', q: 'Which prophet went up to heaven in a whirlwind?', a: 'Elijah', wrong: ['Jonah', 'Moses', 'Daniel'], ref: '2 Kings 2:11', why: 'A chariot of fire appeared and Elijah went up to heaven in a whirlwind.' },
+  { id: 'ot-esther', cat: 'ot', q: 'Which queen bravely went to the king to save her people?', a: 'Esther', wrong: ['Ruth', 'Sarah', 'Miriam'], ref: 'Esther 4:16', why: 'Esther said, "I will go to the king, even though it is against the law."' },
+  { id: 'ot-furnace', cat: 'ot', q: 'Which three friends were thrown into a fiery furnace and not burned?', a: 'Shadrach, Meshach and Abednego', wrong: ['Peter, James and John', 'Moses, Aaron and Miriam', 'Abraham, Isaac and Jacob'], ref: 'Daniel 3:26-27', why: 'They would not bow to the king\'s statue, and God kept them safe in the fire.' },
+  { id: 'ot-lions', cat: 'ot', q: 'Who was thrown into a den of lions for praying to God?', a: 'Daniel', wrong: ['Joseph', 'Samson', 'Jonah'], ref: 'Daniel 6:22', why: 'God sent his angel and shut the lions\' mouths.' },
+  { id: 'ot-jonah', cat: 'ot', q: 'Who was swallowed by a huge fish after running away from God?', a: 'Jonah', wrong: ['Peter', 'Elijah', 'Noah'], ref: 'Jonah 1:17', why: 'Jonah was inside the fish three days and three nights.' },
+  { id: 'ot-tf-rain', cat: 'ot', q: 'True or false: During the flood, rain fell for forty days and forty nights.', a: 'True', wrong: ['False'], ref: 'Genesis 7:12', why: 'Rain fell on the earth forty days and forty nights.' },
+
+  // ------------------------------------------------------------------ Jesus
+  { id: 'j-gabriel', cat: 'jesus', q: 'Which angel told Mary she would have a baby named Jesus?', a: 'Gabriel', wrong: ['Michael', 'Raphael', 'Lucifer'], ref: 'Luke 1:26-31', why: 'God sent the angel Gabriel to Mary in Nazareth.' },
+  { id: 'j-born', cat: 'jesus', q: 'In what town was Jesus born?', a: 'Bethlehem', wrong: ['Nazareth', 'Jerusalem', 'Rome'], ref: 'Matthew 2:1', why: 'Jesus was born in Bethlehem and grew up in Nazareth.' },
+  { id: 'j-manger', cat: 'jesus', q: 'Where did Mary lay baby Jesus?', a: 'In a manger', wrong: ['In a palace bed', 'In a boat', 'In a basket on a river'], ref: 'Luke 2:7', why: 'There was no guest room for them, so Mary placed him in a manger.' },
+  { id: 'j-magi', cat: 'jesus', q: 'Who followed a star to find young Jesus?', a: 'The Magi (wise men)', wrong: ['Roman soldiers', 'The disciples', 'Fishermen'], ref: 'Matthew 2:1-2', why: 'Magi from the east saw his star and came to worship him.' },
+  { id: 'j-baptist', cat: 'jesus', q: 'Who baptized Jesus in the Jordan River?', a: 'John the Baptist', wrong: ['Peter', 'Paul', 'Moses'], ref: 'Matthew 3:13', why: 'Jesus came from Galilee to the Jordan to be baptized by John.' },
+  { id: 'j-twelve', cat: 'jesus', q: 'How many apostles did Jesus choose?', a: '12', wrong: ['7', '10', '40'], ref: 'Luke 6:13', why: 'Jesus chose twelve of his disciples and called them apostles.' },
+  { id: 'j-fisher', cat: 'jesus', q: 'What was Peter\'s job before he followed Jesus?', a: 'Fisherman', wrong: ['Carpenter', 'Shepherd', 'Tax collector'], ref: 'Matthew 4:18-19', why: 'Jesus told Peter and Andrew, "I will send you out to fish for people."' },
+  { id: 'j-wine', cat: 'jesus', q: 'In the Gospel of John, what was the first sign (miracle) Jesus did?', a: 'Turned water into wine', wrong: ['Walked on water', 'Fed 5,000 people', 'Healed a blind man'], ref: 'John 2:11', why: 'At a wedding in Cana, Jesus turned water into wine. John calls it the first of his signs.' },
+  { id: 'j-prayer', cat: 'jesus', q: 'When Jesus taught his disciples to pray, how did the prayer start?', a: '"Our Father in heaven"', wrong: ['"The LORD is my shepherd"', '"In the beginning"', '"Give thanks to the LORD"'], ref: 'Matthew 6:9', why: 'This is called the Lord\'s Prayer.' },
+  { id: 'j-storm', cat: 'jesus', q: 'Jesus said, "Quiet! Be still!" What was he talking to?', a: 'A storm', wrong: ['A crowd', 'A crying baby', 'A barking dog'], ref: 'Mark 4:39', why: 'The wind died down and it was completely calm.' },
+  { id: 'j-5000', cat: 'jesus', q: 'Jesus fed a huge crowd with how many loaves and fish?', a: '5 loaves and 2 fish', wrong: ['2 loaves and 5 fish', '12 loaves and 12 fish', '1 loaf and 1 fish'], ref: 'Matthew 14:17-21', why: 'About five thousand men ate, plus women and children, and there were twelve baskets left over.' },
+  { id: 'j-water', cat: 'jesus', q: 'Which disciple got out of the boat and walked on the water toward Jesus?', a: 'Peter', wrong: ['John', 'Judas', 'Thomas'], ref: 'Matthew 14:29', why: 'Peter walked on the water, then got scared and began to sink. Jesus caught him.' },
+  { id: 'j-samaritan', cat: 'jesus', q: 'In Jesus\' story, who stopped to help the man hurt by robbers?', a: 'A Samaritan', wrong: ['A priest', 'A Levite', 'A king'], ref: 'Luke 10:33-34', why: 'The priest and the Levite passed by. The Samaritan took pity on him and cared for him.' },
+  { id: 'j-prodigal', cat: 'jesus', q: 'In Jesus\' story of the lost son, what did the father do when his son came home?', a: 'Ran to hug him and threw a party', wrong: ['Sent him away', 'Made him sleep outside', 'Pretended not to see him'], ref: 'Luke 15:20-24', why: 'The father ran to his son, hugged him, and said, "Let\'s have a feast and celebrate."' },
+  { id: 'j-zacchaeus', cat: 'jesus', q: 'Which short man climbed a tree to see Jesus?', a: 'Zacchaeus', wrong: ['Nicodemus', 'Lazarus', 'Bartimaeus'], ref: 'Luke 19:3-4', why: 'Zacchaeus was a tax collector who climbed a sycamore-fig tree.' },
+  { id: 'j-lazarus', cat: 'jesus', q: 'Jesus raised his friend from the dead after four days in the tomb. Who was it?', a: 'Lazarus', wrong: ['Peter', 'Zacchaeus', 'John'], ref: 'John 11:43-44', why: 'Jesus called, "Lazarus, come out!" and he did.' },
+  { id: 'j-greatest', cat: 'jesus', q: 'Jesus said the greatest commandment is to love whom with all your heart?', a: 'The Lord your God', wrong: ['Yourself', 'Your teacher', 'The king'], ref: 'Matthew 22:37-38', why: '"Love the Lord your God with all your heart and with all your soul and with all your mind."' },
+  { id: 'j-judas', cat: 'jesus', q: 'Which disciple betrayed Jesus?', a: 'Judas Iscariot', wrong: ['Peter', 'John', 'Andrew'], ref: 'Matthew 26:14-16', why: 'Judas agreed to hand Jesus over for thirty pieces of silver.' },
+  { id: 'j-denied', cat: 'jesus', q: 'Which disciple said he did not know Jesus three times?', a: 'Peter', wrong: ['Thomas', 'Judas', 'Matthew'], ref: 'Luke 22:61', why: 'Jesus had said Peter would disown him three times before the rooster crowed. Later Jesus forgave him.' },
+  { id: 'j-third', cat: 'jesus', q: 'On which day did Jesus rise from the dead?', a: 'The third day', wrong: ['The first day', 'The seventh day', 'The fortieth day'], ref: '1 Corinthians 15:4', why: 'Jesus was buried and was raised on the third day.' },
+  { id: 'j-tomb', cat: 'jesus', q: 'When the women went to Jesus\' tomb on Sunday morning, what did they find?', a: 'The stone rolled away and no body inside', wrong: ['Soldiers guarding a closed tomb', 'Jesus asleep inside', 'The tomb filled with flowers'], ref: 'Luke 24:2-3', why: 'The stone was rolled away, and Jesus was not there. He had risen!' },
+  { id: 'j-tf-nazareth', cat: 'jesus', q: 'True or false: Jesus grew up in Nazareth.', a: 'True', wrong: ['False'], ref: 'Luke 2:39-40', why: 'After Jesus was born in Bethlehem, his family returned to their town of Nazareth.' },
+
+  // ---------------------------------------------------- Church and Letters
+  { id: 'nt-paul', cat: 'nt', q: 'Saul was blinded by a bright light on the road to Damascus. What name is he better known by?', a: 'Paul', wrong: ['Peter', 'Timothy', 'Stephen'], ref: 'Acts 9:3-4; 13:9', why: 'Saul met Jesus on the road and became Paul, who told the world about him.' },
+  { id: 'nt-letters', cat: 'nt', q: 'Who wrote letters to churches, like Romans and Ephesians?', a: 'Paul', wrong: ['Moses', 'David', 'Noah'], ref: 'Romans 1:1', why: 'Romans begins, "Paul, a servant of Christ Jesus."' },
+  { id: 'nt-spirit', cat: 'nt', q: 'After Jesus went back to heaven, who did God send to help the believers?', a: 'The Holy Spirit', wrong: ['A new king', 'Moses', 'An army'], ref: 'Acts 2:4', why: 'At Pentecost the believers were filled with the Holy Spirit.' },
+  { id: 'nt-fruit', cat: 'nt', q: 'Love, joy and peace are part of the fruit of the what?', a: 'The Spirit', wrong: ['The garden', 'The vine', 'The law'], ref: 'Galatians 5:22', why: 'Paul lists love, joy, peace and more as the fruit of the Spirit.' },
+  { id: 'nt-armor', cat: 'nt', q: 'Paul talks about a helmet, a shield and a sword. What does he call them?', a: 'The armor of God', wrong: ['The armor of David', 'The tools of Noah', 'The crown of Solomon'], ref: 'Ephesians 6:11', why: '"Put on the full armor of God."' },
+
+  // ---------------------------------------------------------- Bible Basics
+  { id: 'b-first', cat: 'books', q: 'What is the first book of the Bible?', a: 'Genesis', wrong: ['Exodus', 'Matthew', 'Psalms'], ref: 'Genesis 1:1', why: 'Genesis means "beginning." It starts with creation.' },
+  { id: 'b-last', cat: 'books', q: 'What is the last book of the Bible?', a: 'Revelation', wrong: ['Jude', 'Acts', 'Malachi'], ref: 'Revelation 22:21', why: 'Revelation is the last book of the New Testament.' },
+  { id: 'b-parts', cat: 'books', q: 'What are the two main parts of the Bible called?', a: 'Old Testament and New Testament', wrong: ['First Book and Second Book', 'Law and Psalms', 'Gospels and Letters'], ref: null, why: 'The Old Testament was written before Jesus was born. The New Testament tells about Jesus and the early church.' },
+  { id: 'b-gospels', cat: 'books', q: 'Which one is NOT one of the four Gospels?', a: 'Acts', wrong: ['Matthew', 'Mark', 'John'], ref: 'Acts 1:1', why: 'The four Gospels are Matthew, Mark, Luke and John. Acts comes right after them.' },
+  { id: 'b-66', cat: 'books', q: 'How many books are in most Protestant Bibles?', a: '66', wrong: ['12', '40', '100'], ref: null, why: '39 in the Old Testament and 27 in the New Testament. (Catholic Bibles have a few more.)' },
+  { id: 'b-psalms', cat: 'books', q: 'Which book is full of songs and prayers?', a: 'Psalms', wrong: ['Leviticus', 'Acts', 'Numbers'], ref: 'Psalm 150:6', why: 'Psalms is a book of 150 songs and prayers. Many were written by David.' },
+  { id: 'b-david', cat: 'books', q: 'Which king wrote many of the Psalms?', a: 'David', wrong: ['Saul', 'Herod', 'Pharaoh'], ref: 'Psalm 23', why: 'Psalm 23, "The LORD is my shepherd," is a psalm of David.' },
+  { id: 'b-proverbs', cat: 'books', q: 'Which book is full of wise sayings, many from King Solomon?', a: 'Proverbs', wrong: ['Revelation', 'Genesis', 'Jonah'], ref: 'Proverbs 1:1', why: 'Proverbs begins, "The proverbs of Solomon son of David, king of Israel."' },
+  { id: 'b-tf-jonah', cat: 'books', q: 'True or false: The book of Jonah is in the New Testament.', a: 'False', wrong: ['True'], ref: 'Jonah 1:1', why: 'Jonah is in the Old Testament, with the other prophets.' },
+  { id: 'b-greek', cat: 'books', q: 'What language was the New Testament first written in?', a: 'Greek', wrong: ['English', 'Spanish', 'Latin'], ref: null, why: 'The New Testament was written in Greek. Most of the Old Testament was written in Hebrew.' },
+];
+
+/* Badges. Symbolic on purpose: no prizes, money or screen time are attached,
+   because rewards for something a kid already enjoys can make them like it
+   less once the rewards stop. */
+const BADGES = [
+  { id: 'first-step',  name: 'First Step',      desc: 'Finish your first lesson' },
+  { id: 'first-verse', name: 'Hidden in My Heart', desc: 'Memorize your first verse' },
+  { id: 'verses-5',    name: 'Five Smooth Stones', desc: 'Memorize 5 verses' },
+  { id: 'verses-10',   name: 'Ten Strong',      desc: 'Memorize 10 verses' },
+  { id: 'verses-20',   name: 'Lamp to My Feet', desc: 'Memorize 20 verses' },
+  { id: 'verses-all',  name: 'Whole Quest',     desc: 'Memorize every verse in the game' },
+  { id: 'gold',        name: 'Locked In',       desc: 'Keep a verse until it turns gold' },
+  { id: 'streak-3',    name: 'Three in a Row',  desc: 'Reach a 3-day streak' },
+  { id: 'streak-7',    name: 'Full Week',       desc: 'Reach a 7-day streak' },
+  { id: 'streak-30',   name: 'Faithful',        desc: 'Reach a 30-day streak' },
+  { id: 'trivia-25',   name: 'Bible Explorer',  desc: 'Get 25 trivia questions right' },
+  { id: 'trivia-100',  name: 'Bible Scholar',   desc: 'Get 100 trivia questions right' },
+  { id: 'perfect',     name: 'Perfect Round',   desc: 'Get every question right in a trivia round' },
+];
+
+const COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'];
+
+/* ---- Rules. No page code in here, so the tests can run it in Node.
+
+   How a verse is learned:
+   - Each verse takes 5 steps. Every step is a short lesson (one or two
+     exercises) that hides a little more of the verse than the last one.
+   - A kid can pass at most STEPS_PER_DAY steps of the same verse in a day,
+     and work on at most MAX_ACTIVE verses at once. Spreading the steps over a
+     few days is the point: it sticks far better than cramming.
+   - After step 5 the verse is memorized and goes into review. Reviews come
+     back after 1, 3, 7, 14, 30, then 60 days. A missed review pulls the verse
+     back two boxes, never all the way to the start. A verse that reaches box
+     GOLD_BOX turns gold. */
+
+const STEPS = 5;
+const STEPS_PER_DAY = 2;
+const MAX_ACTIVE = 2;
+const MAX_PLAYERS = 3;
+const INTERVALS = [1, 3, 7, 14, 30, 60];
+const GOLD_BOX = 4;
+const GOALS = [2, 3, 5];
+const ROUND_SIZE = 5;
+const STAR = { step: 10, mastered: 20, retry: 3, review: 5, reviewMiss: 2, practice: 2, trivia: 2, perfect: 5 };
+
+const verseById = id => VERSES.find(v => v.id === id) || null;
+
+/* ------------------------------------------------------------------ rng -- */
+function makeRng(seed = Date.now()) {
+  let a = (Number(seed) >>> 0) || 1;
+  const next = () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  next.int = n => Math.floor(next() * n);
+  next.pick = arr => arr[next.int(arr.length)];
+  next.shuffle = arr => {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i--) { const j = next.int(i + 1); [out[i], out[j]] = [out[j], out[i]]; }
+    return out;
+  };
+  return next;
+}
+
+/* ----------------------------------------------------------------- days -- */
+// Days are local calendar dates as 'YYYY-MM-DD' strings, so "today" flips at
+// the kid's midnight, not UTC midnight.
+function dayStr(d = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const toDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
+const addDays = (s, n) => { const d = toDate(s); d.setDate(d.getDate() + n); return dayStr(d); };
+const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+const isDay = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/* ---------------------------------------------------------------- words -- */
+// Checking ignores case and punctuation: "LORD," and "lord" are the same word.
+const norm = w => w.toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9'-]/g, '').replace(/^['-]+|['-]+$/g, '');
+// What a word looks like on a choice button: no commas or quote marks.
+const clean = w => w.replace(/[‘’]/g, "'").replace(/[^A-Za-z0-9'-]/g, '').replace(/^['-]+|['-]+$/g, '');
+
+/* Split a verse into words. A dash glued between two words ("faith—and")
+   becomes two words, the dash staying on the first. */
+function tokenize(text) {
+  const out = [];
+  for (const piece of text.split(/\s+/).filter(Boolean)) {
+    // No lookbehind regex here: older iPads cannot parse it.
+    const parts = piece.replace(/\u2014(?=\S)/g, '\u2014 ').split(' ').filter(Boolean);
+    for (const t of parts) if (norm(t)) out.push({ t, n: norm(t), c: clean(t) });
+      else if (out.length) out[out.length - 1].t += t; // lone punctuation sticks to the word before
+  }
+  return out;
+}
+
+/* Every word that appears lowercase somewhere in the game. Distractors come
+   only from here, so a capital letter never gives the answer away and proper
+   names (Jesus, Christ, Spirit) are never offered as a wrong word. */
+let POOL = null;
+function wordPool() {
+  if (POOL) return POOL;
+  const seen = new Map();
+  for (const v of VERSES) for (const tok of tokenize(v.text)) {
+    if (tok.c && tok.c === tok.c.toLowerCase() && !seen.has(tok.n)) seen.set(tok.n, tok.c);
+  }
+  POOL = [...seen.values()];
+  return POOL;
+}
+const matchCase = (w, like) => /^[A-Z]/.test(like) ? w[0].toUpperCase() + w.slice(1) : w;
+
+function distractors(correct, rng, count = 2, avoid = []) {
+  const n = norm(correct);
+  const bad = new Set([n, ...avoid.map(norm)]);
+  const pool = wordPool().filter(w => !bad.has(norm(w)));
+  const near = pool.filter(w => Math.abs(w.length - n.length) <= 2);
+  const from = near.length >= count * 3 ? near : pool;
+  return rng.shuffle(from).slice(0, count).map(w => matchCase(w, clean(correct)));
+}
+
+/* Phrase tiles for the put-it-in-order exercise. A tile ends at a comma or
+   other break, or after four words. Always at least three tiles. */
+function chunks(tokens) {
+  let out = [], cur = [];
+  tokens.forEach((tok, i) => {
+    cur.push(i);
+    if (cur.length >= 4 || (cur.length >= 2 && /[,;:.!?—]["”]?$/.test(tok.t))) { out.push(cur); cur = []; }
+  });
+  if (cur.length) {
+    if (cur.length === 1 && out.length) out[out.length - 1].push(cur[0]);
+    else out.push(cur);
+  }
+  if (out.length < 3) {
+    const size = Math.max(1, Math.ceil(tokens.length / 3));
+    out = [];
+    for (let i = 0; i < tokens.length; i += size) out.push(tokens.slice(i, i + size).map((_, k) => i + k));
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------ exercises -- */
+const STOP = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'for', 'is', 'as', 'at', 'by', 'so', 'it', 'be', 'we', 'he', 'i', 'my', 'me', 'us', 'you', 'all']);
+
+function blanks(verse, frac, rng) {
+  const tokens = tokenize(verse.text);
+  const content = tokens.map((t, i) => i).filter(i => !STOP.has(tokens[i].n) && tokens[i].n.length >= 3);
+  const want = Math.max(1, Math.min(content.length, Math.round(tokens.length * frac)));
+  const holes = rng.shuffle(content).slice(0, want).sort((a, b) => a - b);
+  const bankWords = holes.map(i => tokens[i].c);
+  const extra = distractors(bankWords[0].toLowerCase(), rng, 2, tokens.map(t => t.c));
+  const bank = rng.shuffle([...bankWords, ...extra].map(w => ({ c: w, n: norm(w) })));
+  return { type: 'blanks', tokens, holes, bank };
+}
+
+function order(verse, rng) {
+  const tokens = tokenize(verse.text);
+  const groups = chunks(tokens);
+  const tiles = groups.map((g, k) => ({ k, text: g.map(i => tokens[i].t).join(' '), n: g.map(i => tokens[i].n).join(' ') }));
+  let shuffled = rng.shuffle(tiles);
+  // Never hand over the tiles already in order.
+  if (shuffled.every((t, i) => t.k === i)) shuffled = [...shuffled.slice(1), shuffled[0]];
+  return { type: 'order', tokens, tiles: shuffled, count: tiles.length };
+}
+
+function nextWord(verse, hint, rng) {
+  const tokens = tokenize(verse.text);
+  const options = tokens.map(tok => rng.shuffle([tok.c, ...distractors(tok.c, rng, 2)]));
+  return { type: 'next', hint, tokens, options };
+}
+
+function refQuiz(verse, rng) {
+  const others = rng.shuffle(VERSES.filter(v => v.id !== verse.id)).slice(0, 3);
+  if (rng() < 0.5) {
+    return { type: 'ref', mode: 'where', prompt: verse.text,
+      choices: rng.shuffle([verse, ...others].map(v => ({ label: v.ref, correct: v.id === verse.id }))) };
+  }
+  const start = v => { const t = tokenize(v.text); return t.slice(0, 7).map(x => x.t).join(' ') + (t.length > 7 ? ' …' : ''); };
+  return { type: 'ref', mode: 'which', prompt: verse.ref,
+    choices: rng.shuffle([verse, ...others].map(v => ({ label: start(v), correct: v.id === verse.id }))) };
+}
+
+/* The exercises for step `step` (1 to 5) of a verse. */
+function buildLesson(verse, step, rng) {
+  switch (step) {
+    case 1: return [{ type: 'read', verse }, blanks(verse, 0.2, rng)];
+    case 2: return [blanks(verse, 0.4, rng), refQuiz(verse, rng)];
+    case 3: return [order(verse, rng), blanks(verse, 0.6, rng)];
+    case 4: return [nextWord(verse, 'letters', rng), refQuiz(verse, rng)];
+    default: return [nextWord(verse, 'none', rng)];
+  }
+}
+
+/* A review of a memorized verse. Early boxes still show first letters. */
+function buildReview(verse, box, rng) {
+  return [refQuiz(verse, rng), nextWord(verse, box < 2 ? 'letters' : 'none', rng)];
+}
+
+/* How many wrong taps a lesson can have and still pass. Longer verses get a
+   little more room. */
+const allowance = verse => 2 + Math.floor(tokenize(verse.text).length / 10);
+
+/* -------------------------------------------------------------- profile -- */
+function newProfile({ name = 'Player', color = '#f59e0b' } = {}) {
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    name: String(name).trim().slice(0, 16) || 'Player',
+    color,
+    verses: {},       // id -> { stage, box, due, mastered, stepDay, stepsToday, misses }
+    trivia: {},       // question id -> { right, wrong }
+    days: {},         // 'YYYY-MM-DD' -> activities finished that day
+    streak: { count: 0, best: 0, last: null, freezes: 0 },
+    stars: 0,
+    badges: [],
+    triviaRight: 0,
+    triviaTotal: 0,
+    settings: { sound: true, readAloud: false, goal: 3 },
+  };
+}
+
+const vstate = (p, id) => p.verses[id] || null;
+const isMastered = (p, id) => (vstate(p, id)?.stage || 0) >= STEPS;
+const activeIds = p => VERSES.map(v => v.id).filter(id => p.verses[id] && p.verses[id].stage < STEPS);
+const masteredIds = p => VERSES.map(v => v.id).filter(id => isMastered(p, id));
+const goldIds = p => masteredIds(p).filter(id => p.verses[id].box >= GOLD_BOX);
+
+function stepsLeftToday(p, id, today) {
+  const s = vstate(p, id);
+  if (!s || s.stage >= STEPS) return 0;
+  return s.stepDay === today ? Math.max(0, STEPS_PER_DAY - s.stepsToday) : STEPS_PER_DAY;
+}
+
+const canStart = p => activeIds(p).length < MAX_ACTIVE;
+const nextNewVerse = p => VERSES.find(v => !p.verses[v.id]) || null;
+
+function startVerse(p, id) {
+  if (p.verses[id] || !canStart(p) || !verseById(id)) return false;
+  p.verses[id] = { stage: 0, box: 0, due: null, mastered: null, stepDay: null, stepsToday: 0, misses: 0 };
+  return true;
+}
+
+const dueReviews = (p, today) => masteredIds(p).filter(id => p.verses[id].due && p.verses[id].due <= today)
+  .sort((a, b) => p.verses[a].due.localeCompare(p.verses[b].due));
+
+/* What the home screen should offer, in the order it should offer it:
+   reviews first (they are the ones that slip), then lessons, then a new verse. */
+function plan(p, today) {
+  return {
+    reviews: dueReviews(p, today),
+    lessons: activeIds(p).filter(id => stepsLeftToday(p, id, today) > 0),
+    waiting: activeIds(p).filter(id => stepsLeftToday(p, id, today) === 0),
+    next: canStart(p) ? nextNewVerse(p) : null,
+  };
+}
+
+/* ------------------------------------------------------ streak and goal -- */
+/* Counts one finished activity. The streak goes up the first time the daily
+   goal is met on a given day. One missed day is forgiven if a freeze is saved
+   up; a freeze is earned every 7 days of streak, and at most 2 are kept. */
+function countActivity(p, today) {
+  p.days[today] = (p.days[today] || 0) + 1;
+  const goal = p.settings.goal || 3;
+  if (p.days[today] !== goal) return { goalHit: false, froze: false };
+  const s = p.streak;
+  let froze = false;
+  if (s.last === today) return { goalHit: false, froze };
+  const gap = s.last ? daysBetween(s.last, today) : null;
+  if (gap === 1) s.count += 1;
+  else if (gap === 2 && s.freezes > 0) { s.freezes -= 1; s.count += 1; froze = true; }
+  else s.count = 1;
+  s.last = today;
+  if (s.count % 7 === 0) s.freezes = Math.min(2, s.freezes + 1);
+  s.best = Math.max(s.best, s.count);
+  return { goalHit: true, froze };
+}
+
+/* The streak as it stands today. Still alive if the goal was met today or
+   yesterday, or the day before that with a freeze saved up. */
+function currentStreak(p, today) {
+  const s = p.streak;
+  if (!s.last) return 0;
+  const gap = daysBetween(s.last, today);
+  if (gap <= 1) return s.count;
+  if (gap === 2 && s.freezes > 0) return s.count;
+  return 0;
+}
+
+const doneToday = (p, today) => p.days[today] || 0;
+
+/* --------------------------------------------------------------- results -- */
+function finishLesson(p, id, mistakes, today) {
+  const s = vstate(p, id);
+  const verse = verseById(id);
+  const passed = mistakes <= allowance(verse);
+  const res = { passed, mastered: false, stars: 0, step: s.stage + 1 };
+  if (passed) {
+    if (s.stepDay !== today) { s.stepDay = today; s.stepsToday = 0; }
+    s.stepsToday += 1;
+    s.stage += 1;
+    res.stars = STAR.step;
+    if (s.stage >= STEPS) {
+      s.stage = STEPS; s.box = 0; s.mastered = today; s.due = addDays(today, INTERVALS[0]);
+      res.mastered = true;
+      res.stars += STAR.mastered;
+    }
+  } else {
+    s.misses += 1;
+    res.stars = STAR.retry;
+  }
+  p.stars += res.stars;
+  return finish(p, today, res);
+}
+
+function finishReview(p, id, mistakes, today) {
+  const s = vstate(p, id);
+  const verse = verseById(id);
+  const passed = mistakes <= allowance(verse);
+  const wasGold = s.box >= GOLD_BOX;
+  if (passed) s.box = Math.min(INTERVALS.length - 1, s.box + 1);
+  else { s.box = Math.max(0, s.box - 2); s.misses += 1; }
+  s.due = addDays(today, passed ? INTERVALS[s.box] : 1);
+  const res = { passed, box: s.box, gold: !wasGold && s.box >= GOLD_BOX, stars: passed ? STAR.review : STAR.reviewMiss, due: s.due };
+  p.stars += res.stars;
+  return finish(p, today, res);
+}
+
+/* Extra practice on a memorized verse. Counts toward the daily goal but
+   leaves the review schedule alone. */
+function finishPractice(p, today) {
+  p.stars += STAR.practice;
+  return finish(p, today, { passed: true, stars: STAR.practice });
+}
+
+function recordTrivia(p, qid, right) {
+  const t = p.trivia[qid] || (p.trivia[qid] = { right: 0, wrong: 0 });
+  if (right) t.right += 1; else t.wrong += 1;
+  p.triviaTotal += 1;
+  if (right) p.triviaRight += 1;
+}
+
+function finishTrivia(p, right, total, today) {
+  const perfect = total > 0 && right === total;
+  const stars = right * STAR.trivia + (perfect ? STAR.perfect : 0);
+  p.stars += stars;
+  return finish(p, today, { right, total, perfect, stars });
+}
+
+function finish(p, today, res) {
+  Object.assign(res, countActivity(p, today));
+  res.badges = awardBadges(p, today, res);
+  return res;
+}
+
+/* ---------------------------------------------------------------- badges -- */
+function earnedBadges(p, today, res = {}) {
+  const m = masteredIds(p).length;
+  const streak = Math.max(currentStreak(p, today), p.streak.best);
+  const has = {
+    'first-step': Object.values(p.verses).some(s => s.stage > 0),
+    'first-verse': m >= 1,
+    'verses-5': m >= 5,
+    'verses-10': m >= 10,
+    'verses-20': m >= 20,
+    'verses-all': m >= VERSES.length,
+    'gold': goldIds(p).length > 0,
+    'streak-3': streak >= 3,
+    'streak-7': streak >= 7,
+    'streak-30': streak >= 30,
+    'trivia-25': p.triviaRight >= 25,
+    'trivia-100': p.triviaRight >= 100,
+    'perfect': !!res.perfect || p.badges.includes('perfect'),
+  };
+  return BADGES.filter(b => has[b.id]).map(b => b.id);
+}
+
+function awardBadges(p, today, res) {
+  const fresh = earnedBadges(p, today, res).filter(id => !p.badges.includes(id));
+  p.badges.push(...fresh);
+  return fresh;
+}
+
+/* ---------------------------------------------------------------- trivia -- */
+/* Picks a round. Questions never seen and questions missed more than got
+   right come up most; ones answered right several times fade back. */
+function triviaWeight(p, q) {
+  const t = p.trivia[q.id];
+  if (!t) return 3;
+  if (t.wrong > t.right) return 4;
+  return 1 / (1 + t.right - t.wrong);
+}
+
+function pickTrivia(p, rng, n = ROUND_SIZE, cat = null) {
+  let pool = TRIVIA.filter(q => !cat || q.cat === cat);
+  const out = [];
+  while (out.length < n && pool.length) {
+    const weights = pool.map(q => triviaWeight(p, q));
+    let r = rng() * weights.reduce((a, b) => a + b, 0);
+    let i = 0;
+    while (i < pool.length - 1 && (r -= weights[i]) > 0) i++;
+    out.push(pool[i]);
+    pool = pool.filter((_, k) => k !== i);
+  }
+  return out;
+}
+
+function triviaChoices(q, rng) {
+  const all = [{ label: q.a, correct: true }, ...q.wrong.map(w => ({ label: w, correct: false }))];
+  // True/false always reads True then False.
+  if (q.wrong.length === 1) return all.sort((a, b) => (a.label === 'True' ? -1 : b.label === 'True' ? 1 : 0));
+  return rng.shuffle(all);
+}
+
+/* ----------------------------------------------------------------- stats -- */
+function summary(p, today) {
+  return {
+    mastered: masteredIds(p).length,
+    gold: goldIds(p).length,
+    active: activeIds(p).length,
+    due: dueReviews(p, today).length,
+    streak: currentStreak(p, today),
+    best: p.streak.best,
+    freezes: p.streak.freezes,
+    trivia: p.triviaTotal ? Math.round(100 * p.triviaRight / p.triviaTotal) : null,
+    today: doneToday(p, today),
+    goal: p.settings.goal,
+  };
+}
+
+/* ---- Saving: players kept in localStorage on this device. Nothing is sent
+   anywhere. Every load goes through hydrate(), so a save written by an older
+   version comes back with any new fields filled in instead of crashing. */
+
+const KEY = 'verse-quest-v1';
+const num = (v, lo, hi, d = 0) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.floor(n))) : d; };
+
+function hydrateProfile(raw) {
+  if (!raw || typeof raw !== 'object' || !raw.id) return null;
+  const base = newProfile({ name: raw.name, color: raw.color });
+  const p = { ...base, id: String(raw.id) };
+  p.color = typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : '#f59e0b';
+  p.settings = { ...base.settings, ...(raw.settings && typeof raw.settings === 'object' ? raw.settings : {}) };
+  p.settings.sound = p.settings.sound !== false;
+  p.settings.readAloud = !!p.settings.readAloud;
+  if (!GOALS.includes(p.settings.goal)) p.settings.goal = base.settings.goal;
+
+  const known = new Set(VERSES.map(v => v.id));
+  for (const [id, s] of Object.entries(raw.verses && typeof raw.verses === 'object' ? raw.verses : {})) {
+    if (!known.has(id) || !s || typeof s !== 'object') continue;   // a verse removed from the game
+    const stage = num(s.stage, 0, STEPS);
+    p.verses[id] = {
+      stage,
+      box: num(s.box, 0, INTERVALS.length - 1),
+      due: stage >= STEPS && isDay(s.due) ? s.due : null,
+      mastered: isDay(s.mastered) ? s.mastered : null,
+      stepDay: isDay(s.stepDay) ? s.stepDay : null,
+      stepsToday: num(s.stepsToday, 0, 99),
+      misses: num(s.misses, 0, 1e6),
+    };
+  }
+  for (const [id, t] of Object.entries(raw.trivia && typeof raw.trivia === 'object' ? raw.trivia : {})) {
+    if (t && typeof t === 'object') p.trivia[id] = { right: num(t.right, 0, 1e6), wrong: num(t.wrong, 0, 1e6) };
+  }
+  for (const [d, n] of Object.entries(raw.days && typeof raw.days === 'object' ? raw.days : {})) {
+    if (isDay(d)) p.days[d] = num(n, 0, 1e4);
+  }
+  const s = raw.streak && typeof raw.streak === 'object' ? raw.streak : {};
+  p.streak = { count: num(s.count, 0, 1e5), best: num(s.best, 0, 1e5), last: isDay(s.last) ? s.last : null, freezes: num(s.freezes, 0, 2) };
+  p.stars = num(raw.stars, 0, 1e9);
+  p.badges = Array.isArray(raw.badges) ? raw.badges.filter(b => typeof b === 'string') : [];
+  p.triviaRight = num(raw.triviaRight, 0, 1e9);
+  p.triviaTotal = Math.max(p.triviaRight, num(raw.triviaTotal, 0, 1e9));
+  return p;
+}
+
+function hydrate(raw) {
+  const players = Array.isArray(raw?.players) ? raw.players.map(hydrateProfile).filter(Boolean).slice(0, MAX_PLAYERS) : [];
+  // No valid current player means the game opens on "Who's playing?".
+  const current = players.some(b => b.id === raw?.current) ? raw.current : null;
+  return { players, current };
+}
+
+function load(storage = globalThis.localStorage) {
+  let text = null;
+  try { text = storage.getItem(KEY); } catch { return { players: [], current: null, readOnly: true }; }
+  if (!text) return { players: [], current: null };
+  try {
+    return hydrate(JSON.parse(text));
+  } catch {
+    // Unreadable save: leave it on disk untouched rather than overwrite it,
+    // so there is still something to recover by hand.
+    return { players: [], current: null, readOnly: true };
+  }
+}
+
+function save(state, storage = globalThis.localStorage) {
+  if (state.readOnly) return false;
+  try {
+    storage.setItem(KEY, JSON.stringify({ players: state.players, current: state.current }));
+    return true;
+  } catch { return false; }
+}
+// @engine-end
+
+/* ---- Sounds: WebAudio effects and read-aloud. No audio files, works
+   offline. */
+let ctx = null;
+let enabled = true;
+
+function setEnabled(v) { enabled = !!v; }
+
+function audio() {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function tone(freq, dur, type = 'sine', gain = 0.06, delay = 0, slideTo = null) {
+  if (!enabled) return;
+  try {
+    const c = audio();
+    const t0 = c.currentTime + delay;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  } catch { /* audio blocked, carry on silently */ }
+}
+
+const sfx = {
+  tap:    () => tone(660, 0.04, 'triangle', 0.03),
+  right:  () => { tone(784, 0.09, 'triangle', 0.06); tone(1047, 0.14, 'triangle', 0.06, 0.08); },
+  wrong:  () => tone(220, 0.18, 'sawtooth', 0.04, 0, 160),
+  step:   () => [523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.06, i * 0.1)),
+  big:    () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.26, 'triangle', 0.06, i * 0.12)),
+  soft:   () => [392, 330].forEach((f, i) => tone(f, 0.22, 'sine', 0.06, i * 0.16)),
+};
+
+/* Read-aloud uses the device's own voice, so it works offline on most phones
+   and tablets. */
+function speak(text, { rate = 0.9 } = {}) {
+  try {
+    if (!('speechSynthesis' in window)) return false;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/\bLORD\b/g, 'Lord'));
+    u.rate = rate;
+    u.lang = 'en-US';
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch { return false; }
+}
+function stopSpeaking() {
+  try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+}
+const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+const setSound = setEnabled;
+
+/* ---- Screens and the lesson loop. The rules above decide what happened;
+   this part shows exercises, collects taps and reports the result. */
+
+const app = document.getElementById('app');
+const params = new URLSearchParams(location.search);
+const TEST = params.has('test');
+const rng = makeRng(TEST && params.get('seed') ? Number(params.get('seed')) : Date.now());
+const wait = ms => new Promise(r => setTimeout(r, TEST ? 0 : ms));
+// Tests can pin the date with ?test&day=2026-10-02.
+const today = () => (TEST && isDay(params.get('day')) ? params.get('day') : dayStr());
+
+let state = load();
+const me = () => state.players.find(b => b.id === state.current) || null;
+const persist = () => save(state);
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function view(html, cls = '') {
+  stopSpeaking();
+  app.className = cls;
+  app.innerHTML = html;
+  window.scrollTo(0, 0);
+  if (TEST) window.__vq.screen = cls;
+}
+const $ = sel => app.querySelector(sel);
+const $$ = sel => [...app.querySelectorAll(sel)];
+function on(sel, fn) { $$(sel).forEach(el => el.addEventListener('click', e => { sfx.tap(); fn(e, el); })); }
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+/* "Are you sure?" shown on the page itself. Browser pop-ups (confirm) are
+   blocked when the game runs inside some app views, so never rely on them. */
+function askFirst(msg, yes, fn) {
+  $('.ask')?.remove();
+  const box = document.createElement('div');
+  box.className = 'ask';
+  box.innerHTML = `<p>${esc(msg)}</p><div class="ask-row"><button class="btn danger" id="ask-yes">${esc(yes)}</button><button class="btn primary" id="ask-no">Keep going</button></div>`;
+  $('.screen').prepend(box);
+  box.querySelector('#ask-yes').addEventListener('click', () => { sfx.tap(); fn(); });
+  box.querySelector('#ask-no').addEventListener('click', () => { sfx.tap(); box.remove(); });
+  window.scrollTo(0, 0);
+}
+
+/* ------------------------------------------------------------------ art -- */
+const ICON = {
+  flame: c => `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path fill="${c}" d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3-1-3 0-6 1-9.5z"/></svg>`,
+  star: c => `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path fill="${c}" d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>`,
+  lamp: c => `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path fill="${c}" d="M4 14c0-2 3-3 7-3h2c3 0 5-2 7-3-1 3-2 6-6 7l-1 2H8l-1-2c-2 0-3-.5-3-1zm7-5c-1-1-1-2.5 0-4 1 1.5 1 3 0 4zM8 18h7v2H8z"/></svg>`,
+  speaker: `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4zM16 8a5 5 0 0 1 0 8l-1-1.4a3.3 3.3 0 0 0 0-5.2zM18.5 5.5a8.5 8.5 0 0 1 0 13l-1-1.4a6.8 6.8 0 0 0 0-10.2z"/></svg>`,
+  badge: (c, on) => `<svg viewBox="0 0 48 48" class="badge-ico" aria-hidden="true"><circle cx="24" cy="20" r="15" fill="${on ? c : '#d6d3e8'}"/><path d="M16 32l-4 12 8-4 4 6 4-6 8 4-4-12" fill="${on ? '#b45309' : '#c4c1da'}"/><path fill="#fff" opacity="${on ? 1 : .6}" d="M24 10l2.6 5.4 6 .8-4.4 4.1 1.1 5.9L24 23.3l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z"/></svg>`,
+};
+
+function speakBtn(text, id = 'say') {
+  return canSpeak() ? `<button class="iconbtn" id="${id}" data-say="${esc(text)}" aria-label="Read it out loud">${ICON.speaker}</button>` : '';
+}
+function wireSpeak() { $$('[data-say]').forEach(el => el.addEventListener('click', () => speak(el.dataset.say))); }
+
+/* ================================================================ title == */
+/* Kids pick who is playing here. Adding, renaming and deleting players is
+   behind the grown-ups gate, so a kid can't wipe out a sibling by accident. */
+function title() {
+  const brand = `<div class="brand">${ICON.lamp('#f59e0b')}<h1>Verse Quest</h1></div>`;
+  if (!state.players.length) {
+    view(`<div class="screen">
+      ${brand}
+      <p class="tag">Learn Bible verses a little each day, and see how much Bible trivia you know.</p>
+      <div class="panel">
+        <h2>Welcome!</h2>
+        <p>A grown-up sets up the players first. Up to ${MAX_PLAYERS} kids can play on this device, each with their own progress.</p>
+        <button class="btn primary big" id="setup">Set up players</button>
+      </div>
+      ${state.readOnly ? '<p class="warn">This browser is not letting the game save. Progress will be lost when you close it.</p>' : ''}
+      <p class="notice">${esc(NIV_NOTICE)}</p>
+    </div>`, 'bg-title');
+    on('#setup', () => gate('players', title));
+    return;
+  }
+  const empty = MAX_PLAYERS - state.players.length;
+  view(`<div class="screen">
+    ${brand}
+    <p class="tag">Hide God's word in your heart, one step at a time.</p>
+    <h2 class="sub">Who's playing?</h2>
+    <div class="player-list">
+      ${state.players.map(p => {
+        const s = summary(p, today());
+        return `<button class="player-btn" data-id="${esc(p.id)}">
+          <span class="dot" style="background:${esc(p.color)}">${esc(p.name[0].toUpperCase())}</span>
+          <span class="pname">${esc(p.name)}</span>
+          <span class="pmeta">${plural(s.mastered, 'verse')} memorized &middot; ${s.streak} day streak</span>
+        </button>`;
+      }).join('')}
+      ${Array.from({ length: empty }, () => `<div class="player-empty">Empty spot. A grown-up can add a player.</div>`).join('')}
+    </div>
+    <button class="btn ghost" id="grown">Grown-ups</button>
+    ${state.readOnly ? '<p class="warn">This browser is not letting the game save. Progress will be lost when you close it.</p>' : ''}
+    <p class="notice">${esc(NIV_NOTICE)}</p>
+    <p class="version">v${VERSION}</p>
+  </div>`, 'bg-title');
+  on('.player-btn', (e, el) => { state.current = el.dataset.id; persist(); home(); });
+  on('#grown', () => gate('parents', title));
+}
+
+/* ================================================================= gate == */
+/* A times-table question keeps the grown-ups screen out of casual reach. It
+   is a speed bump, not a lock: a kid who knows their 12s can get in. */
+function gate(focus, back) {
+  const a = 6 + rng.int(7), b = 6 + rng.int(7);
+  view(`<div class="screen">
+    <div class="stop"><button class="btn ghost" id="back">Back</button></div>
+    <div class="panel">
+      <h2>Grown-ups only</h2>
+      <p>${focus === 'players' ? 'Next: add, rename or delete players.' : 'Next: players, progress and settings.'}</p>
+      <label class="field" for="gate-input">What is ${a} &times; ${b}?</label>
+      <input id="gate-input" type="number" inputmode="numeric" autocomplete="off" class="gate-input">
+      <p class="muted small" id="gate-msg" aria-live="polite"></p>
+      <button class="btn primary big" id="gate-go">Open</button>
+    </div>
+  </div>`, 'bg-title');
+  if (TEST) window.__vq.gate = a * b;
+  const tryIt = () => {
+    const input = $('#gate-input');
+    if (Number(input.value) === a * b) return parents(focus);
+    if (input.value.trim()) gate(focus, back);
+    $('#gate-msg').textContent = 'Not quite. Try this one.';
+  };
+  on('#back', back);
+  on('#gate-go', tryIt);
+  $('#gate-input').addEventListener('keydown', e => { if (e.key === 'Enter') tryIt(); });
+  $('#gate-input').focus();
+}
+
+/* ================================================================= home == */
+function header(p) {
+  const s = summary(p, today());
+  return `<header class="bar">
+    <button class="who" id="who" style="--c:${esc(p.color)}"><span class="dot small" style="background:${esc(p.color)}">${esc(p.name[0].toUpperCase())}</span>${esc(p.name)}</button>
+    <span class="pill" title="Day streak">${ICON.flame(s.streak ? '#f97316' : '#c4c1da')}<b id="streak">${s.streak}</b></span>
+    <span class="pill" title="Stars">${ICON.star('#f59e0b')}<b id="stars">${p.stars}</b></span>
+  </header>`;
+}
+
+function goalBar(p) {
+  const s = summary(p, today());
+  const pct = Math.min(100, Math.round(100 * s.today / s.goal));
+  const done = s.today >= s.goal;
+  return `<div class="goal${done ? ' done' : ''}">
+    <div class="goal-top"><b>${done ? 'Daily goal done!' : "Today's goal"}</b><span>${Math.min(s.today, s.goal)} / ${s.goal}</span></div>
+    <div class="meter"><i style="width:${pct}%"></i></div>
+    ${s.freezes ? `<small class="muted">${plural(s.freezes, 'streak saver')} ready. If you miss one day, your streak is safe.</small>` : ''}
+  </div>`;
+}
+
+function home() {
+  const p = me();
+  if (!p) return title();
+  setSound(p.settings.sound);
+  const t = today();
+  const pl = plan(p, t);
+  const cards = [];
+  for (const id of pl.reviews) {
+    const v = verseById(id);
+    cards.push(`<button class="card review" data-act="review" data-id="${id}">
+      <span class="kicker">Review</span><span class="ctitle">${esc(v.ref)}</span>
+      <span class="cmeta">Keep this verse strong</span></button>`);
+  }
+  for (const id of pl.lessons) {
+    const v = verseById(id), s = vstate(p, id);
+    cards.push(`<button class="card lesson" data-act="lesson" data-id="${id}">
+      <span class="kicker">Step ${s.stage + 1} of ${STEPS}</span><span class="ctitle">${esc(v.ref)}</span>
+      ${steps(s.stage)}</button>`);
+  }
+  if (pl.next) {
+    cards.push(`<button class="card new" data-act="start" data-id="${pl.next.id}">
+      <span class="kicker">New verse</span><span class="ctitle">${esc(pl.next.ref)}</span>
+      <span class="cmeta">${esc(firstWords(pl.next.text, 6))}</span></button>`);
+  }
+  cards.push(`<button class="card trivia" data-act="trivia">
+    <span class="kicker">Bible trivia</span><span class="ctitle">Quick round</span>
+    <span class="cmeta">${ROUND_SIZE} questions</span></button>`);
+  const waiting = pl.waiting.length
+    ? `<p class="muted small center">${pl.waiting.map(id => esc(verseById(id).ref)).join(' and ')}: come back tomorrow for the next step. Your brain needs a night's sleep to lock it in!</p>` : '';
+
+  view(`<div class="screen">
+    ${header(p)}
+    ${goalBar(p)}
+    <div class="cards">${cards.join('')}</div>
+    ${waiting}
+    <nav class="nav">
+      <button class="btn ghost" id="verses">My verses</button>
+      <button class="btn ghost" id="badges">Badges</button>
+      <button class="btn ghost" id="grown">Grown-ups</button>
+    </nav>
+  </div>`, 'bg-home');
+  on('[data-act="review"]', (e, el) => runSession('review', el.dataset.id));
+  on('[data-act="lesson"]', (e, el) => runSession('lesson', el.dataset.id));
+  on('[data-act="start"]', (e, el) => { startVerse(p, el.dataset.id); persist(); runSession('lesson', el.dataset.id); });
+  on('[data-act="trivia"]', () => trivia());
+  on('#verses', verseList);
+  on('#badges', badges);
+  on('#grown', () => gate('parents', home));
+  on('#who', title);
+}
+
+const firstWords = (text, n) => { const w = text.split(/\s+/); return w.slice(0, n).join(' ') + (w.length > n ? ' …' : ''); };
+const steps = done => `<span class="steps">${Array.from({ length: STEPS }, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</span>`;
+
+/* ============================================================== session == */
+/* Runs a lesson, review or practice: a short list of exercises, then the
+   result. Mistakes add up across the exercises. */
+async function runSession(mode, id) {
+  const p = me();
+  const verse = verseById(id);
+  const s = vstate(p, id);
+  const t = today();
+  if (mode === 'lesson' && stepsLeftToday(p, id, t) === 0) return home();
+  const exercises = mode === 'lesson' ? buildLesson(verse, s.stage + 1, rng) : buildReview(verse, mode === 'practice' ? GOLD_BOX : s.box, rng);
+  const ctx = { mistakes: 0, quit: false };
+  for (let i = 0; i < exercises.length; i++) {
+    await exercise(exercises[i], verse, ctx, { i, n: exercises.length, mode, step: s.stage + 1 });
+    if (ctx.quit) return home();
+  }
+  const res = mode === 'lesson' ? finishLesson(p, id, ctx.mistakes, t)
+    : mode === 'review' ? finishReview(p, id, ctx.mistakes, t)
+      : finishPractice(p, t);
+  persist();
+  result(mode, verse, res, ctx.mistakes);
+}
+
+function sessionTop(meta, title) {
+  const pct = Math.round(100 * meta.i / meta.n);
+  return `<div class="stop">
+    <button class="iconbtn" id="quit" aria-label="Stop">&times;</button>
+    <div class="meter thin"><i style="width:${pct}%"></i></div>
+  </div>
+  <p class="kicker center">${esc(title)}</p>`;
+}
+
+function exercise(ex, verse, ctx, meta) {
+  return new Promise(resolve => {
+    const label = meta.mode === 'lesson' ? `${verse.ref} · Step ${meta.step} of ${STEPS}` : `${verse.ref} · ${meta.mode === 'review' ? 'Review' : 'Practice'}`;
+    const done = () => resolve();
+    const miss = el => {
+      ctx.mistakes++;
+      sfx.wrong();
+      if (el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake', 'bad'); }
+    };
+    const ui = { label: sessionTop(meta, label), done, miss, ctx };
+    if (ex.type === 'read') exRead(ex, verse, ui);
+    else if (ex.type === 'blanks') exBlanks(ex, verse, ui);
+    else if (ex.type === 'order') exOrder(ex, verse, ui);
+    else if (ex.type === 'next') exNext(ex, verse, ui);
+    else if (ex.type === 'ref') exRef(ex, verse, ui);
+    on('#quit', () => {
+      askFirst('Stop this lesson? This step will not be saved.', 'Stop', () => { ctx.quit = true; resolve(); });
+    });
+    wireSpeak();
+  });
+}
+
+/* Read it ----------------------------------------------------------------- */
+function exRead(ex, verse, ui) {
+  view(`<div class="screen">
+    ${ui.label}
+    <h2 class="prompt">Read this verse out loud two times.</h2>
+    <div class="verse big"><p>${esc(verse.text)}</p><p class="ref">${esc(verse.ref)}</p></div>
+    ${canSpeak() ? `<button class="btn" id="listen">${ICON.speaker} Read it to me</button>` : ''}
+    <button class="btn primary big" id="go">I read it!</button>
+  </div>`, 'bg-ex');
+  if (TEST) window.__vq.ex = { type: 'read', right: '#go' };
+  on('#listen', () => speak(`${verse.text} ${verse.ref}`));
+  on('#go', ui.done);
+  if (me().settings.readAloud) speak(`${verse.text} ${verse.ref}`);
+}
+
+/* Fill the blanks --------------------------------------------------------- */
+function exBlanks(ex, verse, ui) {
+  let pos = 0;
+  const filled = new Set();
+  const line = () => ex.tokens.map((tok, i) => {
+    const h = ex.holes.indexOf(i);
+    if (h < 0) return `<span class="w">${esc(tok.t)}</span>`;
+    if (h < pos) return `<span class="w got">${esc(tok.t)}</span>`;
+    return `<span class="hole${h === pos ? ' cur' : ''}">${' '.repeat(Math.max(4, tok.c.length))}</span>`;
+  }).join(' ');
+  view(`<div class="screen">
+    ${ui.label}
+    <h2 class="prompt">Tap the missing words in order.</h2>
+    <div class="verse"><p id="line">${line()}</p><p class="ref">${esc(verse.ref)}</p></div>
+    <div class="bank">${ex.bank.map((b, i) => `<button class="tile" data-i="${i}">${esc(b.c)}</button>`).join('')}</div>
+  </div>`, 'bg-ex');
+  const expect = () => {
+    const want = ex.tokens[ex.holes[pos]]?.n;
+    const i = ex.bank.findIndex((b, k) => !filled.has(k) && b.n === want);
+    const j = ex.bank.findIndex((b, k) => !filled.has(k) && b.n !== want);
+    window.__vq.ex = { type: 'blanks', right: `.tile[data-i="${i}"]`, wrong: j < 0 ? null : `.tile[data-i="${j}"]` };
+  };
+  if (TEST) expect();
+  $$('.tile').forEach(el => el.addEventListener('click', () => {
+    const i = Number(el.dataset.i);
+    if (filled.has(i)) return;
+    if (ex.bank[i].n === ex.tokens[ex.holes[pos]].n) {
+      sfx.right();
+      filled.add(i);
+      el.disabled = true;
+      el.classList.add('used');
+      pos++;
+      $('#line').innerHTML = line();
+      if (pos >= ex.holes.length) return wait(500).then(ui.done);
+      if (TEST) expect();
+    } else ui.miss(el);
+  }));
+}
+
+/* Put it in order --------------------------------------------------------- */
+function exOrder(ex, verse, ui) {
+  const canon = ex.tiles.slice().sort((a, b) => a.k - b.k);
+  let placed = 0;
+  const used = new Set();
+  view(`<div class="screen">
+    ${ui.label}
+    <h2 class="prompt">Put the verse in order.</h2>
+    <div class="verse"><p id="built" class="built"><span class="muted">Tap the first part&hellip;</span></p><p class="ref">${esc(verse.ref)}</p></div>
+    <div class="bank col">${ex.tiles.map((t, i) => `<button class="tile wide" data-i="${i}">${esc(t.text)}</button>`).join('')}</div>
+  </div>`, 'bg-ex');
+  const expect = () => {
+    const want = canon[placed]?.n;
+    const i = ex.tiles.findIndex((t, k) => !used.has(k) && t.n === want);
+    const j = ex.tiles.findIndex((t, k) => !used.has(k) && t.n !== want);
+    window.__vq.ex = { type: 'order', right: `.tile[data-i="${i}"]`, wrong: j < 0 ? null : `.tile[data-i="${j}"]` };
+  };
+  if (TEST) expect();
+  $$('.tile').forEach(el => el.addEventListener('click', () => {
+    const i = Number(el.dataset.i);
+    if (used.has(i)) return;
+    if (ex.tiles[i].n === canon[placed].n) {
+      sfx.right();
+      used.add(i);
+      el.disabled = true;
+      el.classList.add('used');
+      placed++;
+      $('#built').innerHTML = canon.slice(0, placed).map(t => `<span class="w got">${esc(t.text)}</span>`).join(' ');
+      if (placed >= canon.length) return wait(600).then(ui.done);
+      if (TEST) expect();
+    } else ui.miss(el);
+  }));
+}
+
+/* Next word --------------------------------------------------------------- */
+function exNext(ex, verse, ui) {
+  let pos = 0;
+  const hidden = tok => ex.hint === 'letters'
+    ? `<span class="hole letters">${esc(tok.c[0])}${' '.repeat(Math.max(2, tok.c.length - 1))}</span>`
+    : `<span class="hole">${' '.repeat(4)}</span>`;
+  const line = () => ex.tokens.map((tok, i) => i < pos ? `<span class="w got">${esc(tok.t)}</span>`
+    : i === pos ? hidden(tok).replace('class="hole', 'class="hole cur') : hidden(tok)).join(' ');
+  const choices = () => ex.options[pos].map((w, i) => `<button class="choice" data-i="${i}">${esc(w)}</button>`).join('');
+  view(`<div class="screen">
+    ${ui.label}
+    <h2 class="prompt">${ex.hint === 'letters' ? 'Pick each next word. The first letters will help.' : 'Say it from memory! Pick each next word.'}</h2>
+    <div class="verse"><p id="line">${line()}</p><p class="ref">${esc(verse.ref)}</p></div>
+    <div class="choices row" id="choices">${choices()}</div>
+  </div>`, 'bg-ex');
+  const expect = () => {
+    const want = ex.tokens[pos].n;
+    const i = ex.options[pos].findIndex(w => norm(w) === want);
+    const j = ex.options[pos].findIndex(w => norm(w) !== want);
+    window.__vq.ex = { type: 'next', right: `.choice[data-i="${i}"]`, wrong: `.choice[data-i="${j}"]` };
+  };
+  const wire = () => {
+    if (TEST) expect();
+    $$('#choices .choice').forEach(el => el.addEventListener('click', () => {
+      if (el.disabled) return;
+      if (norm(ex.options[pos][Number(el.dataset.i)]) === ex.tokens[pos].n) {
+        sfx.tap();
+        pos++;
+        $('#line').innerHTML = line();
+        if (pos >= ex.tokens.length) { sfx.right(); return wait(600).then(ui.done); }
+        $('#choices').innerHTML = choices();
+        wire();
+      } else { ui.miss(el); el.disabled = true; }
+    }));
+  };
+  wire();
+}
+
+/* Where is it found? ------------------------------------------------------ */
+function exRef(ex, verse, ui) {
+  const q = ex.mode === 'where' ? 'Where is this verse found?' : `Which verse is ${esc(verse.ref)}?`;
+  view(`<div class="screen">
+    ${ui.label}
+    <h2 class="prompt">${q}</h2>
+    ${ex.mode === 'where' ? `<div class="verse"><p>${esc(ex.prompt)}</p></div>` : ''}
+    <div class="choices">${ex.choices.map((c, i) => `<button class="choice${ex.mode === 'which' ? ' long' : ''}" data-i="${i}">${esc(c.label)}</button>`).join('')}</div>
+  </div>`, 'bg-ex');
+  if (TEST) window.__vq.ex = { type: 'ref', right: `.choice[data-i="${ex.choices.findIndex(c => c.correct)}"]`, wrong: `.choice[data-i="${ex.choices.findIndex(c => !c.correct)}"]` };
+  $$('.choice').forEach(el => el.addEventListener('click', () => {
+    if (el.disabled) return;
+    if (ex.choices[Number(el.dataset.i)].correct) {
+      sfx.right();
+      el.classList.add('good');
+      $$('.choice').forEach(b => { b.disabled = true; });
+      wait(700).then(ui.done);
+    } else { ui.miss(el); el.disabled = true; }
+  }));
+}
+
+/* Result ------------------------------------------------------------------ */
+function result(mode, verse, res, mistakes) {
+  const p = me();
+  let head, body;
+  if (mode === 'lesson' && res.mastered) {
+    sfx.big();
+    head = 'Verse memorized!';
+    body = `You learned all ${STEPS} steps of ${esc(verse.ref)}. It will come back for a quick review tomorrow so you don't forget it.`;
+  } else if (mode === 'lesson' && res.passed) {
+    sfx.step();
+    head = `Step ${res.step} done!`;
+    const left = stepsLeftToday(p, verse.id, today());
+    body = left ? 'You can do the next step now, or come back later.' : 'Come back tomorrow for the next step.';
+  } else if (mode === 'lesson') {
+    sfx.soft();
+    head = 'So close!';
+    body = `That was ${plural(mistakes, 'mistake')}. Read the verse again, then try this step one more time.`;
+  } else if (mode === 'review' && res.passed) {
+    sfx.step();
+    head = res.gold ? 'Gold verse!' : 'Still got it!';
+    body = res.gold ? `${esc(verse.ref)} is locked in. It turned gold!` : `Next review in ${plural(daysUntil(res.due), 'day')}.`;
+  } else if (mode === 'review') {
+    sfx.soft();
+    head = 'Let’s practice this one more';
+    body = 'Read it a few times. It will come back tomorrow.';
+  } else {
+    sfx.step();
+    head = 'Nice practice!';
+    body = 'Practicing helps verses stick.';
+  }
+  view(`<div class="screen center-col">
+    <h1 class="big-head">${head}</h1>
+    <p>${body}</p>
+    <div class="verse"><p>${esc(verse.text)}</p><p class="ref">${esc(verse.ref)}</p></div>
+    ${speakBtn(`${verse.text} ${verse.ref}`)}
+    ${rewards(res)}
+    <button class="btn primary big" id="next">Continue</button>
+  </div>`, res.passed ? 'bg-win' : 'bg-soft');
+  wireSpeak();
+  on('#next', home);
+}
+
+const daysUntil = d => Math.max(1, Math.round((new Date(d + 'T12:00') - new Date(today() + 'T12:00')) / 86400000));
+
+function rewards(res) {
+  const out = [];
+  if (res.stars) out.push(`<span class="pill">${ICON.star('#f59e0b')}+${res.stars}</span>`);
+  if (res.goalHit) out.push(`<span class="pill hot">${ICON.flame('#f97316')}Daily goal done! ${currentStreak(me(), today())} day streak</span>`);
+  if (res.froze) out.push('<span class="pill">A streak saver kept your streak going</span>');
+  for (const id of res.badges || []) {
+    const b = BADGES.find(x => x.id === id);
+    out.push(`<div class="newbadge">${ICON.badge('#f59e0b', true)}<div><b>New badge: ${esc(b.name)}</b><small>${esc(b.desc)}</small></div></div>`);
+  }
+  return `<div class="rewards">${out.join('')}</div>`;
+}
+
+/* ================================================================ trivia == */
+function trivia(cat = null) {
+  const p = me();
+  const qs = pickTrivia(p, rng, ROUND_SIZE, cat);
+  let i = 0, right = 0;
+  const ask = () => {
+    const q = qs[i];
+    const choices = triviaChoices(q, rng);
+    view(`<div class="screen">
+      <div class="stop">
+        <button class="iconbtn" id="quit" aria-label="Stop">&times;</button>
+        <div class="meter thin"><i style="width:${Math.round(100 * i / qs.length)}%"></i></div>
+      </div>
+      <p class="kicker center">${esc(CATEGORIES[q.cat])} &middot; ${i + 1} of ${qs.length}</p>
+      <div class="qrow"><h2 class="prompt">${esc(q.q)}</h2>${speakBtn(q.q)}</div>
+      <div class="choices">${choices.map((c, k) => `<button class="choice" data-i="${k}">${esc(c.label)}</button>`).join('')}</div>
+      <div id="fb"></div>
+    </div>`, 'bg-ex');
+    wireSpeak();
+    if (p.settings.readAloud) speak(q.q);
+    if (TEST) window.__vq.ex = { type: 'trivia', right: `.choice[data-i="${choices.findIndex(c => c.correct)}"]`, wrong: `.choice[data-i="${choices.findIndex(c => !c.correct)}"]` };
+    on('#quit', () => (i ? askFirst('Stop this trivia round?', 'Stop', home) : home()));
+    $$('.choice').forEach(el => el.addEventListener('click', () => {
+      const k = Number(el.dataset.i);
+      const ok = choices[k].correct;
+      recordTrivia(p, q.id, ok);
+      if (ok) { right++; sfx.right(); } else sfx.wrong();
+      $$('.choice').forEach((b, n) => {
+        b.disabled = true;
+        if (choices[n].correct) b.classList.add('good');
+        else if (n === k) b.classList.add('bad');
+      });
+      $('#fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">
+        <b>${ok ? 'Right!' : `The answer is: ${esc(q.a)}`}</b>
+        <p>${esc(q.why)}</p>
+        ${q.ref ? `<p class="ref">${esc(q.ref)}</p>` : ''}
+        <button class="btn primary" id="ok">${i + 1 < qs.length ? 'Next' : 'Finish'}</button>
+      </div>`;
+      if (TEST) window.__vq.ex = { type: 'feedback', right: '#ok' };
+      persist();
+      on('#ok', () => { i++; if (i < qs.length) ask(); else done(); });
+      $('#ok').scrollIntoView?.({ block: 'nearest' });
+    }));
+  };
+  const done = () => {
+    const res = finishTrivia(p, right, qs.length, today());
+    persist();
+    if (res.perfect) sfx.big(); else sfx.step();
+    view(`<div class="screen center-col">
+      <h1 class="big-head">${res.perfect ? 'Perfect round!' : right >= qs.length - 1 ? 'Great job!' : 'Round done!'}</h1>
+      <p class="score">${right} / ${qs.length}</p>
+      <p class="muted">Questions you miss come back more often, so you'll get another try.</p>
+      ${rewards(res)}
+      <button class="btn primary big" id="again">Play another round</button>
+      <button class="btn ghost" id="home">Home</button>
+    </div>`, 'bg-win');
+    on('#again', () => trivia(cat));
+    on('#home', home);
+  };
+  ask();
+}
+
+/* ============================================================ my verses == */
+function verseList() {
+  const p = me();
+  const t = today();
+  const status = v => {
+    const s = vstate(p, v.id);
+    if (!s) return { cls: 'todo', label: 'Not started' };
+    if (s.stage < STEPS) return { cls: 'active', label: `Step ${s.stage} of ${STEPS}` };
+    if (s.box >= GOLD_BOX) return { cls: 'gold', label: 'Gold' };
+    return { cls: 'done', label: s.due <= t ? 'Review today' : 'Memorized' };
+  };
+  view(`<div class="screen">
+    ${header(p)}
+    <h2>My verses</h2>
+    <p class="muted small">${plural(masteredIds(p).length, 'verse')} memorized out of ${VERSES.length}. You can work on ${MAX_ACTIVE} new verses at a time.</p>
+    <div class="vlist">${VERSES.map(v => { const st = status(v); return `<button class="vrow ${st.cls}" data-id="${v.id}">
+      <span class="vref">${esc(v.ref)}</span><span class="vstat">${st.label}</span></button>`; }).join('')}</div>
+    <button class="btn ghost" id="home">Home</button>
+  </div>`, 'bg-home');
+  on('#who', title);
+  on('#home', home);
+  on('.vrow', (e, el) => verseDetail(el.dataset.id));
+}
+
+function verseDetail(id) {
+  const p = me();
+  const v = verseById(id);
+  const s = vstate(p, id);
+  const t = today();
+  let actions = '';
+  if (!s && canStart(p)) actions = '<button class="btn primary big" id="start">Start learning this verse</button>';
+  else if (!s) actions = `<p class="muted small">Finish one of the verses you're learning first. You can work on ${MAX_ACTIVE} at a time.</p>`;
+  else if (s.stage < STEPS && stepsLeftToday(p, id, t)) actions = `<button class="btn primary big" id="lesson">Do step ${s.stage + 1}</button>`;
+  else if (s.stage < STEPS) actions = `<p class="muted small">You did ${STEPS_PER_DAY} steps on this verse today. Come back tomorrow!</p>`;
+  else actions = '<button class="btn primary big" id="practice">Practice it</button>';
+  view(`<div class="screen">
+    <h2>${esc(v.ref)}</h2>
+    <div class="verse big"><p>${esc(v.text)}</p><p class="ref">${esc(v.ref)}</p></div>
+    ${s ? steps(s.stage) : ''}
+    ${speakBtn(`${v.text} ${v.ref}`)}
+    ${actions}
+    <button class="btn ghost" id="back">Back</button>
+  </div>`, 'bg-home');
+  wireSpeak();
+  on('#start', () => { startVerse(p, id); persist(); runSession('lesson', id); });
+  on('#lesson', () => runSession('lesson', id));
+  on('#practice', () => runSession('practice', id));
+  on('#back', verseList);
+}
+
+/* =============================================================== badges == */
+function badges() {
+  const p = me();
+  view(`<div class="screen">
+    ${header(p)}
+    <h2>Badges</h2>
+    <div class="badges">${BADGES.map(b => { const has = p.badges.includes(b.id); return `<div class="bcard${has ? ' on' : ''}">
+      ${ICON.badge('#f59e0b', has)}<b>${esc(b.name)}</b><small>${esc(b.desc)}</small></div>`; }).join('')}</div>
+    <button class="btn ghost" id="home">Home</button>
+  </div>`, 'bg-home');
+  on('#who', title);
+  on('#home', home);
+}
+
+/* ============================================================ grown-ups == */
+const unusedColor = () => COLORS.find(c => !state.players.some(p => p.color === c)) || COLORS[0];
+const cleanName = v => String(v || '').trim().replace(/\s+/g, ' ').slice(0, 16);
+
+function parents(focus = 'parents', note = '') {
+  const t = today();
+  const slots = Array.from({ length: MAX_PLAYERS }, (_, i) => state.players[i] || null);
+  const slotRows = slots.map((p, i) => p ? `<div class="slot" data-slot="${i}">
+      <span class="dot" style="background:${esc(p.color)}">${esc(p.name[0].toUpperCase())}</span>
+      <input id="name-${i}" maxlength="16" autocomplete="off" value="${esc(p.name)}" aria-label="Name for player ${i + 1}">
+      <div class="slot-btns"><button class="btn small" data-rename="${i}">Rename</button>
+      <button class="btn small ghost danger" data-del="${i}">Delete</button></div>
+    </div>` : `<div class="slot empty" data-slot="${i}">
+      <span class="dot ghostdot">${i + 1}</span>
+      <input id="name-${i}" maxlength="16" autocomplete="off" placeholder="Name" aria-label="Name for new player ${i + 1}">
+      <div class="slot-btns"><button class="btn small primary" data-add="${i}">Add player</button></div>
+    </div>`).join('');
+
+  const progress = state.players.map(p => {
+    const s = summary(p, t);
+    const missed = Object.entries(p.trivia).filter(([, x]) => x.wrong > x.right)
+      .map(([id]) => TRIVIA.find(q => q.id === id)).filter(Boolean).slice(0, 6);
+    const pid = esc(p.id);
+    return `<section class="panel kid" data-kid="${pid}">
+      <h3><span class="dot small" style="background:${esc(p.color)}">${esc(p.name[0].toUpperCase())}</span> ${esc(p.name)}</h3>
+      <div class="stats">
+        <div><b>${s.mastered}</b><small>verses memorized</small></div>
+        <div><b>${s.gold}</b><small>gold (kept 3+ weeks)</small></div>
+        <div><b>${s.active}</b><small>learning now</small></div>
+        <div><b>${s.due}</b><small>reviews due</small></div>
+        <div><b>${s.streak}</b><small>day streak (best ${s.best})</small></div>
+        <div><b>${s.trivia === null ? '–' : s.trivia + '%'}</b><small>trivia right</small></div>
+      </div>
+      ${missed.length ? `<p class="small"><b>Trivia to talk about</b></p><ul class="missed">${missed.map(q => `<li>${esc(q.q)} <b>${esc(q.a)}</b>${q.ref ? ` <span class="muted">(${esc(q.ref)})</span>` : ''}</li>`).join('')}</ul>` : ''}
+      <label class="toggle"><input type="checkbox" id="sound-${pid}" data-set="sound" ${p.settings.sound ? 'checked' : ''}> Sound effects</label>
+      ${canSpeak() ? `<label class="toggle"><input type="checkbox" id="aloud-${pid}" data-set="readAloud" ${p.settings.readAloud ? 'checked' : ''}> Read verses and questions out loud automatically</label>` : ''}
+      <div class="field">Daily goal (activities per day)
+        <div class="chips">${GOALS.map(g => `<button class="chip${g === p.settings.goal ? ' on' : ''}" data-goal="${g}">${g}</button>`).join('')}</div>
+      </div>
+    </section>`;
+  }).join('');
+
+  view(`<div class="screen">
+    <div class="stop"><button class="btn primary" id="done">Back to game</button></div>
+    <h2>Grown-ups</h2>
+    ${note ? `<p class="okmsg" role="status">${esc(note)}</p>` : ''}
+    <section class="panel" id="players">
+      <h3>Players</h3>
+      <p class="small muted">Up to ${MAX_PLAYERS} players. Each has their own verses, streak and badges.</p>
+      <div class="slots">${slotRows}</div>
+    </section>
+    ${progress}
+    <section class="panel">
+      <h3>How it works</h3>
+      <p class="small">Each verse takes ${STEPS} short steps, at most ${STEPS_PER_DAY} a day, so it is spread over a few days. Once memorized, it comes back for review after 1, 3, 7, 14, 30 and 60 days. A verse kept through four reviews turns gold. Missing a review moves it back a little, not to the start. One activity is a lesson step, a review, a practice or a trivia round.</p>
+      <p class="small">Progress is saved only in this browser on this device. No account, and nothing is sent anywhere. Clearing this browser's site data erases it.</p>
+    </section>
+    <p class="notice">${esc(NIV_NOTICE)}</p>
+  </div>`, 'bg-home');
+
+  const again = msg => parents(focus, msg);
+  on('[data-add]', (e, el) => {
+    const i = Number(el.dataset.add);
+    const name = cleanName($(`#name-${i}`).value);
+    if (!name) { $(`#name-${i}`).classList.add('shake'); $(`#name-${i}`).focus(); return; }
+    if (state.players.length >= MAX_PLAYERS) return again(`All ${MAX_PLAYERS} spots are full.`);
+    const p = newProfile({ name, color: unusedColor() });
+    state.players.push(p);
+    if (!me()) state.current = p.id;
+    persist();
+    again(`Added ${name}.`);
+  });
+  on('[data-rename]', (e, el) => {
+    const i = Number(el.dataset.rename);
+    const p = state.players[i];
+    const name = cleanName($(`#name-${i}`).value);
+    if (!p || !name) { $(`#name-${i}`).classList.add('shake'); return; }
+    p.name = name;
+    persist();
+    again(`Renamed to ${name}.`);
+  });
+  on('[data-del]', (e, el) => {
+    const p = state.players[Number(el.dataset.del)];
+    if (!p) return;
+    askFirst(`Delete ${p.name} and all of their progress? This cannot be undone.`, 'Delete', () => {
+      state.players = state.players.filter(x => x.id !== p.id);
+      // The kid who was playing is gone: send the next tap to "Who's playing?".
+      if (state.current === p.id) state.current = null;
+      persist();
+      again(`Deleted ${p.name}.`);
+    });
+  });
+  $$('[data-kid]').forEach(sec => {
+    const p = state.players.find(x => x.id === sec.dataset.kid);
+    sec.querySelectorAll('[data-set]').forEach(box => box.addEventListener('change', () => {
+      p.settings[box.dataset.set] = box.checked;
+      if (p === me()) setSound(p.settings.sound);
+      persist();
+    }));
+    sec.querySelectorAll('[data-goal]').forEach(chip => chip.addEventListener('click', () => {
+      sfx.tap();
+      p.settings.goal = Number(chip.dataset.goal);
+      persist();
+      sec.querySelectorAll('[data-goal]').forEach(c => c.classList.toggle('on', c === chip));
+    }));
+  });
+  on('#done', () => (me() ? home() : title()));
+  if (focus === 'players' && !state.players.length) $('#name-0')?.focus();
+}
+
+/* ================================================================= boot == */
+if (TEST) window.__vq = { state: () => state, ex: null, screen: '', today };
+if (state.current && me()) home(); else title();
+
+if ('serviceWorker' in navigator && !TEST && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
