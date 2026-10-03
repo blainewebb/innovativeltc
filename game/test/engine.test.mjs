@@ -10,7 +10,7 @@ import {
   isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
   GRADE_DECAY_ATTEMPTS, GRADE_GRACE_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
   parseAnswer, checkAnswer, answerValue, formatAnswer, typeInto,
-  expectedDrillDamage, gateStatus, nextLevelNeeds, GATE_TRIES,
+  expectedDrillDamage, gateStatus, nextLevelNeeds, GATE_TRIES, gateSkills, LEVEL_GATES,
 } from '../js/engine.js';
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          ASKED, ASKED_SKILLS, simplifyFraction, RUNES,
@@ -799,6 +799,40 @@ test('a few power-rune hits no longer leap a 4th grader to 7th grade', () => {
   assert.equal(difficultyLevel(m, 4), 5, 'one 5th grade topic is not enough');
   for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'decimals', correct: true, ms: 7000 });
   assert.equal(difficultyLevel(m, 4), 6);
+});
+
+test('every level can serve its own gate topics, or the climb stalls for good', () => {
+  for (let level = 1; level < MAX_LEVEL; level++) {
+    for (const sk of gateSkills(level)) {
+      let served = false;
+      if (ASKED[sk.id] && sk.tier <= level) served = true;
+      for (let seed = 1; seed <= 300 && !served; seed++) {
+        const p = problemForSkill(makeRng(seed), sk.id, level);
+        if (p && classify(p.a, p.op, p.b) === sk.id) served = true;
+      }
+      assert.ok(served, `level ${level} gate ${sk.id} can never come up at level ${level}`);
+    }
+  }
+  assert.ok(Object.keys(LEVEL_GATES).length >= MAX_LEVEL - 1, 'every level below the top has a gate');
+});
+
+test('a perfect player with no grade set climbs steadily, one level at a time', () => {
+  const rng = makeRng(3), m = blankMastery();
+  let prev = difficultyLevel(m);
+  for (let turn = 0; turn < 1200; turn++) {
+    const level = difficultyLevel(m), runes = unlockedOps(m);
+    if (turn % 2 === 0) {
+      const plays = legalPlays(generateHand(rng, { mastery: m, runes, size: 5, depth: 5 }), runes);
+      if (plays.length) { const p = plays[Math.floor(rng() * plays.length)]; recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: true, ms: 2500 }); }
+    } else {
+      const d = pickDrill(rng, m, runes, level);
+      if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: true, ms: 2500 });
+    }
+    const now = difficultyLevel(m);
+    assert.ok(now - prev <= 1 && now >= prev, `went from ${prev} to ${now}`);
+    prev = now;
+  }
+  assert.ok(prev >= 6, `only reached level ${prev} in 1200 turns of perfect play`);
 });
 
 test('a gate needs the topic mostly right, not just tried', () => {

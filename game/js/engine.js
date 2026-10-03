@@ -159,11 +159,13 @@ export const GATE_ACCURACY = 0.8;
 export const DRILL_GATE_SHARE = 0.35;
 
 /* Each level's own topics, matching the grade descriptions on the hero
-   screen. Skill tiers alone could not be used: 7th and 8th grade would both
+   screen, and only topics that level can actually serve (a test checks). Skill tiers alone could not be used: 7th and 8th grade would both
    have been solving for x, so passing it jumped two levels at once. */
 export const LEVEL_GATES = {
   1: ['add_small', 'sub_small'],
-  2: ['add_big', 'sub_big', 'mult_easy'],
+  // Bigger adding and subtracting cannot be gates here: level 2 tiles only
+  // go to 10, so they never come up and the climb stalled for good.
+  2: ['mult_easy'],
   3: ['mult_hard', 'div_easy'],
   4: ['div_hard'],
   5: ['fractions', 'decimals'],

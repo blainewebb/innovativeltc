@@ -249,9 +249,15 @@ try {
   ok('twelve heroes are still locked', heroCards.locked === 12, JSON.stringify(heroCards));
   ok('a locked hero says what it costs', /floors/.test(await page.$eval('.look.locked small', e => e.textContent)));
   const bookText = await page.$eval('.panel', e => e.textContent);
-  ok('the book counts monsters caught', /Caught 0 of \d+/.test(bookText), bookText.slice(0, 200));
+  // Earlier fights in this test may already have caught something.
+  ok('the book counts monsters caught', /Caught \d+ of \d+/.test(bookText), bookText.slice(0, 200));
   ok('uncaught monsters show their type but not their face', (await page.$$('.look.locked .lt')).length > 20);
   ok('seasonal monsters say when they appear', /October only/.test(bookText));
+  // A catch earlier in the test may already have joined the team, so make room first.
+  while ((await page.$$('.slot-card:not(.empty)')).length > 1) {
+    await page.click('.slot-card:not(.lead) .slot-x');
+    await page.waitForTimeout(50);
+  }
   const secondLook = await page.$$eval('[data-pick]', els => els.find(e => !e.classList.contains('on'))?.dataset.pick);
   await page.click(`[data-pick="${secondLook}"]`);
   await page.waitForSelector('.slot-card:not(.empty):nth-child(2)');
@@ -361,9 +367,10 @@ try {
   }
 
   /* ---- the boss duel on floor 3 ---- */
-  // Walk to the first boss floor. Answering everything correctly is enough.
+  // Walk to the first boss floor. This is the 8th grade hero, whose written
+  // questions the bot can only guess at, so fights run long: give it room.
   let sawDuel = false;
-  for (let step = 0; step < 120 && !sawDuel; step++) {
+  for (let step = 0; step < 400 && !sawDuel; step++) {
     if (await page.$('.duel-banner')) { sawDuel = true; break; }
     if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
     if (await page.$('.hand')) {

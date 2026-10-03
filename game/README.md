@@ -247,10 +247,13 @@ test now replays his report card to keep it from coming back.
 level's own topics, each tried at least 5 times and right 80% of the time
 (the kinder of their lifetime rate and their recent one, so one slip never
 re-closes a level). The topics match the grade descriptions on the hero
-screen: adding and subtracting to 20; two of bigger adding, bigger
-subtracting and times tables 2-5; times tables 6-12 and dividing by 2-5;
+screen: adding and subtracting to 20; times tables 2-5; times tables 6-12
+and dividing by 2-5;
 dividing by 6-12; fractions and decimals; two of percentages, negatives and
-ratios; order of operations and powers; solving for x. While a level's
+ratios; order of operations and powers; solving for x. Every gate topic has
+to be one its level can actually serve (a test checks): bigger adding and
+subtracting were 2nd grade's at first, but level 2 tiles only go to 10, so
+nobody without a declared grade could ever leave level 2. While a level's
 topics have not been tried enough, about a third of the timed problems aim
 at them, and the camp screen lists them with a 0/5 counter. Reaching a new
 level is announced on the next win or loss.
