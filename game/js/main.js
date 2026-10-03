@@ -8,6 +8,7 @@ import {
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
   pickDrill, drillAllowanceMs, bossFightMs, isBossFloor, expectedDrillDamage,
   bestHitEstimate, makeRng as engineRng, typeInto, checkAnswer, formatAnswer, parseAnswer,
+  nextLevelNeeds, GATE_TRIES,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
@@ -194,6 +195,7 @@ function screenHub() {
           ${['+', '-', '*', '/', '^'].map(op => `<span class="rune-chip ${ops.includes(op) ? 'on' : 'off'}">${RUNES[op].glyph}</span>`).join('')}
           <span class="muted tiny">Runes you can find &middot; Challenge level ${level}</span>
         </div>
+        ${nextLevelHtml()}
         <button class="btn primary big" id="startRun">Start a run</button>
         ${profile.records.wins ? `<button class="btn big" id="startEndless">Endless run</button>
         <p class="muted tiny center">Cleared the Deep ${profile.records.wins} time${profile.records.wins === 1 ? '' : 's'}. Best endless floor: ${profile.records.bestEndless || 0}.</p>` : ''}
@@ -238,6 +240,25 @@ function screenTrophies(onDone) {
       </div>
     </div>`);
   $('#done').onclick = () => { sfx.tap(); onDone(); };
+}
+
+/* What the next level needs, in a kid's words. Levels open one at a time by
+   showing the current level's own topics. */
+function nextLevelHtml() {
+  const n = nextLevelNeeds(profile.mastery, profile.grade);
+  if (!n) return '<p class="next-level">\u{1F31F} Top level reached.</p>';
+  const want = n.gate.need === n.gate.skills.length ? '' : ` (any ${n.gate.need} of ${n.gate.skills.length})`;
+  const items = n.gate.skills.map(x => `<span class="${x.ok ? 'done' : ''}">${x.ok ? '\u2705' : '\u2B1C'} ${esc(x.label)} ${Math.min(x.tries, GATE_TRIES)}/${GATE_TRIES}</span>`).join('');
+  return `<div class="next-level"><b>To reach level ${n.next}${want}:</b> ${items}<small>Try each at least ${GATE_TRIES} times and get 4 out of 5 right. New ones show up more in the timed problems.</small></div>`;
+}
+
+/* Announce a new level once, on the next win or loss after it arrives. */
+function levelUpLine() {
+  const now = difficultyLevel(profile.mastery, profile.grade);
+  const seen = profile.records.levelSeen;
+  profile.records.levelSeen = Math.max(seen || 0, now);
+  if (!seen || now <= seen) return '';
+  return `<p class="levelup-line">\u2B06\uFE0F <b>Level up! Challenge level ${now}.</b> New kinds of problems are on the way.</p>`;
 }
 
 function beginRun(endless = false) {
@@ -1417,6 +1438,7 @@ function winBattle() {
   if (e.boss && st.wrong === 0 && st.right >= 1) r.flawlessBosses = (r.flawlessBosses || 0) + 1;
   const caught = tryCatch(e, st);
   const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
+  const levelUp = levelUpLine();
   persist();
   sfx.win();
 
@@ -1448,6 +1470,7 @@ function winBattle() {
         ${catchLine(caught)}
         <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; \u2764\uFE0F +${healAfter}` : ''}</p>
         ${unlockMsg ? `<p class="unlock">${unlockMsg}</p>` : ''}
+        ${levelUp}
         ${trophyLines(trophies)}
         <button class="btn primary" id="cont">Continue</button>
       </div>
@@ -1507,6 +1530,7 @@ function loseRun() {
   const acc = run.stats.correct + run.stats.wrong
     ? Math.round(run.stats.correct / (run.stats.correct + run.stats.wrong) * 100) : 0;
   const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
+  const levelUp = levelUpLine();
   persist();
   render(`
     <div class="screen center">
@@ -1518,6 +1542,7 @@ function loseRun() {
           <li><b>${run.stats.correct}</b> right &middot; <b>${run.stats.wrong}</b> wrong (${acc}%)</li>
           <li>Deepest floor ever: <b>${profile.records.deepest}</b></li>
         </ul>
+        ${levelUp}
         ${trophyLines(trophies)}
         <button class="btn primary big" id="again">Run again</button>
         <button class="btn ghost" id="home">Back to camp</button>

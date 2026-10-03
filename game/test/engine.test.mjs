@@ -10,7 +10,7 @@ import {
   isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
   GRADE_DECAY_ATTEMPTS, GRADE_GRACE_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
   parseAnswer, checkAnswer, answerValue, formatAnswer, typeInto,
-  expectedDrillDamage,
+  expectedDrillDamage, gateStatus, nextLevelNeeds, GATE_TRIES,
 } from '../js/engine.js';
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          ASKED, ASKED_SKILLS, simplifyFraction, RUNES,
@@ -141,6 +141,13 @@ test('operator runes unlock in order, never skipping ahead', () => {
 
 test('difficulty level stays in range and reacts to performance', () => {
   const weak = blankMastery(), strong = blankMastery();
+  // Both have shown the basics; levels are climbed one at a time, so a kid
+  // who has only ever done times tables cannot be rated past the basics.
+  for (const m of [weak, strong]) {
+    for (const [skill, fact] of [['add_small', '3+4'], ['sub_small', '9-4'], ['add_big', '23+18'], ['sub_big', '41-17'], ['mult_easy', '3*4'], ['div_easy', '12/3']]) {
+      for (let i = 0; i < 6; i++) recordAttempt(m, { skill, fact, correct: true, ms: 2500 });
+    }
+  }
   for (let i = 0; i < 12; i++) {
     recordAttempt(weak, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 14000 });
     recordAttempt(strong, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 1500 });
@@ -763,6 +770,64 @@ test('a kid who is struggling still has the grade fade, gradually', () => {
     recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: i % 3 !== 0, ms: 9000 });
   }
   assert.ok(difficultyLevel(m, 6) < 6, `stayed at ${difficultyLevel(m, 6)} while getting a third wrong`);
+});
+
+/** Hudson's real report card: a 4th grader, 60 problems, 98% right. */
+function hudsonCard() {
+  const m = blankMastery();
+  const card = [['add_small', '3+4', 8, 4100], ['sub_small', '9-4', 13, 5600], ['add_big', '23+18', 4, 11100],
+    ['mult_hard', '7*8', 24, 6300], ['div_easy', '12/3', 8, 6100]];
+  for (const [skill, fact, n, ms] of card) {
+    for (let i = 0; i < n; i++) recordAttempt(m, { skill, fact, correct: !(skill === 'mult_hard' && i === 5), ms });
+  }
+  return m;
+}
+
+test('a few power-rune hits no longer leap a 4th grader to 7th grade', () => {
+  /* Squaring counts as 7th grade work, so four of them used to rate him
+     level 7, skipping fractions, decimals and percentages entirely. */
+  const m = hudsonCard();
+  for (let i = 0; i < 6; i++) recordAttempt(m, { skill: 'exponents', fact: '12^2', correct: true, ms: 5000 });
+  assert.equal(difficultyLevel(m, 4), 4, 'still 4th grade until 4th grade topics are shown');
+  const needs = nextLevelNeeds(m, 4);
+  assert.equal(needs.next, 5);
+  assert.deepEqual(needs.gate.skills.map(x => x.id), ['div_hard'], 'the camp can say exactly what is next');
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: true, ms: 6000 });
+  assert.equal(difficultyLevel(m, 4), 5, 'showing 4th grade division opens 5th');
+  // 5th needs both fractions and decimals.
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'fractions', correct: true, ms: 9000 });
+  assert.equal(difficultyLevel(m, 4), 5, 'one 5th grade topic is not enough');
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'decimals', correct: true, ms: 7000 });
+  assert.equal(difficultyLevel(m, 4), 6);
+});
+
+test('a gate needs the topic mostly right, not just tried', () => {
+  const m = blankMastery();
+  for (let i = 0; i < 8; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: i % 2 === 0, ms: 6000 });
+  assert.equal(gateStatus(m, 4).passed, false, 'half right is not shown');
+});
+
+test('playing for big hits, the level only ever climbs one step at a time', () => {
+  for (let seed = 1; seed <= 25; seed++) {
+    const rng = makeRng(seed), m = hudsonCard();
+    let prev = difficultyLevel(m, 4);
+    for (let turn = 0; turn < 500; turn++) {
+      const level = difficultyLevel(m, 4), runes = unlockedOps(m, 4);
+      if (turn % 2 === 0) {
+        const plays = legalPlays(generateHand(rng, { mastery: m, runes, size: 5, depth: 5, grade: 4 }), runes);
+        if (plays.length) {
+          const p = plays.reduce((a, b) => (b.result > a.result ? b : a));
+          recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: rng() > 0.03, ms: 6000 });
+        }
+      } else {
+        const d = pickDrill(rng, m, runes, level);
+        if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: rng() > 0.03, ms: d.kind === 'text' ? 15000 : 6000 });
+      }
+      const now = difficultyLevel(m, 4);
+      assert.ok(now - prev <= 1, `seed ${seed}: jumped from ${prev} to ${now}`);
+      prev = now;
+    }
+  }
 });
 
 test('a kid who races ahead is never held back by the grade', () => {

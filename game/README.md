@@ -243,6 +243,27 @@ for little until there are a dozen), and he had mostly been playing
 subtraction and times tables, which count as 3rd grade skills. The engine
 test now replays his report card to keep it from coming back.
 
+**Levels go up one at a time.** To leave a level a kid has to show that
+level's own topics, each tried at least 5 times and right 80% of the time
+(the kinder of their lifetime rate and their recent one, so one slip never
+re-closes a level). The topics match the grade descriptions on the hero
+screen: adding and subtracting to 20; two of bigger adding, bigger
+subtracting and times tables 2-5; times tables 6-12 and dividing by 2-5;
+dividing by 6-12; fractions and decimals; two of percentages, negatives and
+ratios; order of operations and powers; solving for x. While a level's
+topics have not been tried enough, about a third of the timed problems aim
+at them, and the camp screen lists them with a 0/5 counter. Reaching a new
+level is announced on the next win or loss.
+
+Before this, the level came from the hardest skill tried four times, so four
+squaring problems with the power rune rated a 4th grader as 7th grade and
+skipped fractions, decimals and percentages. It also had a second check on
+the overall record that swung whenever a new skill was started, dropping a
+kid several levels and then jumping them back; that is gone. Simulated from
+a real 4th grader's report card at 97% right, 5th grade now arrives after
+about 60 more problems, 6th about 45 after that and 7th about 55 after that,
+in order.
+
 The school year can be **changed later** from the report card, since the best
 setting is often not obvious until you have watched a few runs. Changing it
 never touches their record.

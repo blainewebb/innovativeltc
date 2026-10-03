@@ -798,3 +798,11 @@ body[data-season="winter"] .field:not(.boss) {
     radial-gradient(120% 60% at 50% 115%, #dfefff 0%, #b9d6f2 30%, transparent 62%),
     linear-gradient(180deg, #1a2a50 0%, #2a4270 55%, #6a8ab0 100%);
 }
+
+/* ------------------------------------------------------------ next level */
+.next-level { margin: 0 0 12px; font-size: .8rem; color: var(--muted); text-align: left; line-height: 1.5; }
+.next-level b { color: var(--ink); }
+.next-level span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.next-level span.done { color: var(--green); }
+.next-level small { display: block; font-size: .7rem; }
+.levelup-line { text-align: center; color: var(--green); margin: 6px 0; }
