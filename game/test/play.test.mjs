@@ -102,6 +102,7 @@ async function toHand(page) {
     if (await page.$('#cont')) { await page.click('#cont'); continue; }
     if (await page.$('#next')) { await page.click('#next'); continue; }
     if (await page.$('#wear')) { await page.click('#wear'); continue; }
+    if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
     if (await page.$('.choice')) { await page.click('.choice'); continue; }
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
@@ -249,9 +250,15 @@ try {
   ok('twelve heroes are still locked', heroCards.locked === 12, JSON.stringify(heroCards));
   ok('a locked hero says what it costs', /floors/.test(await page.$eval('.look.locked small', e => e.textContent)));
   const bookText = await page.$eval('.panel', e => e.textContent);
-  ok('the book counts monsters caught', /Caught 0 of \d+/.test(bookText), bookText.slice(0, 200));
+  // Earlier fights in this test may already have caught something.
+  ok('the book counts monsters caught', /Caught \d+ of \d+/.test(bookText), bookText.slice(0, 200));
   ok('uncaught monsters show their type but not their face', (await page.$$('.look.locked .lt')).length > 20);
   ok('seasonal monsters say when they appear', /October only/.test(bookText));
+  // A catch earlier in the test may already have joined the team, so make room first.
+  while ((await page.$$('.slot-card:not(.empty)')).length > 1) {
+    await page.click('.slot-card:not(.lead) .slot-x');
+    await page.waitForTimeout(50);
+  }
   const secondLook = await page.$$eval('[data-pick]', els => els.find(e => !e.classList.contains('on'))?.dataset.pick);
   await page.click(`[data-pick="${secondLook}"]`);
   await page.waitForSelector('.slot-card:not(.empty):nth-child(2)');
@@ -282,6 +289,7 @@ try {
       await typeNumber(page, ex.answer, '#strike');
       continue;
     }
+    if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
     if (await page.$('#cont')) { await page.click('#cont'); continue; }
     if (await page.$('#next')) { await page.click('#next'); continue; }
     if (await page.$('.choice')) { await page.click('.choice'); continue; }
@@ -331,6 +339,7 @@ try {
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
     if (await page.$('#again')) { await page.click('#again'); continue; }
     if (await page.$('#wear')) { await page.click('#wear'); continue; }
+    if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
     if (await page.$('.node')) {
       const n = await page.$('.node.battle') || await page.$('.node');
       await n.click();
@@ -361,9 +370,10 @@ try {
   }
 
   /* ---- the boss duel on floor 3 ---- */
-  // Walk to the first boss floor. Answering everything correctly is enough.
+  // Walk to the first boss floor. This is the 8th grade hero, whose written
+  // questions the bot can only guess at, so fights run long: give it room.
   let sawDuel = false;
-  for (let step = 0; step < 120 && !sawDuel; step++) {
+  for (let step = 0; step < 400 && !sawDuel; step++) {
     if (await page.$('.duel-banner')) { sawDuel = true; break; }
     if (await page.$('.drill-problem')) { await clearDrill(page); continue; }
     if (await page.$('.hand')) {
@@ -382,6 +392,7 @@ try {
     // floor 3. That says nothing about duels, so it just starts again.
     if (await page.$('#again')) { await page.click('#again'); continue; }
     if (await page.$('#wear')) { await page.click('#wear'); continue; }
+    if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
     if (await page.$('.node')) {
       const n = await page.$('.node.boss') || await page.$('.node.battle') || await page.$('.node');
       await n.click();
@@ -697,6 +708,48 @@ try {
     ok('a win gets a victory banner', false, 'no win scene after the knockout');
   }
   await fxPage.close();
+
+  /* ---- evolving ---- */
+  const evoPage = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  evoPage.on('pageerror', e => errors.push(e.message));
+  await evoPage.goto(URL, { waitUntil: 'networkidle' });
+  await evoPage.fill('#newName', 'Grower');
+  await evoPage.click('.grade[data-grade="3"]');
+  await evoPage.click('#createProfile');
+  await evoPage.waitForSelector('#startRun');
+  // One right answer short of evolving.
+  await evoPage.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('runebreaker.v1'));
+    d.profiles[0].xp = { mage: 59 };
+    localStorage.setItem('runebreaker.v1', JSON.stringify(d));
+  });
+  await evoPage.goto(URL, { waitUntil: 'networkidle' });
+  await evoPage.click('#looksBtn');
+  await evoPage.waitForSelector('.evo-count');
+  ok('the team screen shows how close a character is to evolving', /59\/60 to evolve/.test(await evoPage.$eval('.slot-card.lead', e => e.textContent)));
+  await evoPage.click('#done');
+  await evoPage.click('#startRun');
+  let evolved = '';
+  for (let step = 0; step < 200 && !evolved; step++) {
+    if (await evoPage.$('.evolve-screen')) { evolved = await evoPage.$eval('.evolve-screen', e => e.textContent); break; }
+    if (await evoPage.$('.drill-problem')) { await clearDrill(evoPage); continue; }
+    if (await evoPage.$('.hand')) {
+      if (!(await buildLegalExpression(evoPage))) { if (await tryReshuffle(evoPage)) continue; break; }
+      const ex = await readExpression(evoPage);
+      await typeNumber(evoPage, ex.answer, '#strike');
+      continue;
+    }
+    // Through the win screen by hand: toHand would tap past the evolution.
+    if (await evoPage.$('.win-scene')) { await evoPage.click('#cont', { force: true }); if (await evoPage.$('#cont')) await evoPage.click('#cont'); continue; }
+    if (!(await toHand(evoPage))) break;
+  }
+  ok('winning a fight after the 60th right answer shows the evolution', /evolved into/.test(evolved), evolved.slice(0, 160));
+  ok('the evolved form has its new name', /Bright Mage/.test(evolved));
+  await evoPage.click('#evoOk');
+  await toHand(evoPage);
+  ok('the evolved fighter carries its stars into the next fight',
+     /Bright Mage/.test(await evoPage.$eval('.ibox.hero .nm', e => e.textContent).catch(() => '')) && !!(await evoPage.$('#heroSprite.evo2')));
+  await evoPage.close();
 
   /* ---- seasons ---- */
   const seasonPage = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });

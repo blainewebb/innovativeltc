@@ -10,15 +10,16 @@ import {
   isBossFloor, bossFightMs, BOSS_EVERY, FINAL_DEPTH, totalAttempts,
   GRADE_DECAY_ATTEMPTS, GRADE_GRACE_ATTEMPTS, MAX_LEVEL, negativeTilesFor,
   parseAnswer, checkAnswer, answerValue, formatAnswer, typeInto,
-  expectedDrillDamage,
+  expectedDrillDamage, gateStatus, nextLevelNeeds, GATE_TRIES, gateSkills, LEVEL_GATES,
 } from '../js/engine.js';
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          ASKED, ASKED_SKILLS, simplifyFraction, RUNES,
          AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
          FLOORS_PER_AVATAR, TYPES, typeMult, TYPE_STRONG, TYPE_WEAK, ENEMIES, BOSSES,
          SEASONAL_MONSTERS, ALL_MONSTERS, seasonFor } from '../js/data.js';
-import { CHARACTERS, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
-         TROPHIES, checkTrophies, TEAM_SIZE } from '../js/collection.js';
+import { CHARACTERS, CHARACTER_BY_ID, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
+         TROPHIES, checkTrophies, TEAM_SIZE, EVOLVE_AT, STAGE_POWER, EVO_CHAINS, formOf, stageName,
+         earnedStage, stageOf, pendingEvolutions, evolve, addXp, evolveProgress } from '../js/collection.js';
 import { newProfile } from '../js/storage.js';
 
 /** A drill is either a calculation off the tiles or a written question. */
@@ -141,6 +142,13 @@ test('operator runes unlock in order, never skipping ahead', () => {
 
 test('difficulty level stays in range and reacts to performance', () => {
   const weak = blankMastery(), strong = blankMastery();
+  // Both have shown the basics; levels are climbed one at a time, so a kid
+  // who has only ever done times tables cannot be rated past the basics.
+  for (const m of [weak, strong]) {
+    for (const [skill, fact] of [['add_small', '3+4'], ['sub_small', '9-4'], ['add_big', '23+18'], ['sub_big', '41-17'], ['mult_easy', '3*4'], ['div_easy', '12/3']]) {
+      for (let i = 0; i < 6; i++) recordAttempt(m, { skill, fact, correct: true, ms: 2500 });
+    }
+  }
   for (let i = 0; i < 12; i++) {
     recordAttempt(weak, { skill: 'mult_hard', fact: '7*8', correct: false, ms: 14000 });
     recordAttempt(strong, { skill: 'mult_hard', fact: '7*8', correct: true, ms: 1500 });
@@ -763,6 +771,98 @@ test('a kid who is struggling still has the grade fade, gradually', () => {
     recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: i % 3 !== 0, ms: 9000 });
   }
   assert.ok(difficultyLevel(m, 6) < 6, `stayed at ${difficultyLevel(m, 6)} while getting a third wrong`);
+});
+
+/** Hudson's real report card: a 4th grader, 60 problems, 98% right. */
+function hudsonCard() {
+  const m = blankMastery();
+  const card = [['add_small', '3+4', 8, 4100], ['sub_small', '9-4', 13, 5600], ['add_big', '23+18', 4, 11100],
+    ['mult_hard', '7*8', 24, 6300], ['div_easy', '12/3', 8, 6100]];
+  for (const [skill, fact, n, ms] of card) {
+    for (let i = 0; i < n; i++) recordAttempt(m, { skill, fact, correct: !(skill === 'mult_hard' && i === 5), ms });
+  }
+  return m;
+}
+
+test('a few power-rune hits no longer leap a 4th grader to 7th grade', () => {
+  /* Squaring counts as 7th grade work, so four of them used to rate him
+     level 7, skipping fractions, decimals and percentages entirely. */
+  const m = hudsonCard();
+  for (let i = 0; i < 6; i++) recordAttempt(m, { skill: 'exponents', fact: '12^2', correct: true, ms: 5000 });
+  assert.equal(difficultyLevel(m, 4), 4, 'still 4th grade until 4th grade topics are shown');
+  const needs = nextLevelNeeds(m, 4);
+  assert.equal(needs.next, 5);
+  assert.deepEqual(needs.gate.skills.map(x => x.id), ['div_hard'], 'the camp can say exactly what is next');
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: true, ms: 6000 });
+  assert.equal(difficultyLevel(m, 4), 5, 'showing 4th grade division opens 5th');
+  // 5th needs both fractions and decimals.
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'fractions', correct: true, ms: 9000 });
+  assert.equal(difficultyLevel(m, 4), 5, 'one 5th grade topic is not enough');
+  for (let i = 0; i < GATE_TRIES; i++) recordAttempt(m, { skill: 'decimals', correct: true, ms: 7000 });
+  assert.equal(difficultyLevel(m, 4), 6);
+});
+
+test('every level can serve its own gate topics, or the climb stalls for good', () => {
+  for (let level = 1; level < MAX_LEVEL; level++) {
+    for (const sk of gateSkills(level)) {
+      let served = false;
+      if (ASKED[sk.id] && sk.tier <= level) served = true;
+      for (let seed = 1; seed <= 300 && !served; seed++) {
+        const p = problemForSkill(makeRng(seed), sk.id, level);
+        if (p && classify(p.a, p.op, p.b) === sk.id) served = true;
+      }
+      assert.ok(served, `level ${level} gate ${sk.id} can never come up at level ${level}`);
+    }
+  }
+  assert.ok(Object.keys(LEVEL_GATES).length >= MAX_LEVEL - 1, 'every level below the top has a gate');
+});
+
+test('a perfect player with no grade set climbs steadily, one level at a time', () => {
+  const rng = makeRng(3), m = blankMastery();
+  let prev = difficultyLevel(m);
+  for (let turn = 0; turn < 1200; turn++) {
+    const level = difficultyLevel(m), runes = unlockedOps(m);
+    if (turn % 2 === 0) {
+      const plays = legalPlays(generateHand(rng, { mastery: m, runes, size: 5, depth: 5 }), runes);
+      if (plays.length) { const p = plays[Math.floor(rng() * plays.length)]; recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: true, ms: 2500 }); }
+    } else {
+      const d = pickDrill(rng, m, runes, level);
+      if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: true, ms: 2500 });
+    }
+    const now = difficultyLevel(m);
+    assert.ok(now - prev <= 1 && now >= prev, `went from ${prev} to ${now}`);
+    prev = now;
+  }
+  assert.ok(prev >= 6, `only reached level ${prev} in 1200 turns of perfect play`);
+});
+
+test('a gate needs the topic mostly right, not just tried', () => {
+  const m = blankMastery();
+  for (let i = 0; i < 8; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: i % 2 === 0, ms: 6000 });
+  assert.equal(gateStatus(m, 4).passed, false, 'half right is not shown');
+});
+
+test('playing for big hits, the level only ever climbs one step at a time', () => {
+  for (let seed = 1; seed <= 25; seed++) {
+    const rng = makeRng(seed), m = hudsonCard();
+    let prev = difficultyLevel(m, 4);
+    for (let turn = 0; turn < 500; turn++) {
+      const level = difficultyLevel(m, 4), runes = unlockedOps(m, 4);
+      if (turn % 2 === 0) {
+        const plays = legalPlays(generateHand(rng, { mastery: m, runes, size: 5, depth: 5, grade: 4 }), runes);
+        if (plays.length) {
+          const p = plays.reduce((a, b) => (b.result > a.result ? b : a));
+          recordAttempt(m, { skill: classify(p.a, p.op, p.b), fact: factKey(p.a, p.op, p.b), correct: rng() > 0.03, ms: 6000 });
+        }
+      } else {
+        const d = pickDrill(rng, m, runes, level);
+        if (d) recordAttempt(m, { skill: d.skill, fact: d.fact, correct: rng() > 0.03, ms: d.kind === 'text' ? 15000 : 6000 });
+      }
+      const now = difficultyLevel(m, 4);
+      assert.ok(now - prev <= 1, `seed ${seed}: jumped from ${prev} to ${now}`);
+      prev = now;
+    }
+  }
 });
 
 test('a kid who races ahead is never held back by the grade', () => {
@@ -1402,6 +1502,48 @@ test('trophies come from the maths, once each', () => {
   assert.ok(p.trophies.level5, 'climbing counts');
   assert.ok(TROPHIES.length >= 20);
   assert.equal(new Set(TROPHIES.map(t => t.id)).size, TROPHIES.length);
+});
+
+/* ---------------------------------------------------------- evolving -- */
+test('characters evolve from right answers, one stage at a time, shown before they count', () => {
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(stageOf(p, 'fox'), 1);
+  for (let i = 0; i < EVOLVE_AT[1] - 1; i++) addXp(p, 'fox');
+  assert.deepEqual(pendingEvolutions(p), [], 'one short');
+  addXp(p, 'fox');
+  assert.deepEqual(pendingEvolutions(p), [{ id: 'fox', from: 1, to: 2 }]);
+  assert.equal(stageOf(p, 'fox'), 1, 'not evolved until the screen plays it');
+  evolve(p, 'fox');
+  assert.equal(stageOf(p, 'fox'), 2);
+  assert.deepEqual(pendingEvolutions(p), []);
+  for (let i = 0; i < 1000; i++) addXp(p, 'fox');
+  assert.equal(earnedStage(p, 'fox'), 3, 'three stages, no more');
+  evolve(p, 'fox'); evolve(p, 'fox');
+  assert.equal(stageOf(p, 'fox'), 3);
+  assert.equal(evolveProgress(p, 'fox'), null, 'fully evolved');
+});
+
+test('evolved names and pictures read well, and only change where a real chain exists', () => {
+  assert.equal(stageName(CHARACTER_BY_ID.newt, 2), 'Blaze Newt');
+  assert.equal(stageName(CHARACTER_BY_ID.newt, 3), 'Inferno Newt');
+  assert.equal(stageName(CHARACTER_BY_ID.fox, 2), 'Blaze Fox');
+  assert.equal(stageName(CHARACTER_BY_ID.king, 3), 'The Radiant Number King');
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(formOf(p, CHARACTER_BY_ID.newt, 3).char, '\u{1F409}', 'lizard to dragon');
+  assert.equal(formOf(p, CHARACTER_BY_ID.fox, 3).char, CHARACTER_BY_ID.fox.char, 'no chain: same picture, glow instead');
+  for (const [id, chain] of Object.entries(EVO_CHAINS)) {
+    assert.ok(CHARACTER_BY_ID[id], `${id} is a real character`);
+    assert.equal(chain.length, 3);
+    assert.equal(chain[0], CHARACTER_BY_ID[id].char, `${id} chain starts at its own picture`);
+  }
+  assert.deepEqual(STAGE_POWER, [1, 1.1, 1.2], 'a little stronger, not a lot');
+  assert.equal(formOf(p, CHARACTER_BY_ID.fox, 2).power, 1.1);
+});
+
+test('an evolved fighter hits harder through the same damage formula', () => {
+  const base = { result: 30, op: '+', ward: 'none', resist: 'none', resistAt: 0, armor: 0, relics: [], combo: 0, ms: 3000, isFirstHit: false };
+  assert.equal(computeDamage(base).damage, 30);
+  assert.equal(computeDamage({ ...base, typeMult: STAGE_POWER[2] }).damage, 36);
 });
 
 console.log(`${passed} engine tests passed`);

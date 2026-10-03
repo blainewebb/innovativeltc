@@ -223,4 +223,16 @@ test('the collection survives a round trip, and junk in it is dropped', () => {
   assert.deepEqual(after.trophies, { first_win: 1700000000000 });
 });
 
+test('evolution progress survives a round trip, and junk is dropped', () => {
+  const before = heroWithHistory();
+  before.xp = { fox: 75, newt: 'lots', crab: -3 };
+  before.stages = { fox: 2, newt: 9 };
+  const [after] = parseImport(JSON.stringify(exportPayload([before])));
+  assert.deepEqual(after.xp, { fox: 75 });
+  assert.deepEqual(after.stages, { fox: 2, newt: 3 }, 'a stage above three is clamped');
+  const old = normalizeProfile({ name: 'Old', avatar: '\u{1F98A}' });
+  assert.deepEqual(old.xp, {});
+  assert.deepEqual(old.stages, {});
+});
+
 console.log(`${passed} storage tests passed`);

@@ -8,13 +8,15 @@ import {
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
   pickDrill, drillAllowanceMs, bossFightMs, isBossFloor, expectedDrillDamage,
   bestHitEstimate, makeRng as engineRng, typeInto, checkAnswer, formatAnswer, parseAnswer,
+  nextLevelNeeds, GATE_TRIES,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
          AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
          FLOORS_PER_AVATAR, TYPES, typeMult, seasonFor, MONSTER_BY_ID } from './data.js';
 import { CHARACTERS, CHARACTER_BY_ID, TEAM_SIZE, ownedIds, leadOf, teamOf, matchup,
-         catchChance, seasonProgress, TROPHIES, checkTrophies } from './collection.js';
+         catchChance, seasonProgress, TROPHIES, checkTrophies,
+         formOf, addXp, pendingEvolutions, evolve, evolveProgress } from './collection.js';
 import * as store from './storage.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
@@ -38,6 +40,12 @@ const app = document.getElementById('app');
 const $ = sel => app.querySelector(sel);
 const $$ = sel => Array.from(app.querySelectorAll(sel));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* A character as this hero has grown it: evolved picture, name and power. */
+const form = c => formOf(profile, c);
+const stars = n => (n > 1 ? `<span class="stars">${'\u2605'.repeat(n - 1)}</span>` : '');
+/** The picture with its evolution glow, in the character's type colour. */
+const charSpan = (f, cls = '') => `<span class="ch ${cls} evo${f.stage} t-${f.type}">${f.char}</span>`;
 
 function render(html) { stopDrillTimer(); fxGen += 1; delete app.dataset.busy; app.innerHTML = html; }
 function persist() { store.save(data); }
@@ -160,6 +168,8 @@ function screenConfirmDelete(hero) {
 
 /* ================================================================= hub === */
 function screenHub() {
+  // An evolution earned but never shown (the app was closed mid-fight) plays here.
+  if (pendingEvolutions(profile).length) return withEvolutions(screenHub);
   const upNext = nextAvatar(profile.records.floorsBeaten || 0);
   const level = difficultyLevel(profile.mastery, profile.grade);
   const ops = unlockedOps(profile.mastery, profile.grade);
@@ -179,11 +189,11 @@ function screenHub() {
       </div>` : ''}
       <div class="panel">
         <div class="hero-row">
-          <button class="pa big as-button" id="looksBtn" title="Change your team">${team[0].char}</button>
+          <button class="pa big as-button" id="looksBtn" title="Change your team">${charSpan(form(team[0]))}</button>
           <div>
             <h2>${esc(profile.name)}</h2>
             <p class="muted">Deepest floor <b>${profile.records.deepest}</b> &middot; ${profile.records.runs} runs &middot; ${profile.records.bossesFelled} bosses felled</p>
-            <p class="muted tiny">Team: ${team.map(c => `${c.char}${TYPES[c.type].icon}`).join(' ')} &middot; ${upNext ? `next hero in ${upNext.away} floor${upNext.away === 1 ? '' : 's'}` : 'every hero earned'}</p>
+            <p class="muted tiny">Team: ${team.map(c => `${form(c).char}${TYPES[c.type].icon}`).join(' ')} &middot; ${upNext ? `next hero in ${upNext.away} floor${upNext.away === 1 ? '' : 's'}` : 'every hero earned'}</p>
           </div>
         </div>
         <div class="row">
@@ -194,6 +204,7 @@ function screenHub() {
           ${['+', '-', '*', '/', '^'].map(op => `<span class="rune-chip ${ops.includes(op) ? 'on' : 'off'}">${RUNES[op].glyph}</span>`).join('')}
           <span class="muted tiny">Runes you can find &middot; Challenge level ${level}</span>
         </div>
+        ${nextLevelHtml()}
         <button class="btn primary big" id="startRun">Start a run</button>
         ${profile.records.wins ? `<button class="btn big" id="startEndless">Endless run</button>
         <p class="muted tiny center">Cleared the Deep ${profile.records.wins} time${profile.records.wins === 1 ? '' : 's'}. Best endless floor: ${profile.records.bestEndless || 0}.</p>` : ''}
@@ -238,6 +249,25 @@ function screenTrophies(onDone) {
       </div>
     </div>`);
   $('#done').onclick = () => { sfx.tap(); onDone(); };
+}
+
+/* What the next level needs, in a kid's words. Levels open one at a time by
+   showing the current level's own topics. */
+function nextLevelHtml() {
+  const n = nextLevelNeeds(profile.mastery, profile.grade);
+  if (!n) return '<p class="next-level">\u{1F31F} Top level reached.</p>';
+  const want = n.gate.need === n.gate.skills.length ? '' : ` (any ${n.gate.need} of ${n.gate.skills.length})`;
+  const items = n.gate.skills.map(x => `<span class="${x.ok ? 'done' : ''}">${x.ok ? '\u2705' : '\u2B1C'} ${esc(x.label)} ${Math.min(x.tries, GATE_TRIES)}/${GATE_TRIES}</span>`).join('');
+  return `<div class="next-level"><b>To reach level ${n.next}${want}:</b> ${items}<small>Try each at least ${GATE_TRIES} times and get 4 out of 5 right. New ones show up more in the timed problems.</small></div>`;
+}
+
+/* Announce a new level once, on the next win or loss after it arrives. */
+function levelUpLine() {
+  const now = difficultyLevel(profile.mastery, profile.grade);
+  const seen = profile.records.levelSeen;
+  profile.records.levelSeen = Math.max(seen || 0, now);
+  if (!seen || now <= seen) return '';
+  return `<p class="levelup-line">\u2B06\uFE0F <b>Level up! Challenge level ${now}.</b> New kinds of problems are on the way.</p>`;
 }
 
 function beginRun(endless = false) {
@@ -364,11 +394,12 @@ function screenLooks(onDone) {
   const card = c => {
     const have = owned.has(c.id);
     const t = TYPES[c.type];
-    const sub = have ? esc(c.name)
+    const f = form(c);
+    const sub = have ? `${esc(f.name)}${f.stage > 1 ? ' ' + '\u2605'.repeat(f.stage - 1) : ''}`
       : c.kind === 'hero' ? `${c.at} floors`
       : c.season ? `${MONTH[c.season]} only` : '???';
     return `<button class="look ${have ? '' : 'locked'} ${inTeam.has(c.id) ? 'on' : ''}" ${have ? `data-pick="${c.id}"` : 'disabled'}>
-      <span class="lk">${have ? c.char : c.kind === 'hero' ? '\u{1F512}' : '❓'}</span>
+      <span class="lk">${have ? charSpan(f) : c.kind === 'hero' ? '\u{1F512}' : '❓'}</span>
       <span class="lt" title="${t.name}">${t.icon}</span>
       <small>${sub}</small>
     </button>`;
@@ -380,14 +411,19 @@ function screenLooks(onDone) {
     <div class="screen center">
       <div class="panel">
         <h2>Your team</h2>
-        <p class="muted tiny center">Up to ${TEAM_SIZE}. Switch between them in a fight to get the best type matchup. The first one leads.</p>
+        <p class="muted tiny center">Up to ${TEAM_SIZE}. Switch between them in a fight to get the best type matchup. The first one leads. Every right answer a character makes in a fight helps it evolve.</p>
         <div class="team-slots">
           ${Array.from({ length: TEAM_SIZE }, (_, i) => {
             const c = team[i];
             if (!c) return '<div class="slot-card empty">Empty</div>';
+            const f = form(c);
+            const prog = evolveProgress(profile, c.id);
             return `<div class="slot-card ${i === 0 ? 'lead' : ''}">
               <button class="slot-main" data-lead="${c.id}" title="${i === 0 ? 'Leads the team' : 'Make lead'}">
-                <span class="lk">${c.char}</span><small>${TYPES[c.type].icon} ${esc(c.name)}</small>
+                <span class="lk">${charSpan(f)}</span><small>${TYPES[c.type].icon} ${esc(f.name)} ${stars(f.stage)}</small>
+                ${prog ? `<span class="evo-bar" title="Right answers until it evolves"><i style="width:${Math.min(100, prog.have / prog.need * 100)}%"></i></span>
+                <small class="evo-count">${prog.have >= prog.need ? 'Ready to evolve!' : `${prog.have}/${prog.need} to evolve`}</small>`
+                  : '<small class="evo-count">Fully evolved</small>'}
                 <em>${i === 0 ? 'Lead' : 'Make lead'}</em>
               </button>
               ${team.length > 1 ? `<button class="slot-x" data-drop="${c.id}" aria-label="Take ${esc(c.name)} off the team">✕</button>` : ''}
@@ -547,15 +583,17 @@ function switchFighter(id) {
   sfx.tap();
   const hero = $('#heroSprite');
   if (hero) {
-    hero.textContent = next.char;
+    const f = form(next);
+    hero.textContent = f.char;
+    hero.className = `sprite hero evo${f.stage} t-${f.type}`;
     anim(hero, [{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1 }, { transform: 'scale(1)' }], { duration: 300 });
   }
   const nm = $('.ibox.hero .nm span');
-  if (nm) nm.innerHTML = `${TYPES[next.type].icon} ${esc(next.name)}`;
+  if (nm) nm.innerHTML = `${TYPES[next.type].icon} ${esc(form(next).name)}${stars(form(next).stage)}`;
   const intent = $('.ibox.foe .intent');
   if (intent) { const it = describeIntent(battle.enemy); intent.textContent = `Next: ${it.icon} ${it.text}`; }
   $$('.tchip').forEach(b => b.classList.toggle('on', b.dataset.fighter === next.id));
-  battle.log.push(`Go, ${next.char} ${esc(next.name)}! ${matchupText(false)}`);
+  battle.log.push(`Go, ${form(next).char} ${esc(form(next).name)}! ${matchupText(false)}`);
   const log = $('.log');
   if (log) log.innerHTML = battle.log.slice(-2).map(l => `<div>${l}</div>`).join('');
 }
@@ -566,7 +604,7 @@ function matchupText(withLead = true) {
   const e = battle.enemy, f = battle.fighter;
   const m = matchup(f.type, e.type);
   const t = TYPES[f.type], o = TYPES[e.type];
-  const lead = withLead ? `${esc(f.name)} is ${t.icon} ${t.name}. ` : '';
+  const lead = withLead ? `${esc(form(f).name)} is ${t.icon} ${t.name}. ` : '';
   // Kept to one line on a phone: the log has two lines and the keypad needs the rest.
   return lead + (m.edge === 'clash' ? `<b>${t.icon} vs ${o.icon}: super effective both ways!</b>`
     : m.edge === 'strong' ? `<b class="good">${t.icon} ${t.name} beats ${o.icon} ${o.name}: super effective!</b>`
@@ -583,7 +621,7 @@ function teamChips() {
     const m = matchup(c.type, e.type);
     const mark = m.edge === 'strong' ? '\u25B2' : m.edge === 'clash' ? '\u2694\uFE0F' : m.edge === 'weak' || m.edge === 'risky' ? '\u25BC' : '';
     return `<button class="tchip ${c.id === battle.fighter.id ? 'on' : ''} ${m.edge}" data-fighter="${c.id}" title="${esc(c.name)}">
-      <span class="tc">${c.char}</span><span class="tt">${TYPES[c.type].icon}</span>${mark ? `<b>${mark}</b>` : ''}
+      <span class="tc">${form(c).char}</span><span class="tt">${TYPES[c.type].icon}</span>${mark ? `<b>${mark}</b>` : ''}
     </button>`;
   }).join('');
 }
@@ -654,9 +692,9 @@ function fieldHtml() {
       <div class="plat foe"></div>
       <div class="sprite foe" id="foeSprite">${e.art}</div>
       <div class="plat hero"></div>
-      <div class="sprite hero" id="heroSprite">${battle.fighter.char}</div>
+      <div class="sprite hero evo${form(battle.fighter).stage} t-${battle.fighter.type}" id="heroSprite">${form(battle.fighter).char}</div>
       <div class="ibox hero">
-        <div class="nm"><span>${TYPES[battle.fighter.type].icon} ${esc(battle.fighter.name)}</span><small class="combo ${p.combo ? 'on' : ''}">\u{1F525}${p.combo}</small></div>
+        <div class="nm"><span>${TYPES[battle.fighter.type].icon} ${esc(form(battle.fighter).name)}${stars(form(battle.fighter).stage)}</span><small class="combo ${p.combo ? 'on' : ''}">\u{1F525}${p.combo}</small></div>
         ${hpBar('heroHp', p.hp, p.maxHp)}
       </div>
     </div>
@@ -1050,7 +1088,8 @@ function submitStrike() {
   const { damage, warded, resisted, capped } = computeDamage({
     result, op, ward: e.ward, resist: e.resist, resistAt: e.resistAt,
     armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: battle.firstHit,
-    typeMult: typeMult(battle.fighter.type, e.type),
+    // An evolved fighter hits a little harder, on top of the type matchup.
+    typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power,
   });
 
   let beat;
@@ -1092,6 +1131,8 @@ function tally(correct, ms) {
   const r = profile.records;
   r.bestStreak = Math.max(r.bestStreak || 0, run.player.combo);
   if (correct && ms < 3000) r.fastAnswers = (r.fastAnswers || 0) + 1;
+  // Every right answer helps whoever is fighting evolve.
+  if (correct) addXp(profile, battle.fighter.id);
 }
 
 /* Roll to catch the monster just beaten. The chance is the fight's maths.
@@ -1367,7 +1408,7 @@ function resolveDrill(text) {
     const { damage } = computeDamage({
       result, op: d.op || '+', ward: 'none', resist: 'none', resistAt: 0,
       armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
-      typeMult: typeMult(battle.fighter.type, e.type),
+      typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power,
     });
     e.hp -= damage;
     p.combo += 1;
@@ -1417,6 +1458,7 @@ function winBattle() {
   if (e.boss && st.wrong === 0 && st.right >= 1) r.flawlessBosses = (r.flawlessBosses || 0) + 1;
   const caught = tryCatch(e, st);
   const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
+  const levelUp = levelUpLine();
   persist();
   sfx.win();
 
@@ -1437,17 +1479,18 @@ function winBattle() {
         ${boss ? `<div class="rays"></div><div class="confetti">${confetti}</div>` : ''}
         <div class="vbanner">${boss ? 'BOSS FELLED!' : 'VICTORY!'}</div>
         <div class="vplat"></div>
-        <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${battle.fighter.char}</div>
+        <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${charSpan(form(battle.fighter))}</div>
         <div class="vfoe">${e.art}</div>
         <div class="dizzy">\u{1F4AB}</div>
         ${caught && !caught.already ? '<div class="vorb">\u{1F52E}</div>' : ''}
       </div>
       <div class="panel win vpanel">
-        <p class="vline">${esc(battle.fighter.name)} beat ${esc(e.name)}!</p>
+        <p class="vline">${esc(form(battle.fighter).name)} beat ${esc(e.name)}!</p>
         <p class="recap">${recap}</p>
         ${catchLine(caught)}
         <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; \u2764\uFE0F +${healAfter}` : ''}</p>
         ${unlockMsg ? `<p class="unlock">${unlockMsg}</p>` : ''}
+        ${levelUp}
         ${trophyLines(trophies)}
         <button class="btn primary" id="cont">Continue</button>
       </div>
@@ -1469,9 +1512,63 @@ function winBattle() {
   $('#cont').onclick = () => {
     if (!scene.classList.contains('done')) return finishScene();
     sfx.tap();
-    if (e.boss && !run.endless && run.depth >= FINAL_DEPTH) return screenRunComplete();
-    if (battle.reward.relic) return screenRelicPick(() => nextFloor());
-    nextFloor();
+    withEvolutions(() => {
+      if (e.boss && !run.endless && run.depth >= FINAL_DEPTH) return screenRunComplete();
+      if (battle.reward.relic) return screenRelicPick(() => nextFloor());
+      nextFloor();
+    });
+  };
+}
+
+/* ============================================================ evolving === */
+/* After a fight, anything whose right answers earned a new stage evolves, one
+   at a time, on a screen of its own, the way every kid who has played Pokemon
+   expects. The flicker between old and new speeds up, then the new form holds. */
+function withEvolutions(next) {
+  const list = pendingEvolutions(profile);
+  if (!list.length) return next();
+  screenEvolve(list[0], () => withEvolutions(next));
+}
+
+function screenEvolve(ev, done) {
+  const c = CHARACTER_BY_ID[ev.id];
+  const before = formOf(profile, c, ev.from), after = formOf(profile, c, ev.to);
+  evolve(profile, ev.id);
+  persist();
+  const boost = Math.round((after.power - 1) * 100);
+  render(`
+    <div class="screen center evolve-screen">
+      <div class="evo-stage t-${c.type}">
+        <div class="evo-rays"></div>
+        <div class="evo-pair">
+          <span class="evo-old">${before.char}</span>
+          <span class="evo-new evo${after.stage} t-${c.type}">${after.char}</span>
+        </div>
+      </div>
+      <div class="panel win">
+        <p class="evo-what">What? <b>${esc(before.name)}</b> is evolving!</p>
+        <p class="evo-done"><b>${esc(before.name)}</b> evolved into <b>${esc(after.name)}</b>! ${stars(after.stage)}</p>
+        <p class="muted center evo-done">${TYPES[c.type].icon} Hits ${boost}% harder than when it started.${after.stage < 3 ? ' One more evolution to go.' : ' Fully evolved!'}</p>
+        <button class="btn primary evo-done" id="evoOk">Awesome!</button>
+      </div>
+    </div>`);
+  const scene = $('.evolve-screen');
+  const finish = () => {
+    if (scene.classList.contains('done')) return;
+    scene.classList.add('done');
+    sfx.win();
+  };
+  if (reducedMotion()) finish();
+  else {
+    sfx.reward();
+    const gen = fxGen;
+    setTimeout(() => { if (gen === fxGen) finish(); }, 2600);
+  }
+  scene.addEventListener('click', finish);
+  $('#evoOk').onclick = ev2 => {
+    ev2.stopPropagation();
+    if (!scene.classList.contains('done')) return finish();
+    sfx.tap(); done();
   };
 }
 
@@ -1507,6 +1604,7 @@ function loseRun() {
   const acc = run.stats.correct + run.stats.wrong
     ? Math.round(run.stats.correct / (run.stats.correct + run.stats.wrong) * 100) : 0;
   const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
+  const levelUp = levelUpLine();
   persist();
   render(`
     <div class="screen center">
@@ -1518,13 +1616,14 @@ function loseRun() {
           <li><b>${run.stats.correct}</b> right &middot; <b>${run.stats.wrong}</b> wrong (${acc}%)</li>
           <li>Deepest floor ever: <b>${profile.records.deepest}</b></li>
         </ul>
+        ${levelUp}
         ${trophyLines(trophies)}
         <button class="btn primary big" id="again">Run again</button>
         <button class="btn ghost" id="home">Back to camp</button>
       </div>
     </div>`);
-  $('#again').onclick = () => { sfx.tap(); beginRun(); };
-  $('#home').onclick = () => { sfx.tap(); screenHub(); };
+  $('#again').onclick = () => { sfx.tap(); withEvolutions(() => beginRun()); };
+  $('#home').onclick = () => { sfx.tap(); withEvolutions(screenHub); };
 }
 
 /* A shared keypad. Middle school answers can be fractions, decimals or
@@ -2083,13 +2182,13 @@ function commitImport(heroes, mode) {
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if (app.dataset.busy) { if (fxSkip) { ev.preventDefault(); fxSkip(); } return; }
-  const scene = app.querySelector('.win-scene:not(.done)');
+  const scene = app.querySelector('.win-scene:not(.done), .evolve-screen:not(.done)');
   if (scene) { ev.preventDefault(); scene.classList.add('done'); return; }
   if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);
   else if (ev.key === 'Backspace') btn = app.querySelector('.key[data-k="back"]');
-  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #next, #cont');
+  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #next, #cont, #evoOk');
   if (btn && !btn.disabled) { ev.preventDefault(); btn.click(); }
 });
 

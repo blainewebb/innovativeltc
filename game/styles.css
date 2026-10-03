@@ -798,3 +798,60 @@ body[data-season="winter"] .field:not(.boss) {
     radial-gradient(120% 60% at 50% 115%, #dfefff 0%, #b9d6f2 30%, transparent 62%),
     linear-gradient(180deg, #1a2a50 0%, #2a4270 55%, #6a8ab0 100%);
 }
+
+/* ------------------------------------------------------------ next level */
+.next-level { margin: 0 0 12px; font-size: .8rem; color: var(--muted); text-align: left; line-height: 1.5; }
+.next-level b { color: var(--ink); }
+.next-level span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.next-level span.done { color: var(--green); }
+.next-level small { display: block; font-size: .7rem; }
+.levelup-line { text-align: center; color: var(--green); margin: 6px 0; }
+
+/* -------------------------------------------------------------- evolving */
+.t-fire { --tc: #ff7a2e; } .t-water { --tc: #4aa8ff; } .t-grass { --tc: #4ade80; }
+.t-storm { --tc: #ffe14a; } .t-light { --tc: #fff2a8; } .t-shadow { --tc: #b07aff; }
+/* text-shadow rather than filter: the hit animations drive filter, and would wipe a glow. */
+.evo2 { text-shadow: 0 0 10px var(--tc), 0 0 3px var(--tc); }
+.evo3 { text-shadow: 0 0 18px var(--tc), 0 0 8px var(--tc), 0 0 2px #fff; }
+.ch { display: inline-block; line-height: 1; }
+.stars { color: var(--gold); font-size: .78em; margin-left: 3px; letter-spacing: -1px; }
+.evo-bar { display: block; width: 80%; height: 6px; border-radius: 999px; background: var(--bg2); overflow: hidden; margin-top: 2px; }
+.evo-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--purple), var(--gold)); }
+.evo-count { font-size: .58rem !important; color: var(--muted); }
+
+.evo-stage {
+  position: relative; height: 230px; overflow: hidden; flex: none;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: radial-gradient(circle at 50% 55%, #3a3060 0%, #1a1530 70%);
+}
+.evo-rays {
+  position: absolute; left: 50%; top: 55%; width: 520px; height: 520px; margin: -260px 0 0 -260px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--tc) 22%, transparent) 0 10deg, transparent 10deg 20deg);
+  border-radius: 50%; opacity: .7;
+}
+.evo-pair { position: absolute; inset: 0; display: grid; place-items: center; }
+.evo-pair span { grid-area: 1 / 1; font-size: 96px; line-height: 1; }
+.evo-old { opacity: 0; }
+.evolve-screen .evo-what { display: none; text-align: center; font-size: 1.1rem; }
+.evolve-screen .evo-done { text-align: center; }
+.evolve-screen p.evo-done { font-size: 1.05rem; }
+.evolve-screen .panel { min-height: 150px; }
+@media (prefers-reduced-motion: no-preference) {
+  .evolve-screen:not(.done) .evo-what { display: block; }
+  .evolve-screen:not(.done) .evo-done { display: none; }
+  .evolve-screen:not(.done) .evo-old { animation: evoFlickA 2.6s linear forwards; }
+  .evolve-screen:not(.done) .evo-new { animation: evoFlickB 2.6s linear forwards; }
+  .evolve-screen.done .evo-new { animation: evoPop .5s cubic-bezier(.2,1.6,.4,1); }
+  .evo-rays { animation: vRays 10s linear infinite; }
+}
+@keyframes evoFlickA {
+  0%, 18% { opacity: 1; filter: brightness(1); } 22%, 30% { opacity: 0; } 34%, 44% { opacity: 1; filter: brightness(3); }
+  48%, 54% { opacity: 0; } 57%, 63% { opacity: 1; } 66%, 70% { opacity: 0; } 72%, 76% { opacity: 1; }
+  78%, 80% { opacity: 0; } 82%, 84% { opacity: 1; } 86%, 100% { opacity: 0; }
+}
+@keyframes evoFlickB {
+  0%, 18% { opacity: 0; } 22%, 30% { opacity: 1; filter: brightness(3); } 34%, 44% { opacity: 0; }
+  48%, 54% { opacity: 1; } 57%, 63% { opacity: 0; } 66%, 70% { opacity: 1; } 72%, 76% { opacity: 0; }
+  78%, 80% { opacity: 1; } 82%, 84% { opacity: 0; } 86%, 100% { opacity: 1; filter: brightness(1); }
+}
+@keyframes evoPop { from { transform: scale(.4); } }
