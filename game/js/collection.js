@@ -49,6 +49,102 @@ export function matchup(fighterType, foeType) {
   return { dealt, taken, edge };
 }
 
+/* ------------------------------------------------------------- evolving --
+   Characters evolve from the maths done with them: every right answer while
+   a character is the one fighting counts toward its next stage. Three stages,
+   and each one hits a little harder, so a favourite is worth building up.
+
+   Emoji only stretch so far. Where a real line exists (an egg-to-bird kind
+   of chain) the picture changes; everything else keeps its picture and
+   gains a new name, a glow in its type's colour, and stars. */
+export const EVOLVE_AT = [0, 60, 200];          // right answers to reach stage 1, 2, 3
+export const STAGE_POWER = [1, 1.1, 1.2];       // damage at stage 1, 2, 3
+export const MAX_STAGE = 3;
+
+export const EVO_CHAINS = {
+  chick:   ['\u{1F425}', '\u{1F414}', '\u{1F99A}'],                   // chick, hen, peacock
+  newt:    ['\u{1F98E}', '\u{1F40A}', '\u{1F409}'],                   // lizard, crocodile, dragon
+  crab:    ['\u{1F980}', '\u{1F99E}', '\u{1F991}'],                   // crab, lobster, squid
+  tiger:   ['\u{1F42F}', '\u{1F405}', '\u{1F405}'],                   // tiger face, tiger
+  bat:     ['\u{1F987}', '\u{1F9DB}', '\u{1F9DB}'],                   // bat, vampire
+  wisp:    ['✨', '⭐', '\u{1F31F}'],                         // sparkles, star, glowing star
+  v_rain:  ['\u{1F327}️', '⛈️', '\u{1F30A}'],          // rain, thunderstorm, wave
+  h_candle:['\u{1F56F}️', '\u{1F525}', '☄️'],          // candle, flame, comet
+  w_snow:  ['⛄', '☃️', '☃️'],                // snowman, snowing snowman
+};
+
+const STAGE_WORDS = {
+  fire:   ['Blaze', 'Inferno'],
+  water:  ['Tide', 'Tsunami'],
+  grass:  ['Wild', 'Ancient'],
+  storm:  ['Thunder', 'Tempest'],
+  light:  ['Bright', 'Radiant'],
+  shadow: ['Dusk', 'Eclipse'],
+};
+
+/** Right answers made with a character. */
+export function xpOf(profile, id) { return (profile.xp && profile.xp[id]) || 0; }
+
+/** The stage a character has actually evolved to (shown on the evolution screen first). */
+export function stageOf(profile, id) {
+  return Math.max(1, Math.min(MAX_STAGE, (profile.stages && profile.stages[id]) || 1));
+}
+
+/** The stage its right answers have earned, which may be ahead of what has been shown. */
+export function earnedStage(profile, id) {
+  const xp = xpOf(profile, id);
+  return EVOLVE_AT.reduce((st, at, i) => (xp >= at ? i + 1 : st), 1);
+}
+
+/** Its name at a stage: "Ember Newt" becomes "Blaze Newt" then "Inferno Newt". */
+export function stageName(c, stage) {
+  if (stage <= 1) return c.name;
+  const word = (STAGE_WORDS[c.type] || STAGE_WORDS.light)[stage - 2];
+  const words = c.name.split(' ');
+  if (words[0] === 'The') return ['The', word, ...words.slice(1)].join(' ');
+  if (words.length >= 2) return [word, ...words.slice(1)].join(' ');
+  return `${word} ${c.name}`;
+}
+
+/** How a character looks for this profile: picture, name, stage, and power. */
+export function formOf(profile, c, stage = stageOf(profile, c.id)) {
+  const chain = EVO_CHAINS[c.id];
+  return {
+    ...c,
+    char: chain ? chain[stage - 1] : c.char,
+    name: stageName(c, stage),
+    stage,
+    power: STAGE_POWER[stage - 1],
+    newPicture: !!(chain && stage > 1 && chain[stage - 1] !== chain[stage - 2]),
+  };
+}
+
+/** Progress toward the next stage, for a bar: { have, need, next } or null at the top. */
+export function evolveProgress(profile, id) {
+  const st = stageOf(profile, id);
+  if (st >= MAX_STAGE) return null;
+  return { have: xpOf(profile, id), need: EVOLVE_AT[st], next: st + 1 };
+}
+
+/** Count a right answer for a character. */
+export function addXp(profile, id) {
+  profile.xp = profile.xp || {};
+  profile.xp[id] = (profile.xp[id] || 0) + 1;
+}
+
+/** Characters whose right answers have earned a stage not yet shown. */
+export function pendingEvolutions(profile) {
+  return Object.keys(profile.xp || {})
+    .filter(id => CHARACTER_BY_ID[id] && earnedStage(profile, id) > stageOf(profile, id))
+    .map(id => ({ id, from: stageOf(profile, id), to: stageOf(profile, id) + 1 }));
+}
+
+/** Evolve one step (the screen calls this as it plays). */
+export function evolve(profile, id) {
+  profile.stages = profile.stages || {};
+  profile.stages[id] = Math.min(MAX_STAGE, stageOf(profile, id) + 1);
+}
+
 /* -------------------------------------------------------------- catching --
    A win is a chance to catch the monster, and the chance is the math: the
    better the fight went, the likelier it joins. A flawless fight is close to

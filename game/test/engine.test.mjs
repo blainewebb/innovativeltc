@@ -17,8 +17,9 @@ import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
          FLOORS_PER_AVATAR, TYPES, typeMult, TYPE_STRONG, TYPE_WEAK, ENEMIES, BOSSES,
          SEASONAL_MONSTERS, ALL_MONSTERS, seasonFor } from '../js/data.js';
-import { CHARACTERS, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
-         TROPHIES, checkTrophies, TEAM_SIZE } from '../js/collection.js';
+import { CHARACTERS, CHARACTER_BY_ID, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
+         TROPHIES, checkTrophies, TEAM_SIZE, EVOLVE_AT, STAGE_POWER, EVO_CHAINS, formOf, stageName,
+         earnedStage, stageOf, pendingEvolutions, evolve, addXp, evolveProgress } from '../js/collection.js';
 import { newProfile } from '../js/storage.js';
 
 /** A drill is either a calculation off the tiles or a written question. */
@@ -1501,6 +1502,48 @@ test('trophies come from the maths, once each', () => {
   assert.ok(p.trophies.level5, 'climbing counts');
   assert.ok(TROPHIES.length >= 20);
   assert.equal(new Set(TROPHIES.map(t => t.id)).size, TROPHIES.length);
+});
+
+/* ---------------------------------------------------------- evolving -- */
+test('characters evolve from right answers, one stage at a time, shown before they count', () => {
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(stageOf(p, 'fox'), 1);
+  for (let i = 0; i < EVOLVE_AT[1] - 1; i++) addXp(p, 'fox');
+  assert.deepEqual(pendingEvolutions(p), [], 'one short');
+  addXp(p, 'fox');
+  assert.deepEqual(pendingEvolutions(p), [{ id: 'fox', from: 1, to: 2 }]);
+  assert.equal(stageOf(p, 'fox'), 1, 'not evolved until the screen plays it');
+  evolve(p, 'fox');
+  assert.equal(stageOf(p, 'fox'), 2);
+  assert.deepEqual(pendingEvolutions(p), []);
+  for (let i = 0; i < 1000; i++) addXp(p, 'fox');
+  assert.equal(earnedStage(p, 'fox'), 3, 'three stages, no more');
+  evolve(p, 'fox'); evolve(p, 'fox');
+  assert.equal(stageOf(p, 'fox'), 3);
+  assert.equal(evolveProgress(p, 'fox'), null, 'fully evolved');
+});
+
+test('evolved names and pictures read well, and only change where a real chain exists', () => {
+  assert.equal(stageName(CHARACTER_BY_ID.newt, 2), 'Blaze Newt');
+  assert.equal(stageName(CHARACTER_BY_ID.newt, 3), 'Inferno Newt');
+  assert.equal(stageName(CHARACTER_BY_ID.fox, 2), 'Blaze Fox');
+  assert.equal(stageName(CHARACTER_BY_ID.king, 3), 'The Radiant Number King');
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(formOf(p, CHARACTER_BY_ID.newt, 3).char, '\u{1F409}', 'lizard to dragon');
+  assert.equal(formOf(p, CHARACTER_BY_ID.fox, 3).char, CHARACTER_BY_ID.fox.char, 'no chain: same picture, glow instead');
+  for (const [id, chain] of Object.entries(EVO_CHAINS)) {
+    assert.ok(CHARACTER_BY_ID[id], `${id} is a real character`);
+    assert.equal(chain.length, 3);
+    assert.equal(chain[0], CHARACTER_BY_ID[id].char, `${id} chain starts at its own picture`);
+  }
+  assert.deepEqual(STAGE_POWER, [1, 1.1, 1.2], 'a little stronger, not a lot');
+  assert.equal(formOf(p, CHARACTER_BY_ID.fox, 2).power, 1.1);
+});
+
+test('an evolved fighter hits harder through the same damage formula', () => {
+  const base = { result: 30, op: '+', ward: 'none', resist: 'none', resistAt: 0, armor: 0, relics: [], combo: 0, ms: 3000, isFirstHit: false };
+  assert.equal(computeDamage(base).damage, 30);
+  assert.equal(computeDamage({ ...base, typeMult: STAGE_POWER[2] }).damage, 36);
 });
 
 console.log(`${passed} engine tests passed`);

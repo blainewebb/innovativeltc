@@ -353,6 +353,28 @@ mix of matchups): the primary clear rate is unchanged at about 70%, and 8th
 grade is 52% over four runs against 55% before. A kid who always switches
 to the strong matchup will find it easier, which is the point.
 
+## Evolving
+
+Every right answer a character makes while it is the one fighting counts
+toward evolving it: 60 right answers for stage 2, 200 for stage 3. Each
+stage hits a little harder (1.1x, then 1.2x, on top of the type matchup),
+which is the reason to stick with a favourite and build it up.
+
+After the fight, it evolves on a screen of its own, Pokemon style: "What?
+Ember Newt is evolving!", a flicker between the old and new forms that
+speeds up, then the new one holds. It counts from that screen, not before,
+so nothing changes mid-fight without the kid seeing it. An evolution earned
+but never shown (the app closed mid-fight) plays the next time camp opens.
+
+Emoji only stretch so far. Nine characters have a real line where the
+picture changes (chick, hen, peacock; lizard, crocodile, dragon; crab,
+lobster, squid; tiger face, tiger; bat, vampire; sparkle, star, glowing
+star; rain cloud, thunderstorm, wave; candle, flame, comet; snowman,
+snowing snowman). Everything else keeps its picture and gets a new name
+by type (Ember Newt to Blaze Newt to Inferno Newt; Fox to Blaze Fox), a
+glow in its type's colour, and stars. The team screen shows a bar of right
+answers toward the next stage.
+
 ## Seasons
 
 By the device's date: October is **Halloween**, November **Thanksgiving**,

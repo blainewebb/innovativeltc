@@ -293,6 +293,9 @@ try {
       await page.click('#wear');
     } else if (await page.$('#next')) {
       await page.click('#next');
+    } else if (await page.$('#evoOk')) {          // a character evolved
+      seen.add('evolved');
+      await page.click('#evoOk');
     } else if (await page.$('#cont')) {
       seen.add('victory');
       await page.click('#cont');
@@ -353,6 +356,7 @@ try {
   ok('heroes are earned along the way', seen.has('avatar-earned'), [...seen].join(','));
   ok('saw the map', seen.has('map'));
   ok('saw a victory screen', seen.has('victory'));
+  ok('a character evolved from the maths done with it', seen.has('evolved'));
   ok('saw a boss node', seen.has('node:boss'), [...seen].join(','));
   ok('saw a non-combat node', [...seen].some(t => /^node:(riddle|treasure|shop|rest)$/.test(t)), [...seen].join(','));
   // If the bot is mostly guessing at written problems, the clear rate below is
