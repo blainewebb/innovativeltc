@@ -7,7 +7,7 @@
 /* Shown on the picker so "is this the new version?" is a thing you read
    rather than infer from which buttons exist. Bump it with any change worth
    telling a device about, alongside CACHE in sw.js. */
-export const VERSION = '2026-09-23.2';
+export const VERSION = '2026-10-03.1';
 
 export const SKILLS = [
   { id: 'add_small',  label: 'Adding to 20',        op: '+', tier: 1 },
@@ -58,28 +58,54 @@ export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
    encouragement is worth something. */
 export const FLOORS_PER_AVATAR = 5;
 
-export const AVATARS = [
-  { id: 'mage',    char: '\u{1F9D9}', name: 'Mage',      at: 0 },
-  { id: 'elf',     char: '\u{1F9DD}', name: 'Elf',       at: 0 },
-  { id: 'vampire', char: '\u{1F9DB}', name: 'Vampire',   at: 0 },
-  { id: 'robot',   char: '\u{1F916}', name: 'Robot',     at: 0 },
-  { id: 'fox',     char: '\u{1F98A}', name: 'Fox',       at: 0 },
-  { id: 'tiger',   char: '\u{1F42F}', name: 'Tiger',     at: 0 },
-  { id: 'dragon',  char: '\u{1F409}', name: 'Dragon',    at: 0 },
-  { id: 'unicorn', char: '\u{1F984}', name: 'Unicorn',   at: 0 },
+/* ----------------------------------------------------------------- types --
+   Every hero and monster has one, Pokemon style. Water puts out Fire, Fire
+   burns Grass, Grass grounds Storm, Storm zaps Water; Light and Shadow hit
+   each other hard. A strong matchup hits for half again as much, a weak one
+   for three quarters. It works both ways, so picking the right fighter for
+   the monster in front of you is a real choice. */
+export const TYPES = {
+  fire:   { id: 'fire',   name: 'Fire',   icon: '\u{1F525}', beats: ['grass'] },
+  water:  { id: 'water',  name: 'Water',  icon: '\u{1F4A7}', beats: ['fire'] },
+  grass:  { id: 'grass',  name: 'Grass',  icon: '\u{1F33F}', beats: ['storm'] },
+  storm:  { id: 'storm',  name: 'Storm',  icon: '⚡',    beats: ['water'] },
+  light:  { id: 'light',  name: 'Light',  icon: '☀️', beats: ['shadow'] },
+  shadow: { id: 'shadow', name: 'Shadow', icon: '\u{1F319}', beats: ['light'] },
+};
+export const TYPE_STRONG = 1.5;
+export const TYPE_WEAK = 0.75;
 
-  { id: 'wolf',    char: '\u{1F43A}', name: 'Wolf',      at: 5 },
-  { id: 'owl',     char: '\u{1F989}', name: 'Owl',       at: 10 },
-  { id: 'bear',    char: '\u{1F43B}', name: 'Bear',      at: 15 },
-  { id: 'eagle',   char: '\u{1F985}', name: 'Eagle',     at: 20 },
-  { id: 'shark',   char: '\u{1F988}', name: 'Shark',     at: 25 },
-  { id: 'kraken',  char: '\u{1F419}', name: 'Kraken',    at: 30 },
-  { id: 'ghost',   char: '\u{1F47B}', name: 'Ghost',     at: 35 },
-  { id: 'raptor',  char: '\u{1F996}', name: 'Raptor',    at: 40 },
-  { id: 'revenant',char: '\u{1F9DF}', name: 'Revenant',  at: 45 },
-  { id: 'wyrm',    char: '\u{1F432}', name: 'Wyrm',      at: 50 },
-  { id: 'visitor', char: '\u{1F47D}', name: 'Visitor',   at: 55 },
-  { id: 'lion',    char: '\u{1F981}', name: 'Lion',      at: 60 },
+/** Damage multiplier when a fighter of type `att` hits one of type `def`. */
+export function typeMult(att, def) {
+  const a = TYPES[att], d = TYPES[def];
+  if (!a || !d) return 1;
+  if (a.beats.includes(def)) return TYPE_STRONG;
+  if (d.beats.includes(att)) return TYPE_WEAK;
+  return 1;
+}
+
+export const AVATARS = [
+  { id: 'mage',    char: '\u{1F9D9}', name: 'Mage',      at: 0, type: 'light' },
+  { id: 'elf',     char: '\u{1F9DD}', name: 'Elf',       at: 0, type: 'grass' },
+  { id: 'vampire', char: '\u{1F9DB}', name: 'Vampire',   at: 0, type: 'shadow' },
+  { id: 'robot',   char: '\u{1F916}', name: 'Robot',     at: 0, type: 'storm' },
+  { id: 'fox',     char: '\u{1F98A}', name: 'Fox',       at: 0, type: 'fire' },
+  { id: 'tiger',   char: '\u{1F42F}', name: 'Tiger',     at: 0, type: 'grass' },
+  { id: 'dragon',  char: '\u{1F409}', name: 'Dragon',    at: 0, type: 'fire' },
+  { id: 'unicorn', char: '\u{1F984}', name: 'Unicorn',   at: 0, type: 'light' },
+
+  { id: 'wolf',    char: '\u{1F43A}', name: 'Wolf',      at: 5, type: 'storm' },
+  { id: 'owl',     char: '\u{1F989}', name: 'Owl',       at: 10, type: 'shadow' },
+  { id: 'bear',    char: '\u{1F43B}', name: 'Bear',      at: 15, type: 'grass' },
+  { id: 'eagle',   char: '\u{1F985}', name: 'Eagle',     at: 20, type: 'storm' },
+  { id: 'shark',   char: '\u{1F988}', name: 'Shark',     at: 25, type: 'water' },
+  { id: 'kraken',  char: '\u{1F419}', name: 'Kraken',    at: 30, type: 'water' },
+  { id: 'ghost',   char: '\u{1F47B}', name: 'Ghost',     at: 35, type: 'shadow' },
+  { id: 'raptor',  char: '\u{1F996}', name: 'Raptor',    at: 40, type: 'grass' },
+  { id: 'revenant',char: '\u{1F9DF}', name: 'Revenant',  at: 45, type: 'shadow' },
+  { id: 'wyrm',    char: '\u{1F432}', name: 'Wyrm',      at: 50, type: 'water' },
+  { id: 'visitor', char: '\u{1F47D}', name: 'Visitor',   at: 55, type: 'light' },
+  { id: 'lion',    char: '\u{1F981}', name: 'Lion',      at: 60, type: 'fire' },
 ];
 
 export const AVATAR_BY_CHAR = Object.fromEntries(AVATARS.map(a => [a.char, a]));
@@ -184,40 +210,126 @@ export const RESISTS = {
    armorFrac armor as a share of the player's best realistic hit
    intents   the telegraphed move cycle; `w` weights an attack's damage
 */
+/* Mechanics come in a handful of shapes (a soft opener, a jammer, an armored
+   brute, a healer, a shield knight, a heavy hitter) so new monsters can be
+   added for variety without each one needing its own balance pass. Health
+   is never written here: spawnEnemy budgets it from what the player can hit
+   for, so every one of these is a 3-5 turn fight at any level. */
+const SHAPES = {
+  soft:   { hpW: 0.85, armorFrac: 0,    resist: ['none', 'none', 'under'],
+            intents: [{ type: 'attack', w: 0.9 }, { type: 'attack', w: 1.1 }] },
+  jammer: { hpW: 0.75, armorFrac: 0,    resist: ['none', 'over'],
+            intents: [{ type: 'attack', w: 0.8 }, { type: 'jam' }, { type: 'attack', w: 0.95 }] },
+  brute:  { hpW: 1.15, armorFrac: 0.22, resist: ['over', 'cap'],
+            intents: [{ type: 'attack', w: 1 }, { type: 'armorUp' }, { type: 'attack', w: 1.2 }] },
+  healer: { hpW: 0.9,  armorFrac: 0.08, resist: ['over', 'none'],
+            intents: [{ type: 'attack', w: 0.9 }, { type: 'heal' }] },
+  knight: { hpW: 1.2,  armorFrac: 0.3,  resist: ['cap', 'over'],
+            intents: [{ type: 'attack', w: 1 }, { type: 'shield' }, { type: 'bigAttack', w: 1.8 }] },
+  heavy:  { hpW: 1.3,  armorFrac: 0.15, resist: ['over', 'under'],
+            intents: [{ type: 'attack', w: 1 }, { type: 'jam' }, { type: 'bigAttack', w: 1.6 }] },
+};
+
+const monster = (id, name, art, type, tier, shape, ward, extra = {}) =>
+  ({ id, name, art, type, tier, shape, ward, ...SHAPES[shape], ...extra });
+
 export const ENEMIES = [
-  { id: 'slime', name: 'Digit Slime', art: '\u{1F7E2}', tier: 1,
-    hpW: 0.85, armorFrac: 0, ward: ['none', 'even'], resist: ['none', 'none', 'under'],
-    intents: [{ type: 'attack', w: 0.9 }, { type: 'attack', w: 1.1 }] },
-
-  { id: 'bat', name: 'Tally Bat', art: '\u{1F987}', tier: 1,
-    hpW: 0.7, armorFrac: 0, ward: ['odd', 'small'], resist: ['none', 'over'],
-    intents: [{ type: 'attack', w: 0.7 }, { type: 'jam' }, { type: 'attack', w: 0.9 }] },
-
-  { id: 'golem', name: 'Abacus Golem', art: '\u{1F5FF}', tier: 2,
-    hpW: 1.15, armorFrac: 0.22, ward: ['five', 'ten'], resist: ['over', 'cap'],
-    intents: [{ type: 'attack', w: 1 }, { type: 'armorUp' }, { type: 'attack', w: 1.2 }] },
-
-  { id: 'wisp', name: 'Carry Wisp', art: '\u2728', tier: 2,
-    hpW: 0.9, armorFrac: 0.08, ward: ['three', 'twoDigit'], resist: ['over', 'none'],
-    intents: [{ type: 'attack', w: 0.9 }, { type: 'heal' }] },
-
-  { id: 'knight', name: 'Remainder Knight', art: '\u{1F6E1}\uFE0F', tier: 3,
-    hpW: 1.2, armorFrac: 0.3, ward: ['square', 'ten'], resist: ['cap', 'over'],
-    intents: [{ type: 'attack', w: 1 }, { type: 'shield' }, { type: 'bigAttack', w: 1.8 }] },
-
-  { id: 'hydra', name: 'Fraction Hydra', art: '\u{1F409}', tier: 3,
-    hpW: 1.3, armorFrac: 0.15, ward: ['even', 'five'], resist: ['over', 'under'],
-    intents: [{ type: 'attack', w: 1 }, { type: 'jam' }, { type: 'bigAttack', w: 1.6 }] },
+  // tier 1: floors 1-3
+  monster('slime',   'Digit Slime',      '\u{1F7E2}', 'grass',  1, 'soft',   ['none', 'even']),
+  monster('bat',     'Tally Bat',        '\u{1F987}', 'shadow', 1, 'jammer', ['odd', 'small'], { hpW: 0.7 }),
+  monster('newt',    'Ember Newt',       '\u{1F98E}', 'fire',   1, 'soft',   ['none', 'five']),
+  monster('crab',    'Bubble Crab',      '\u{1F980}', 'water',  1, 'soft',   ['none', 'ten'], { hpW: 0.9, armorFrac: 0.05 }),
+  monster('mouse',   'Spark Mouse',      '\u{1F42D}', 'storm',  1, 'jammer', ['even', 'small']),
+  monster('chick',   'Sunny Chick',      '\u{1F425}', 'light',  1, 'soft',   ['odd', 'none']),
+  // tier 2: floors 4-6
+  monster('golem',   'Abacus Golem',     '\u{1F5FF}', 'grass',  2, 'brute',  ['five', 'ten']),
+  monster('wisp',    'Carry Wisp',       '✨',    'light',  2, 'healer', ['three', 'twoDigit']),
+  monster('bee',     'Buzz Multiplier',  '\u{1F41D}', 'storm',  2, 'jammer', ['odd', 'three'], { hpW: 0.85, armorFrac: 0.05 }),
+  monster('turtle',  'Tide Turtle',      '\u{1F422}', 'water',  2, 'brute',  ['even', 'ten'], { hpW: 1.1 }),
+  monster('toad',    'Lava Toad',        '\u{1F438}', 'fire',   2, 'healer', ['five', 'twoDigit']),
+  monster('rat',     'Borrow Rat',       '\u{1F400}', 'shadow', 2, 'jammer', ['even', 'three']),
+  // tier 3: floors 7 and up
+  monster('knight',  'Remainder Knight', '\u{1F6E1}️', 'light', 3, 'knight', ['square', 'ten']),
+  monster('hydra',   'Fraction Hydra',   '\u{1F40D}', 'water',  3, 'heavy',  ['even', 'five']),
+  monster('scorpion','Quotient Scorpion','\u{1F982}', 'fire',   3, 'heavy',  ['odd', 'square']),
+  monster('panther', 'Shadow Panther',   '\u{1F406}', 'shadow', 3, 'knight', ['three', 'ten'], { hpW: 1.15, armorFrac: 0.2 }),
+  monster('bison',   'Thunder Bison',    '\u{1F9AC}', 'storm',  3, 'brute',  ['ten', 'five'], { hpW: 1.25, armorFrac: 0.25 }),
+  monster('cactus',  'Cactus Counter',   '\u{1F335}', 'grass',  3, 'knight', ['square', 'odd']),
 ];
+
+const bossShape = (intents, extra = {}) => ({ boss: true, hpW: 1, armorFrac: 0.24, resist: ['cap', 'over'], intents, ...extra });
+const B_SHIELD = [{ type: 'attack', w: 1 }, { type: 'shield' }, { type: 'armorUp' }, { type: 'bigAttack', w: 1.7 }];
+const B_JAM = [{ type: 'jam' }, { type: 'attack', w: 1.1 }, { type: 'shield' }, { type: 'bigAttack', w: 1.6 }];
+const B_HEAL = [{ type: 'attack', w: 1 }, { type: 'heal' }, { type: 'attack', w: 1.1 }, { type: 'bigAttack', w: 1.6 }];
 
 export const BOSSES = [
-  { id: 'king', name: 'The Number King', art: '\u{1F451}', boss: true,
-    hpW: 1, armorFrac: 0.28, ward: ['ten', 'square'], resist: ['cap', 'over'],
-    intents: [{ type: 'attack', w: 1 }, { type: 'shield' }, { type: 'armorUp' }, { type: 'bigAttack', w: 1.7 }] },
-  { id: 'scribe', name: 'The Zero Scribe', art: '\u{1F4DC}', boss: true,
-    hpW: 1, armorFrac: 0.2, ward: ['odd', 'three'], resist: ['over', 'cap'],
-    intents: [{ type: 'jam' }, { type: 'attack', w: 1.1 }, { type: 'shield' }, { type: 'bigAttack', w: 1.6 }] },
+  { id: 'king',   name: 'The Number King', art: '\u{1F451}', type: 'light',  ward: ['ten', 'square'], ...bossShape(B_SHIELD, { armorFrac: 0.28 }) },
+  { id: 'scribe', name: 'The Zero Scribe', art: '\u{1F4DC}', type: 'shadow', ward: ['odd', 'three'],  ...bossShape(B_JAM, { armorFrac: 0.2, resist: ['over', 'cap'] }) },
+  { id: 'lavalord', name: 'The Lava Lord', art: '\u{1F30B}', type: 'fire',   ward: ['even', 'five'], ...bossShape(B_SHIELD) },
+  { id: 'whale',  name: 'The Deep Whale',  art: '\u{1F40B}', type: 'water',  ward: ['ten', 'odd'],   ...bossShape(B_HEAL) },
+  { id: 'sultan', name: 'The Storm Sultan', art: '\u{1F32A}️', type: 'storm', ward: ['three', 'square'], ...bossShape(B_JAM) },
+  { id: 'giant',  name: 'The Grove Giant', art: '\u{1F333}', type: 'grass',  ward: ['five', 'even'], ...bossShape(B_HEAL, { armorFrac: 0.28 }) },
 ];
+
+/* ------------------------------------------------------------- seasons --
+   By the device's date. In season, about half the monsters met are from the
+   season's set, and so is about half of the bosses. Anything caught stays
+   for good; a set nobody finished comes back next year. */
+export const SEASONS = [
+  { id: 'halloween', name: 'Halloween',    icon: '\u{1F383}', month: 10, until: 'October 31',
+    blurb: 'Spooky monsters are out' },
+  { id: 'harvest',   name: 'Thanksgiving', icon: '\u{1F983}', month: 11, until: 'November 30',
+    blurb: 'Harvest monsters are out' },
+  { id: 'winter',    name: 'Christmas',    icon: '\u{1F384}', month: 12, until: 'December 31',
+    blurb: 'Winter monsters are out' },
+];
+export const SEASON_BY_ID = Object.fromEntries(SEASONS.map(x => [x.id, x]));
+
+/** The season a date falls in, or null. `override` ('none' or an id) wins. */
+export function seasonFor(date = new Date(), override = null) {
+  if (override === 'none') return null;
+  if (override && SEASON_BY_ID[override]) return SEASON_BY_ID[override];
+  return SEASONS.find(x => x.month === date.getMonth() + 1) || null;
+}
+
+const seasonal = (season, ...args) => ({ ...monster(...args), season });
+export const SEASONAL_MONSTERS = [
+  seasonal('halloween', 'h_jack',    "Jack-o'-Brute",  '\u{1F383}', 'fire',   1, 'soft',   ['none', 'odd']),
+  seasonal('halloween', 'h_candy',   'Candy Mimic',    '\u{1F36C}', 'light',  1, 'soft',   ['even', 'none']),
+  seasonal('halloween', 'h_spider',  'Web Spinner',    '\u{1F577}️', 'shadow', 1, 'jammer', ['odd', 'small']),
+  seasonal('halloween', 'h_imp',     'Toadstool Imp',  '\u{1F344}', 'grass',  1, 'jammer', ['even', 'five']),
+  seasonal('halloween', 'h_candle',  'Candle Wraith',  '\u{1F56F}️', 'fire', 2, 'healer', ['three', 'twoDigit']),
+  seasonal('halloween', 'h_ooze',    'Potion Ooze',    '\u{1F9EA}', 'water',  2, 'healer', ['even', 'ten']),
+  seasonal('halloween', 'h_cat',     'Static Cat',     '\u{1F408}‍⬛', 'storm', 2, 'jammer', ['odd', 'three']),
+  seasonal('halloween', 'h_skull',   'Bone Adder',     '\u{1F480}', 'shadow', 2, 'brute',  ['five', 'ten']),
+  seasonal('halloween', 'h_witch',   'Hex Witch',      '\u{1F9D9}‍♀️', 'light', 3, 'heavy', ['square', 'odd']),
+  { ...bossShape(B_JAM), id: 'h_count', name: 'Count Calculus', art: '\u{1F9DB}‍♂️', type: 'shadow',
+    ward: ['odd', 'square'], season: 'halloween' },
+
+  seasonal('harvest', 'v_leaf',     'Leaf Sprite',    '\u{1F342}', 'grass',  1, 'soft',   ['none', 'even']),
+  seasonal('harvest', 'v_maple',    'Maple Wisp',     '\u{1F341}', 'fire',   1, 'soft',   ['odd', 'none']),
+  seasonal('harvest', 'v_squirrel', 'Acorn Bandit',   '\u{1F43F}️', 'storm', 1, 'jammer', ['even', 'small']),
+  seasonal('harvest', 'v_corn',     'Corn Golem',     '\u{1F33D}', 'grass',  2, 'brute',  ['five', 'ten']),
+  seasonal('harvest', 'v_pie',      'Pie Mimic',      '\u{1F967}', 'fire',   2, 'healer', ['three', 'twoDigit']),
+  seasonal('harvest', 'v_rain',     'Rain Cloud',     '\u{1F327}️', 'water', 2, 'healer', ['even', 'ten']),
+  seasonal('harvest', 'v_apple',    'Apple Knocker',  '\u{1F34E}', 'water',  3, 'knight', ['square', 'ten']),
+  { ...bossShape(B_HEAL), id: 'v_turkey', name: 'The Turkey Titan', art: '\u{1F983}', type: 'light',
+    ward: ['ten', 'even'], season: 'harvest' },
+
+  seasonal('winter', 'w_frost',     'Frost Wisp',     '❄️', 'water', 1, 'soft', ['none', 'even']),
+  seasonal('winter', 'w_gift',      'Gift Mimic',     '\u{1F381}', 'light',  1, 'soft',   ['odd', 'none']),
+  seasonal('winter', 'w_pine',      'Pine Sentry',    '\u{1F332}', 'grass',  1, 'jammer', ['even', 'five']),
+  seasonal('winter', 'w_snow',      'Snow Brute',     '⛄',    'water',  2, 'brute',  ['five', 'ten']),
+  seasonal('winter', 'w_cookie',    'Cookie Knight',  '\u{1F36A}', 'fire',   2, 'healer', ['three', 'twoDigit']),
+  seasonal('winter', 'w_reindeer',  'Reindeer Racer', '\u{1F98C}', 'storm',  2, 'jammer', ['odd', 'three']),
+  seasonal('winter', 'w_ice',       'Ice Golem',      '\u{1F9CA}', 'water',  3, 'knight', ['square', 'ten']),
+  seasonal('winter', 'w_star',      'Candle Star',    '\u{1F31F}', 'light',  3, 'heavy',  ['even', 'square']),
+  { ...bossShape(B_SHIELD), id: 'w_frostking', name: 'The Frost King', art: '☃️', type: 'water',
+    ward: ['ten', 'square'], season: 'winter' },
+];
+
+export const ALL_MONSTERS = [...ENEMIES, ...BOSSES, ...SEASONAL_MONSTERS];
+export const MONSTER_BY_ID = Object.fromEntries(ALL_MONSTERS.map(m => [m.id, m]));
 
 /* ---------------------------------------------------------------- relics --
    Run-scoped items. `hooks` are read by the battle engine.

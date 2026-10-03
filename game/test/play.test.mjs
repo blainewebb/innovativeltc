@@ -236,17 +236,36 @@ try {
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForSelector('#startRun');
   const nextHeroLine = await page.$eval('.hero-row', e => e.textContent);
-  ok('the hub says how close the next hero is', /Next hero: .* in 1 floor\b/.test(nextHeroLine), nextHeroLine);
+  ok('the hub says how close the next hero is', /next hero in 1 floor\b/i.test(nextHeroLine), nextHeroLine);
 
+  /* ---- team and Monster Book ---- */
   await page.click('#looksBtn');
-  await page.waitForSelector('.look');
-  ok('the look picker shows all twenty', (await page.$$('.look')).length === 20);
-  ok('twelve of them are still locked', (await page.$$('.look.locked')).length === 12);
-  ok('a locked one says what it costs', /floors/.test(await page.$eval('.look.locked small', e => e.textContent)));
-  const secondLook = await page.$$eval('[data-look]', els => els[1]?.dataset.look);
-  await page.click(`[data-look="${secondLook}"]`);
+  await page.waitForSelector('.team-slots');
+  const heroCards = await page.$$eval('.looks', els => {
+    const h = els[0];
+    return { all: h.querySelectorAll('.look').length, locked: h.querySelectorAll('.look.locked').length };
+  });
+  ok('the book lists all twenty heroes', heroCards.all === 20, JSON.stringify(heroCards));
+  ok('twelve heroes are still locked', heroCards.locked === 12, JSON.stringify(heroCards));
+  ok('a locked hero says what it costs', /floors/.test(await page.$eval('.look.locked small', e => e.textContent)));
+  const bookText = await page.$eval('.panel', e => e.textContent);
+  ok('the book counts monsters caught', /Caught 0 of \d+/.test(bookText), bookText.slice(0, 200));
+  ok('uncaught monsters show their type but not their face', (await page.$$('.look.locked .lt')).length > 20);
+  ok('seasonal monsters say when they appear', /October only/.test(bookText));
+  const secondLook = await page.$$eval('[data-pick]', els => els.find(e => !e.classList.contains('on'))?.dataset.pick);
+  await page.click(`[data-pick="${secondLook}"]`);
+  await page.waitForSelector('.slot-card:not(.empty):nth-child(2)');
+  ok('picking an earned hero adds it to the team', (await page.$$('.slot-card:not(.empty)')).length === 2);
+  await page.click(`[data-lead="${secondLook}"]`);
   await page.waitForTimeout(100);
-  ok('picking an earned hero changes it', (await page.$eval('.look.on', e => e.dataset.look)) === secondLook);
+  ok('a team member can be made lead', (await page.$eval('.slot-card.lead [data-lead]', e => e.dataset.lead)) === secondLook);
+  await page.click('#done');
+  await page.waitForSelector('#startRun');
+  ok('the hub shows the new lead', (await page.$eval('#looksBtn', e => e.textContent.trim())).length > 0);
+
+  await page.click('#trophyBtn');
+  await page.waitForSelector('.trophy-grid');
+  ok('the trophy case lists every trophy, locked ones included', (await page.$$('.trophy')).length >= 20);
   await page.click('#done');
   await page.waitForSelector('#startRun');
 
@@ -559,6 +578,15 @@ try {
   await fxPage.click('.grade[data-grade="4"]');
   await fxPage.click('#createProfile');
   await fxPage.waitForSelector('#startRun');
+  // A team of three, so switching can be tested in the fight.
+  await fxPage.click('#looksBtn');
+  await fxPage.waitForSelector('.team-slots');
+  for (const id of ['elf', 'fox']) {
+    if (!(await fxPage.$(`[data-pick="${id}"].on`))) await fxPage.click(`[data-pick="${id}"]`);
+  }
+  ok('a team can hold three', (await fxPage.$$('.slot-card:not(.empty)')).length === 3);
+  await fxPage.click('#done');
+  await fxPage.waitForSelector('#startRun');
   await fxPage.click('#startRun');
   await fxPage.waitForSelector('.node');
   for (let i = 0; i < 6 && !(await fxPage.$('.hand')); i++) {
@@ -573,6 +601,20 @@ try {
   ok('the battle shows both fighters on a field',
      !!(await fxPage.$('.field #heroSprite')) && !!(await fxPage.$('.field #foeSprite')));
   ok('both fighters have a health bar', !!(await fxPage.$('#heroHp')) && !!(await fxPage.$('#foeHp')));
+
+  /* ---- types and switching ---- */
+  const typeIcons = ['\u{1F525}', '\u{1F4A7}', '\u{1F33F}', '\u26A1', '\u2600\uFE0F', '\u{1F319}'];
+  const foeName = await fxPage.$eval('.ibox.foe .nm', e => e.textContent);
+  ok('the monster shows its type', typeIcons.some(i => foeName.includes(i)), foeName);
+  ok('the log says what type it is and how the matchup looks',
+     /(Fire|Water|Grass|Storm|Light|Shadow)\)/.test(await fxPage.$eval('.log', e => e.textContent)));
+  ok('the team is in the top bar during a fight', (await fxPage.$$('.tchip')).length === 3);
+  const before = await fxPage.$eval('#heroSprite', e => e.textContent);
+  await fxPage.click('.tchip:not(.on)');
+  const after = await fxPage.$eval('#heroSprite', e => e.textContent);
+  ok('tapping a team member switches fighter', before !== after, `${before} -> ${after}`);
+  ok('switching says so in the log', /Go, /.test(await fxPage.$eval('.log', e => e.textContent)));
+  ok('switching does not end the turn', !!(await fxPage.$('.hand')));
 
   await buildLegalExpression(fxPage);
   const fxExpr = await readExpression(fxPage);
@@ -643,6 +685,8 @@ try {
     ok('the hero stands on the stage', (await fxPage.$eval('.vhero', e => e.textContent)).length > 0);
     const recap = await fxPage.$eval('.recap', e => e.textContent);
     ok('the win recaps the maths in that fight', /\d+ right/.test(recap) && /\d+ wrong/.test(recap), recap);
+    const catchText = await fxPage.$eval('.catch-line', e => e.textContent).catch(() => '');
+    ok('a win tries to catch the monster', /Gotcha|got away|already in your Monster Book/.test(catchText), catchText);
     ok('the scene is still playing at first', !(await fxPage.$('.win-scene.done')));
     await fxPage.click('#cont', { force: true });
     ok('an early tap finishes the scene instead of leaving it', !!(await fxPage.$('.win-scene.done')));
@@ -653,6 +697,25 @@ try {
     ok('a win gets a victory banner', false, 'no win scene after the knockout');
   }
   await fxPage.close();
+
+  /* ---- seasons ---- */
+  const seasonPage = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  seasonPage.on('pageerror', e => errors.push(e.message));
+  await seasonPage.goto(URL + '?season=winter', { waitUntil: 'networkidle' });
+  await seasonPage.waitForSelector('#startRun, .profile-card, #newName');
+  // Each page here is a fresh browser profile, so make a hero first.
+  if (!(await seasonPage.$('#startRun'))) {
+    await seasonPage.fill('#newName', 'Frost');
+    await seasonPage.click('#createProfile');
+    await seasonPage.waitForSelector('#startRun');
+  }
+  ok('a season themes the whole game', (await seasonPage.evaluate(() => document.body.dataset.season)) === 'winter');
+  const banner = await seasonPage.$eval('.season-banner', e => e.textContent).catch(() => '');
+  ok('the camp says which season it is and how many are caught', /Christmas season/.test(banner) && /Caught \d+ of \d+/.test(banner), banner);
+  await seasonPage.goto(URL + '?season=none', { waitUntil: 'networkidle' });
+  await seasonPage.waitForSelector('#startRun');
+  ok('out of season there is no banner', !(await seasonPage.$('.season-banner')));
+  await seasonPage.close();
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {

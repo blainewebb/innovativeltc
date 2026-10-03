@@ -2,6 +2,7 @@
    Everything stays in localStorage. Nothing is sent anywhere. */
 
 import { blankMastery } from './engine.js';
+import { AVATAR_BY_CHAR, MONSTER_BY_ID } from './data.js';
 
 const KEY = 'runebreaker.v1';
 
@@ -46,6 +47,12 @@ export function newProfile(name, avatar, grade = 0) {
     id: `p${Date.now()}${Math.floor(Math.random() * 1000)}`,
     name,
     avatar,
+    /* Who they play as. heroId names a character (an earned hero or a caught
+       monster); avatar is kept as its picture, which the older screens use. */
+    heroId: AVATAR_BY_CHAR[avatar]?.id || 'mage',
+    party: [],
+    caught: [],
+    trophies: {},
     /* A starting point for difficulty, not a setting. Its influence fades as
        the child's own answers accumulate. 0 means it was never asked. */
     grade,
@@ -55,7 +62,8 @@ export function newProfile(name, avatar, grade = 0) {
     /* Per hero, so a kid who freezes under a clock can have drills off
        without changing anything for their brother. */
     prefs: { drills: true },
-    records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0, floorsBeaten: 0 },
+    records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0, floorsBeaten: 0,
+               fightsWon: 0, bestStreak: 0, flawlessFights: 0, flawlessBosses: 0, fastAnswers: 0 },
     /* One entry per day the kid played: { date:'YYYY-MM-DD', ms, correct, wrong } */
     days: [],
   };
@@ -75,6 +83,13 @@ export function normalizeProfile(raw) {
     grade: Number(raw.grade) || 0,
     meta: { ...base.meta, ...(raw.meta || {}) },
     prefs: { ...base.prefs, ...(raw.prefs || {}) },
+    heroId: typeof raw.heroId === 'string' && raw.heroId ? raw.heroId : base.heroId,
+    party: Array.isArray(raw.party) ? raw.party.filter(x => typeof x === 'string').slice(0, 3) : [],
+    // Only monsters that still exist, so a renamed one cannot leave a blank card.
+    caught: Array.isArray(raw.caught) ? [...new Set(raw.caught.filter(id => MONSTER_BY_ID[id]))] : [],
+    trophies: raw.trophies && typeof raw.trophies === 'object' && !Array.isArray(raw.trophies)
+      ? Object.fromEntries(Object.entries(raw.trophies).filter(([, v]) => Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]))
+      : {},
     records: (() => {
       const r = { ...base.records, ...(raw.records || {}) };
       /* Heroes from before avatars were earned should not read as zero. Credit

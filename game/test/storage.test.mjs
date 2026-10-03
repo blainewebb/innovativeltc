@@ -201,4 +201,26 @@ test('an existing floor count is never overwritten by the fallback', () => {
   assert.equal(hero.records.floorsBeaten, 40);
 });
 
+test('a save from before the collection gains a team, a book and a trophy case', () => {
+  const old = heroWithHistory();
+  delete old.heroId; delete old.party; delete old.caught; delete old.trophies;
+  const p = normalizeProfile(JSON.parse(JSON.stringify(old)));
+  assert.equal(p.heroId, 'dragon', 'the picked avatar becomes the lead');
+  assert.deepEqual(p.caught, []);
+  assert.deepEqual(p.party, []);
+  assert.deepEqual(p.trophies, {});
+  assert.equal(p.records.floorsBeaten, 47, 'nothing else is lost');
+});
+
+test('the collection survives a round trip, and junk in it is dropped', () => {
+  const before = heroWithHistory();
+  before.caught = ['slime', 'h_jack', 'not_a_monster', 'slime'];
+  before.party = ['dragon', 'slime', 42];
+  before.trophies = { first_win: 1700000000000, junk: 'yesterday' };
+  const [after] = parseImport(JSON.stringify(exportPayload([before])));
+  assert.deepEqual(after.caught, ['slime', 'h_jack']);
+  assert.deepEqual(after.party, ['dragon', 'slime']);
+  assert.deepEqual(after.trophies, { first_win: 1700000000000 });
+});
+
 console.log(`${passed} storage tests passed`);
