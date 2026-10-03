@@ -1,7 +1,7 @@
 /* Runebreaker — pure game logic. No DOM, no localStorage.
    Everything here is deterministic given a seed, so it can be unit tested. */
 
-import { SKILLS, SKILL_BY_ID, classify, factKey, WARDS, RESISTS, ENEMIES, BOSSES,
+import { SKILLS, SKILL_BY_ID, classify, factKey, WARDS, RESISTS, ENEMIES, BOSSES, SEASONAL_MONSTERS,
          RELICS, RELIC_BY_ID, RIDDLES, GRADES, GRADE_BY_ID, ASKED, ASKED_SKILLS,
          simplifyFraction } from './data.js';
 
@@ -536,7 +536,7 @@ export function legalPlays(tiles, runes) {
    Order: raw result -> relic flat/op bonuses -> ward multiplier -> combo
    -> subtract armor. Armor last so a ward can punch through it, which is the
    whole reason a smaller ward-matching number can beat a bigger raw one. */
-export function computeDamage({ result, op, ward, resist, resistAt, armor, relics, combo, ms, isFirstHit }) {
+export function computeDamage({ result, op, ward, resist, resistAt, armor, relics, combo, ms, isFirstHit, typeMult = 1 }) {
   let dmg = result;
   const owned = relics.map(id => RELIC_BY_ID[id]).filter(Boolean);
 
@@ -568,6 +568,9 @@ export function computeDamage({ result, op, ward, resist, resistAt, armor, relic
   dmg *= 1 + Math.min(5, combo) * comboStep;
 
   if (isFirstHit && owned.some(r => r.firstHitX2)) dmg *= 2;
+
+  // Type matchup last before armor, so a strong matchup can punch through it.
+  dmg *= typeMult;
 
   const final = Math.max(1, Math.round(dmg) - armor);
   return { damage: Math.max(1, final), warded, resisted, capped, blockedByArmor: Math.round(dmg) <= armor };
@@ -647,9 +650,15 @@ export function expectedDrillDamage(rng, mastery, runes, level, samples = 48) {
 
 export function spawnEnemy(rng, depth, opts = {}) {
   const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
-          ceiling = null, armorBase = null, duel = false } = opts;
+          ceiling = null, armorBase = null, duel = false, season = null } = opts;
   const tier = Math.max(1, Math.min(3, Math.ceil(depth / 3)));
-  const pool = boss ? BOSSES : ENEMIES.filter(e => e.tier <= tier + (elite ? 1 : 0));
+  let pool = boss ? BOSSES : ENEMIES.filter(e => e.tier <= tier + (elite ? 1 : 0));
+  /* In season, about half of what is met comes from the season's set. */
+  if (season) {
+    const set = SEASONAL_MONSTERS.filter(m => m.season === season
+      && (boss ? m.boss : !m.boss && m.tier <= tier + (elite ? 1 : 0)));
+    if (set.length && rng() < 0.5) pool = set;
+  }
   const tpl = pick(rng, pool.length ? pool : ENEMIES);
 
   const fallback = bestHitEstimate(runes, level);
@@ -708,6 +717,8 @@ export function spawnEnemy(rng, depth, opts = {}) {
     id: tpl.id,
     name: (elite ? 'Elite ' : '') + tpl.name,
     art: tpl.art,
+    type: tpl.type || 'light',
+    season: tpl.season || null,
     boss: !!tpl.boss,
     elite,
     duel,
@@ -735,7 +746,8 @@ export function enemyAct(enemy, player, rng) {
     case 'bigAttack': {
       const block = player.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
-      const raw = enemy.enraged ? intent.dmg * 2 : intent.dmg;
+      // typeEdge is the enemy's matchup against whoever the player is fighting with.
+      const raw = Math.round((enemy.enraged ? intent.dmg * 2 : intent.dmg) * (enemy.typeEdge || 1));
       const dmg = Math.max(1, raw - block);
       player.hp -= dmg;
       events.push({ type: 'damage', amount: dmg, text: `${enemy.name} hits you for ${dmg}.` });
@@ -767,7 +779,8 @@ export function enemyAct(enemy, player, rng) {
 /** The one-turn warning the player plans against. */
 export function describeIntent(enemy) {
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
-  const hit = n => (enemy.enraged ? n * 2 : n);
+  // Matches enemyAct exactly, so the warning is the number that lands.
+  const hit = n => Math.round((enemy.enraged ? n * 2 : n) * (enemy.typeEdge || 1));
   switch (intent.type) {
     case 'attack': return { icon: '\u{1F5E1}\uFE0F', text: `Attack for ${hit(intent.dmg)}` };
     case 'bigAttack': return { icon: '\u{1F4A5}', text: `BIG attack for ${hit(intent.dmg)}` };

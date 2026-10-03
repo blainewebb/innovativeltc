@@ -296,6 +296,62 @@ ordinary Safari browsing is subject to.
 
 To move a hero between browsers, use the backup below rather than hoping.
 
+## Types, catching and the team
+
+Every hero and monster has a **type**, Pokemon style: Water puts out Fire,
+Fire burns Grass, Grass grounds Storm, Storm zaps Water, and Light and Shadow
+hit each other hard. A strong matchup deals 1.5x, a weak one 0.75x, and it
+works both ways, so the enemy hits harder too if it has the edge. It applies
+to built strikes, drill counters and enemy attacks, and the warning above
+the enemy shows the real number.
+
+**Catching.** Winning a fight is a chance to catch that monster, and the
+chance is the maths in that fight: accuracy matters most, a streak and a
+quick answer add a little, and a flawless fight (no wrong answers, three or
+more right) is at least 90%. Elites are a bit harder, bosses harder still,
+and nothing is ever quite certain or hopeless (5% to 95%). The win screen
+says the chance when one gets away, and what would raise it.
+
+**The team.** Up to three, picked at camp from earned heroes and caught
+monsters. In a fight they sit in the top bar with a mark for the matchup
+against the current monster, and tapping one switches for free, any turn,
+even mid-question, so picking the right type is a thinking reward rather than
+a cost. The battle log says the matchup at the start of each fight.
+
+**The monster count went from 8 to 51**: 18 regular monsters, 6 bosses, and
+27 seasonal ones. That was a big part of the game feeling stale. Every
+monster uses one of a handful of balanced mechanic shapes, and health is
+always budgeted from what the player can hit for, so new ones need no
+balance pass of their own.
+
+Measured with the soak bots (default hero, never switching, so a neutral
+mix of matchups): the primary clear rate is unchanged at about 70%, and 8th
+grade is 52% over four runs against 55% before. A kid who always switches
+to the strong matchup will find it easier, which is the point.
+
+## Seasons
+
+By the device's date: October is **Halloween**, November **Thanksgiving**,
+December **Christmas**. In season the colors change, the camp shows a
+banner with how many of that season's monsters have been caught, and about
+half the monsters and bosses met come from the season's set (9 or 10 per
+season, including a boss). Anything caught is kept for good; an unfinished
+set comes back next year. The Monster Book shows the rest as "?" with the
+month they appear.
+
+`?season=halloween` (or `harvest`, `winter`, `none`) on the address previews
+another season, for a grown-up checking what is coming or for the tests.
+
+## Trophies
+
+24 trophies, every one for the maths: streaks (10, 25), speed (25 and 100
+answers under 3 seconds), clean fights and bosses, right-answer milestones
+(100, 500, 2,000), mastering the times tables and division, five right in
+each middle school topic, word problems, and reaching challenge levels 5, 7
+and 9. Locked ones show exactly what to do, including topics above the kid's
+current level. New ones are announced on the win and lose screens and kept
+in a trophy case at camp.
+
 ## Earning heroes
 
 Twenty avatars. Eight to choose from on day one, so picking still feels like a
@@ -476,10 +532,11 @@ lands without anyone having to know they must refresh twice. Bumping `CACHE` in
 | `js/data.js` | skills, enemy templates, wards, relics, word-problem generators |
 | `js/engine.js` | mastery tracking, adaptation, damage, enemy budget, map, runs |
 | `js/main.js` | every screen, input handling, the run state machine |
+| `js/collection.js` | characters, teams, catch chance, trophies |
 | `js/storage.js` | hero profiles in localStorage |
 | `js/sfx.js` | WebAudio blips, no audio files to download |
 
-`data.js` and `engine.js` never touch the DOM, which is why the logic is testable.
+`data.js`, `engine.js` and `collection.js` never touch the DOM, which is why the logic is testable.
 
 ## Adding English
 

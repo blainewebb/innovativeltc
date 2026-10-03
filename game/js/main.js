@@ -12,7 +12,9 @@ import {
 } from './engine.js';
 import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
          AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
-         FLOORS_PER_AVATAR } from './data.js';
+         FLOORS_PER_AVATAR, TYPES, typeMult, seasonFor, MONSTER_BY_ID } from './data.js';
+import { CHARACTERS, CHARACTER_BY_ID, TEAM_SIZE, ownedIds, leadOf, teamOf, matchup,
+         catchChance, seasonProgress, TROPHIES, checkTrophies } from './collection.js';
 import * as store from './storage.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
@@ -22,6 +24,15 @@ let run = null;
 let battle = null;
 let playClock = null;
 let manageHeroes = false;
+
+/* The season comes from the device's date. ?season=halloween (or harvest,
+   winter, none) previews another one, for a grown-up or a test. */
+const SEASON = (() => {
+  let override = null;
+  try { override = new URLSearchParams(location.search).get('season'); } catch { /* no URL */ }
+  return seasonFor(new Date(), override);
+})();
+if (SEASON) document.body.dataset.season = SEASON.id;
 
 const app = document.getElementById('app');
 const $ = sel => app.querySelector(sel);
@@ -152,17 +163,32 @@ function screenHub() {
   const upNext = nextAvatar(profile.records.floorsBeaten || 0);
   const level = difficultyLevel(profile.mastery, profile.grade);
   const ops = unlockedOps(profile.mastery, profile.grade);
+  const team = teamOf(profile);
+  const monsters = CHARACTERS.filter(c => c.kind !== 'hero');
+  const owned = new Set(ownedIds(profile));
+  const caughtCount = monsters.filter(c => owned.has(c.id)).length;
+  const trophyCount = Object.keys(profile.trophies || {}).length;
+  const season = SEASON ? seasonProgress(profile, SEASON.id) : null;
   render(`
     <div class="screen center">
       <h1 class="logo small">RUNE<span>BREAKER</span></h1>
+      ${SEASON ? `<div class="season-banner">
+        <span class="sb-icon">${SEASON.icon}</span>
+        <div><b>${SEASON.name} season!</b> ${SEASON.blurb} until ${SEASON.until}.
+        <small>Caught ${season.caught} of ${season.total} ${SEASON.name} monsters. Anything you catch is yours to keep.</small></div>
+      </div>` : ''}
       <div class="panel">
         <div class="hero-row">
-          <button class="pa big as-button" id="looksBtn" title="Change your hero">${profile.avatar}</button>
+          <button class="pa big as-button" id="looksBtn" title="Change your team">${team[0].char}</button>
           <div>
             <h2>${esc(profile.name)}</h2>
             <p class="muted">Deepest floor <b>${profile.records.deepest}</b> &middot; ${profile.records.runs} runs &middot; ${profile.records.bossesFelled} bosses felled</p>
-            <p class="muted tiny">${upNext ? `Next hero: ${upNext.char} in ${upNext.away} floor${upNext.away === 1 ? '' : 's'}` : 'Every hero earned'} &middot; tap your hero to change it</p>
+            <p class="muted tiny">Team: ${team.map(c => `${c.char}${TYPES[c.type].icon}`).join(' ')} &middot; ${upNext ? `next hero in ${upNext.away} floor${upNext.away === 1 ? '' : 's'}` : 'every hero earned'}</p>
           </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="bookBtn">\u{1F4D6} Team &amp; Monsters <small>${caughtCount}/${monsters.length}</small></button>
+          <button class="btn" id="trophyBtn">\u{1F3C6} Trophies <small>${trophyCount}/${TROPHIES.length}</small></button>
         </div>
         <div class="runes-owned">
           ${['+', '-', '*', '/', '^'].map(op => `<span class="rune-chip ${ops.includes(op) ? 'on' : 'off'}">${RUNES[op].glyph}</span>`).join('')}
@@ -183,11 +209,35 @@ function screenHub() {
   const endlessBtn = $('#startEndless');
   if (endlessBtn) endlessBtn.onclick = () => { sfx.tap(); beginRun(true); };
   $('#looksBtn').onclick = () => { sfx.tap(); screenLooks(screenHub); };
+  $('#bookBtn').onclick = () => { sfx.tap(); screenLooks(screenHub); };
+  $('#trophyBtn').onclick = () => { sfx.tap(); screenTrophies(screenHub); };
   $('#switchBtn').onclick = () => { data.activeId = null; persist(); screenProfiles(); };
   $('#soundBtn').onclick = () => {
     setEnabled(!isEnabled()); data.settings.sound = isEnabled(); persist(); sfx.tap(); screenHub();
   };
   $('#parentBtn').onclick = parentGate;
+}
+
+/* Every trophy, earned or not. Locked ones say exactly what to do, which is
+   most of what makes a trophy case worth opening. */
+function screenTrophies(onDone) {
+  const got = profile.trophies || {};
+  render(`
+    <div class="screen center">
+      <div class="panel">
+        <h2>Trophies</h2>
+        <p class="muted tiny center">${Object.keys(got).length} of ${TROPHIES.length}. Every one is for the maths.</p>
+        <div class="trophy-grid">
+          ${TROPHIES.map(t => `<div class="trophy ${got[t.id] ? 'won' : ''}">
+            <span class="ti">${got[t.id] ? t.icon : '\u{1F512}'}</span>
+            <b>${esc(t.name)}</b>
+            <small>${esc(t.text)}</small>
+          </div>`).join('')}
+        </div>
+        <button class="btn primary" id="done">Done</button>
+      </div>
+    </div>`);
+  $('#done').onclick = () => { sfx.tap(); onDone(); };
 }
 
 function beginRun(endless = false) {
@@ -242,7 +292,8 @@ function topBar({ inBattle = false } = {}) {
       ${inBattle ? '' : `<span class="hp-pill">\u2764\uFE0F ${Math.max(0, p.hp)}/${p.maxHp}</span>`}
       <span class="gold-pill">\u{1FA99} ${p.gold}</span>
       <span class="depth-pill">Floor ${run.depth}${run.endless ? '' : `/${FINAL_DEPTH}`}</span>
-      <span class="runes-pill">${p.runes.map(o => RUNES[o].glyph).join(' ')}</span>
+      ${inBattle && battle && battle.team.length > 1 ? `<span class="team-chips">${teamChips()}</span>`
+        : `<span class="runes-pill">${p.runes.map(o => RUNES[o].glyph).join(' ')}</span>`}
       ${inBattle && p.relics.length ? `<span class="relic-tray inline">${p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')}</span>` : ''}
     </div>`;
 }
@@ -286,40 +337,101 @@ function screenAvatarEarned(earned) {
       </div>
     </div>`);
   $('#wear').onclick = () => {
+    const ids = teamOf(profile).map(c => c.id).filter(x => x !== a.id);
+    profile.party = [a.id, ...ids].slice(0, TEAM_SIZE);
+    profile.heroId = a.id;
     profile.avatar = a.char;
     persist(); sfx.reward(); screenMap();
   };
   $('#later').onclick = () => { sfx.tap(); screenMap(); };
 }
 
-/* Every hero they have earned, plus the ones still to come and what they
-   cost, because a locked row a kid can see is most of the motivation. */
+/* Team and Monster Book in one place. The team (up to three) is who they
+   can switch between in a fight; the first is the lead. Below it, every
+   character in the game: heroes earned by beating floors, and monsters that
+   join by being caught. Uncaught ones show as a "?" with their type, so a kid
+   knows what to hunt for, and seasonal ones say when they can be met. */
+let teamMsg = '';
 function screenLooks(onDone) {
+  const owned = new Set(ownedIds(profile));
+  const team = teamOf(profile);
+  const inTeam = new Set(team.map(c => c.id));
   const beaten = profile.records.floorsBeaten || 0;
+  const monsters = CHARACTERS.filter(c => c.kind !== 'hero');
+  const caughtCount = monsters.filter(c => owned.has(c.id)).length;
+  const MONTH = { halloween: 'October', harvest: 'November', winter: 'December' };
+
+  const card = c => {
+    const have = owned.has(c.id);
+    const t = TYPES[c.type];
+    const sub = have ? esc(c.name)
+      : c.kind === 'hero' ? `${c.at} floors`
+      : c.season ? `${MONTH[c.season]} only` : '???';
+    return `<button class="look ${have ? '' : 'locked'} ${inTeam.has(c.id) ? 'on' : ''}" ${have ? `data-pick="${c.id}"` : 'disabled'}>
+      <span class="lk">${have ? c.char : c.kind === 'hero' ? '\u{1F512}' : '❓'}</span>
+      <span class="lt" title="${t.name}">${t.icon}</span>
+      <small>${sub}</small>
+    </button>`;
+  };
+  const section = (title, list) => list.length ? `<h3 class="book-h">${title}</h3><div class="looks">${list.map(card).join('')}</div>` : '';
   const next = nextAvatar(beaten);
+
   render(`
     <div class="screen center">
       <div class="panel">
-        <h2>Your heroes</h2>
-        <p class="muted tiny center">One more every ${FLOORS_PER_AVATAR} floors beaten. You have beaten <b>${beaten}</b>.${next ? ` Next: ${next.char} ${esc(next.name)} in ${next.away}.` : ' You have earned them all.'}</p>
-        <div class="looks">
-          ${AVATARS.map(a => {
-            const locked = a.at > beaten;
-            return `<button class="look ${locked ? 'locked' : ''} ${profile.avatar === a.char ? 'on' : ''}"
-                      ${locked ? 'disabled' : `data-look="${a.char}"`}>
-                      <span class="lk">${locked ? '\u{1F512}' : a.char}</span>
-                      <small>${locked ? `${a.at} floors` : esc(a.name)}</small>
-                    </button>`;
+        <h2>Your team</h2>
+        <p class="muted tiny center">Up to ${TEAM_SIZE}. Switch between them in a fight to get the best type matchup. The first one leads.</p>
+        <div class="team-slots">
+          ${Array.from({ length: TEAM_SIZE }, (_, i) => {
+            const c = team[i];
+            if (!c) return '<div class="slot-card empty">Empty</div>';
+            return `<div class="slot-card ${i === 0 ? 'lead' : ''}">
+              <button class="slot-main" data-lead="${c.id}" title="${i === 0 ? 'Leads the team' : 'Make lead'}">
+                <span class="lk">${c.char}</span><small>${TYPES[c.type].icon} ${esc(c.name)}</small>
+                <em>${i === 0 ? 'Lead' : 'Make lead'}</em>
+              </button>
+              ${team.length > 1 ? `<button class="slot-x" data-drop="${c.id}" aria-label="Take ${esc(c.name)} off the team">✕</button>` : ''}
+            </div>`;
           }).join('')}
         </div>
+        ${teamMsg ? `<p class="team-msg">${teamMsg}</p>` : ''}
+        <div class="type-key">${Object.values(TYPES).map(t => `<span>${t.icon} ${t.name} beats ${t.beats.map(b => TYPES[b].icon).join('')}</span>`).join('')}</div>
+        <h2 class="book-title">Monster Book</h2>
+        <p class="muted tiny center">Caught <b>${caughtCount}</b> of ${monsters.length}. Win a fight to try to catch that monster: the better your maths in the fight, the better the chance.${next ? ` Next hero: ${next.char} in ${next.away} floors.` : ''}</p>
+        ${section('Heroes', CHARACTERS.filter(c => c.kind === 'hero'))}
+        ${section('Monsters', monsters.filter(c => c.kind === 'monster' && !c.season))}
+        ${section('Bosses', monsters.filter(c => c.kind === 'boss' && !c.season))}
+        ${section('\u{1F383} Halloween', monsters.filter(c => c.season === 'halloween'))}
+        ${section('\u{1F983} Thanksgiving', monsters.filter(c => c.season === 'harvest'))}
+        ${section('\u{1F384} Christmas', monsters.filter(c => c.season === 'winter'))}
         <button class="btn primary" id="done">Done</button>
       </div>
     </div>`);
-  $$('[data-look]').forEach(b => b.onclick = () => {
-    profile.avatar = b.dataset.look;
-    persist(); sfx.reward(); screenLooks(onDone);
+
+  const save = ids => {
+    profile.party = ids;
+    profile.heroId = ids[0];
+    profile.avatar = CHARACTER_BY_ID[ids[0]].char;
+    persist();
+  };
+  const ids = team.map(c => c.id);
+  $$('[data-pick]').forEach(b => b.onclick = () => {
+    const id = b.dataset.pick;
+    teamMsg = '';
+    if (ids.includes(id)) {
+      if (ids.length === 1) teamMsg = 'Your team needs at least one.';
+      else save(ids.filter(x => x !== id));
+    } else if (ids.length >= TEAM_SIZE) {
+      teamMsg = `Your team is full. Tap ✕ on one to make room.`;
+    } else save([...ids, id]);
+    sfx.tap(); screenLooks(onDone);
   });
-  $('#done').onclick = () => { sfx.tap(); onDone(); };
+  $$('[data-drop]').forEach(b => b.onclick = () => { teamMsg = ''; save(ids.filter(x => x !== b.dataset.drop)); sfx.tap(); screenLooks(onDone); });
+  $$('[data-lead]').forEach(b => b.onclick = () => {
+    teamMsg = '';
+    save([b.dataset.lead, ...ids.filter(x => x !== b.dataset.lead)]); sfx.reward(); screenLooks(onDone);
+  });
+  $('#done').onclick = () => { teamMsg = ''; sfx.tap(); onDone(); };
 }
 
 function enterNode(node) {
@@ -328,6 +440,7 @@ function enterNode(node) {
     runes: run.player.runes,
     level,
     playerMaxHp: run.player.maxHp,
+    season: SEASON ? SEASON.id : null,
   };
 
   /* Enemy health is budgeted against what this player can actually hit for,
@@ -369,9 +482,12 @@ function enterNode(node) {
 
 /* ============================================================== battle === */
 function startBattle(enemy, reward) {
+  const team = teamOf(profile);
   battle = {
     enemy,
     reward,
+    team,
+    fighter: team[0],
     tiles: [],
     sel: { aIdx: null, op: null, bIdx: null },
     lockedId: null,
@@ -404,9 +520,76 @@ function startBattle(enemy, reward) {
     battle.fightMs = bossFightMs(profile.mastery, run.depth);
     battle.log = [`${enemy.name} challenges you to a duel. Answer, or be hit.`];
   }
+  applyFighter();
+  const o = TYPES[enemy.type];
+  battle.log[0] = battle.log[0].replace(enemy.name, `${enemy.name} (${o.icon} ${o.name})`);
+  battle.log.push(matchupText(false));
   dealHand();
   if (battle.allDrills) { battle.turn = 0; return nextTurn(); }
   renderBattle();
+}
+
+/* The matchup both ways for whoever is fighting right now. */
+function applyFighter() {
+  const e = battle.enemy;
+  e.typeEdge = typeMult(e.type, battle.fighter.type);
+}
+
+/* Swapping fighter is free and allowed on any turn, including mid-question,
+   so it never costs time on a clock. It updates the field in place rather
+   than re-rendering, because a re-render restarts a drill. */
+function switchFighter(id) {
+  if (app.dataset.busy) return;
+  const next = battle.team.find(c => c.id === id);
+  if (!next || next.id === battle.fighter.id) return;
+  battle.fighter = next;
+  applyFighter();
+  sfx.tap();
+  const hero = $('#heroSprite');
+  if (hero) {
+    hero.textContent = next.char;
+    anim(hero, [{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1 }, { transform: 'scale(1)' }], { duration: 300 });
+  }
+  const nm = $('.ibox.hero .nm span');
+  if (nm) nm.innerHTML = `${TYPES[next.type].icon} ${esc(next.name)}`;
+  const intent = $('.ibox.foe .intent');
+  if (intent) { const it = describeIntent(battle.enemy); intent.textContent = `Next: ${it.icon} ${it.text}`; }
+  $$('.tchip').forEach(b => b.classList.toggle('on', b.dataset.fighter === next.id));
+  battle.log.push(`Go, ${next.char} ${esc(next.name)}! ${matchupText(false)}`);
+  const log = $('.log');
+  if (log) log.innerHTML = battle.log.slice(-2).map(l => `<div>${l}</div>`).join('');
+}
+
+/* The matchup in words, Pokemon style. Goes in the battle log at the start
+   of a fight and whenever they switch, so it costs no screen space. */
+function matchupText(withLead = true) {
+  const e = battle.enemy, f = battle.fighter;
+  const m = matchup(f.type, e.type);
+  const t = TYPES[f.type], o = TYPES[e.type];
+  const lead = withLead ? `${esc(f.name)} is ${t.icon} ${t.name}. ` : '';
+  // Kept to one line on a phone: the log has two lines and the keypad needs the rest.
+  return lead + (m.edge === 'clash' ? `<b>${t.icon} vs ${o.icon}: super effective both ways!</b>`
+    : m.edge === 'strong' ? `<b class="good">${t.icon} ${t.name} beats ${o.icon} ${o.name}: super effective!</b>`
+    : m.edge === 'weak' ? `<b class="bad">${o.icon} ${o.name} beats ${t.icon} ${t.name}.</b> Try switching!`
+    : m.edge === 'risky' ? `<b class="bad">${o.icon} ${o.name} hits ${t.icon} ${t.name} hard!</b>`
+    : `${t.icon} ${t.name} vs ${o.icon} ${o.name}: an even match.`);
+}
+
+/* Team chips sit in the top bar during a fight: a row of their own pushed
+   the keypad off a phone screen. */
+function teamChips() {
+  const e = battle.enemy;
+  return battle.team.map(c => {
+    const m = matchup(c.type, e.type);
+    const mark = m.edge === 'strong' ? '\u25B2' : m.edge === 'clash' ? '\u2694\uFE0F' : m.edge === 'weak' || m.edge === 'risky' ? '\u25BC' : '';
+    return `<button class="tchip ${c.id === battle.fighter.id ? 'on' : ''} ${m.edge}" data-fighter="${c.id}" title="${esc(c.name)}">
+      <span class="tc">${c.char}</span><span class="tt">${TYPES[c.type].icon}</span>${mark ? `<b>${mark}</b>` : ''}
+    </button>`;
+  }).join('');
+}
+
+function wireTeam() {
+  $$('.tchip').forEach(b => b.onclick = ev => { ev.stopPropagation(); switchFighter(b.dataset.fighter); });
 }
 
 function dealHand() {
@@ -464,16 +647,16 @@ function fieldHtml() {
   return `
     <div class="field ${e.boss ? 'boss' : ''} ${e.elite ? 'elite' : ''}">
       <div class="ibox foe">
-        <div class="nm"><span>${esc(e.name)}</span></div>
+        <div class="nm"><span>${TYPES[e.type] ? TYPES[e.type].icon + ' ' : ''}${esc(e.name)}</span></div>
         ${hpBar('foeHp', e.hp, e.maxHp)}
         <div class="intent">Next: ${intent.icon} ${intent.text}</div>
       </div>
       <div class="plat foe"></div>
       <div class="sprite foe" id="foeSprite">${e.art}</div>
       <div class="plat hero"></div>
-      <div class="sprite hero" id="heroSprite">${profile.avatar}</div>
+      <div class="sprite hero" id="heroSprite">${battle.fighter.char}</div>
       <div class="ibox hero">
-        <div class="nm"><span>${esc(profile.name)}</span><small class="combo ${p.combo ? 'on' : ''}">\u{1F525}${p.combo}</small></div>
+        <div class="nm"><span>${TYPES[battle.fighter.type].icon} ${esc(battle.fighter.name)}</span><small class="combo ${p.combo ? 'on' : ''}">\u{1F525}${p.combo}</small></div>
         ${hpBar('heroHp', p.hp, p.maxHp)}
       </div>
     </div>
@@ -553,6 +736,18 @@ function shake(el, strong = false) {
   ], { duration: 260 });
 }
 
+function effNote(att, def) {
+  const m = typeMult(att, def);
+  return m > 1 ? ' Super effective!' : m < 1 ? ' Not very effective.' : '';
+}
+
+/* The Pokemon line every kid knows, added to a hit's caption. */
+function effText(mult) {
+  if (mult > 1) return ' <span class="eff super">It\'s super effective!</span>';
+  if (mult < 1) return ' <span class="eff weak">It\'s not very effective...</span>';
+  return '';
+}
+
 /* One beat of the replay. Returns how long it takes, so the next can follow. */
 function runBeat(b, gen, later) {
   const field = app.querySelector('.field');
@@ -593,9 +788,10 @@ function runBeat(b, gen, later) {
       shake(foe, b.kind === 'warded' || b.kind === 'shatter');
       popNumber(foe, `-${b.dmg}`, b.kind === 'warded' || b.kind === 'shatter' ? 'crit' : 'hit');
       setBar('foeHp', b.hp, b.max);
-      caption(b.kind === 'shatter' ? `EXACT! The shield shatters, <b>${b.dmg}</b> damage!`
+      const eff = effText(typeMult(battle.fighter.type, battle.enemy.type));
+      caption((b.kind === 'shatter' ? `EXACT! The shield shatters, <b>${b.dmg}</b> damage!`
             : b.kind === 'warded' ? `Ward broken! <b>${b.dmg}</b> damage!`
-            : `It hit for <b>${b.dmg}</b>!`);
+            : `It hit for <b>${b.dmg}</b>!`) + eff);
       (b.kind === 'shatter' ? sfx.shatter : b.kind === 'warded' ? sfx.crit : sfx.hit)();
     });
     return 580;
@@ -613,7 +809,7 @@ function runBeat(b, gen, later) {
       shake(hero, b.big);
       popNumber(hero, `-${b.dmg}`, 'hurt');
       setBar('heroHp', b.hp, b.max);
-      caption(`${them} hit you for <b>${b.dmg}</b>.`);
+      caption(`${them} hit you for <b>${b.dmg}</b>.` + effText(battle.enemy.typeEdge || 1));
       sfx.hurt();
     });
     return 500;
@@ -770,6 +966,7 @@ function renderBattle() {
     sfx.tap(); renderBattle();
   };
   const st = $('#strike'); if (st) st.onclick = submitStrike;
+  wireTeam();
 }
 
 function onTile(i) {
@@ -853,6 +1050,7 @@ function submitStrike() {
   const { damage, warded, resisted, capped } = computeDamage({
     result, op, ward: e.ward, resist: e.resist, resistAt: e.resistAt,
     armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: battle.firstHit,
+    typeMult: typeMult(battle.fighter.type, e.type),
   });
 
   let beat;
@@ -869,7 +1067,7 @@ function submitStrike() {
   } else {
     e.hp -= damage;
     const note = capped ? ' (capped)' : resisted ? ' (resisted)' : '';
-    battle.log.push(`${warded ? '\u{1F52E} WARD BROKEN! ' : '\u2694\uFE0F '}${a} ${RUNES[op].glyph} ${b} = ${result} \u2192 <b>${damage}</b> damage${note}.`);
+    battle.log.push(`${warded ? '\u{1F52E} WARD BROKEN! ' : '\u2694\uFE0F '}${a} ${RUNES[op].glyph} ${b} = ${result} \u2192 <b>${damage}</b> damage${note}.${effNote(battle.fighter.type, e.type)}`);
     beat = { type: 'strike', kind: warded ? 'warded' : '', value: result, dmg: damage, hp: e.hp, max: e.maxHp, move: MOVE[op] };
   }
 
@@ -890,6 +1088,40 @@ function tally(correct, ms) {
   if (correct) { st.right += 1; if (st.fastMs === null || ms < st.fastMs) st.fastMs = ms; }
   else st.wrong += 1;
   st.best = Math.max(st.best, run.player.combo);
+  // Lifetime counts the trophies are built on.
+  const r = profile.records;
+  r.bestStreak = Math.max(r.bestStreak || 0, run.player.combo);
+  if (correct && ms < 3000) r.fastAnswers = (r.fastAnswers || 0) + 1;
+}
+
+/* Roll to catch the monster just beaten. The chance is the fight's maths.
+   Returns null when there is nothing to catch (already in the book). */
+function tryCatch(e, st) {
+  const mon = MONSTER_BY_ID[e.id];
+  profile.caught = profile.caught || [];
+  if (!mon) return null;
+  if (profile.caught.includes(e.id)) return { mon, already: true };
+  const chance = catchChance(st, { boss: e.boss, elite: e.elite });
+  const caught = run.rng() < chance;
+  let joined = false;
+  if (caught) {
+    profile.caught.push(e.id);
+    const ids = teamOf(profile).map(c => c.id);
+    if (ids.length < TEAM_SIZE) { profile.party = [...ids, e.id]; joined = true; }
+  }
+  return { mon, chance, caught, joined };
+}
+
+function catchLine(c) {
+  if (!c) return '';
+  const t = TYPES[c.mon.type];
+  if (c.already) return `<p class="catch-line muted">${c.mon.art} ${esc(c.mon.name)} is already in your Monster Book.</p>`;
+  if (c.caught) return `<p class="catch-line caught">\u{1F389} Gotcha! <b>${esc(c.mon.name)}</b> (${t.icon} ${t.name}) is yours!${c.joined ? ' It joined your team.' : ' Add it to your team at camp.'}</p>`;
+  return `<p class="catch-line escaped">It got away. Catch chance was ${Math.round(c.chance * 100)}%. Fewer mistakes and quicker answers raise it.</p>`;
+}
+
+function trophyLines(list) {
+  return list.map(t => `<p class="trophy-line">\u{1F3C6} New trophy: <b>${t.icon} ${esc(t.name)}</b> <small>${esc(t.text)}</small></p>`).join('');
 }
 
 /* After the player's move: if the enemy survived it strikes back, then the
@@ -1049,6 +1281,7 @@ function renderDrill() {
   });
   const go = $('#answer');
   if (go) go.onclick = () => resolveDrill(battle.typed);
+  wireTeam();
 
   startDrillTimer();
 }
@@ -1111,7 +1344,7 @@ function resolveDrill(text) {
     if (pending.dmg) {
       const block = p.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
-      const raw = e.enraged ? pending.dmg * 2 : pending.dmg;
+      const raw = Math.round((e.enraged ? pending.dmg * 2 : pending.dmg) * (e.typeEdge || 1));
       const leak = Math.max(1, Math.round(raw * PARRY_LEAK) - block);
       p.hp -= leak;
       battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
@@ -1134,12 +1367,13 @@ function resolveDrill(text) {
     const { damage } = computeDamage({
       result, op: d.op || '+', ward: 'none', resist: 'none', resistAt: 0,
       armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
+      typeMult: typeMult(battle.fighter.type, e.type),
     });
     e.hp -= damage;
     p.combo += 1;
     battle.log.push(d.kind === 'text'
-      ? `\u{1F6E1}\uFE0F PARRIED! ${expected} is right, riposte for <b>${damage}</b>.${note ? ' ' + note : ''}`
-      : `\u{1F6E1}\uFE0F PARRIED! ${shown} = ${expected}, riposte for <b>${damage}</b>.`);
+      ? `\u{1F6E1}\uFE0F PARRIED! ${expected} is right, riposte for <b>${damage}</b>.${effNote(battle.fighter.type, e.type)}${note ? ' ' + note : ''}`
+      : `\u{1F6E1}\uFE0F PARRIED! ${shown} = ${expected}, riposte for <b>${damage}</b>.${effNote(battle.fighter.type, e.type)}`);
     beats.push({ type: 'strike', kind: '', value: expected, dmg: damage, hp: e.hp, max: e.maxHp, move });
   } else if (mercied) {
     e.intentIndex += 1;
@@ -1176,10 +1410,16 @@ function winBattle() {
   run.stats.battlesWon += 1;
   let unlockMsg = '';
   if (e.boss) { profile.records.bossesFelled += 1; unlockMsg = grantBossUnlock(); }
+  const st = battle.stats;
+  const r = profile.records;
+  r.fightsWon = (r.fightsWon || 0) + 1;
+  if (st.wrong === 0 && st.right >= 5) r.flawlessFights = (r.flawlessFights || 0) + 1;
+  if (e.boss && st.wrong === 0 && st.right >= 1) r.flawlessBosses = (r.flawlessBosses || 0) + 1;
+  const caught = tryCatch(e, st);
+  const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
   persist();
   sfx.win();
 
-  const st = battle.stats;
   const recap = [
     `<b>${st.right}</b> right`,
     `<b>${st.wrong}</b> wrong`,
@@ -1191,21 +1431,24 @@ function winBattle() {
     `<i style="left:${(i * 37) % 100}%;--d:${((i * 7) % 10) / 10}s;--c:${CONFETTI[i % CONFETTI.length]};--x:${((i * 53) % 60) - 30}px"></i>`).join('') : '';
 
   render(`
-    <div class="screen center win-scene ${boss ? 'boss' : ''}">
+    <div class="screen center win-scene ${boss ? 'boss' : ''} ${caught && !caught.already ? (caught.caught ? 'catching caught' : 'catching escaped') : ''}">
       ${topBar()}
       <div class="stage ${boss ? 'boss' : ''}">
         ${boss ? `<div class="rays"></div><div class="confetti">${confetti}</div>` : ''}
         <div class="vbanner">${boss ? 'BOSS FELLED!' : 'VICTORY!'}</div>
         <div class="vplat"></div>
-        <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${profile.avatar}</div>
+        <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${battle.fighter.char}</div>
         <div class="vfoe">${e.art}</div>
         <div class="dizzy">\u{1F4AB}</div>
+        ${caught && !caught.already ? '<div class="vorb">\u{1F52E}</div>' : ''}
       </div>
       <div class="panel win vpanel">
-        <p class="vline">${esc(profile.name)} beat ${esc(e.name)}!</p>
+        <p class="vline">${esc(battle.fighter.name)} beat ${esc(e.name)}!</p>
         <p class="recap">${recap}</p>
+        ${catchLine(caught)}
         <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; \u2764\uFE0F +${healAfter}` : ''}</p>
         ${unlockMsg ? `<p class="unlock">${unlockMsg}</p>` : ''}
+        ${trophyLines(trophies)}
         <button class="btn primary" id="cont">Continue</button>
       </div>
     </div>`);
@@ -1218,7 +1461,9 @@ function winBattle() {
   if (reducedMotion()) finishScene();
   else {
     const gen = fxGen;
-    setTimeout(() => { if (gen === fxGen) finishScene(); }, boss ? 1900 : 1500);
+    const catching = caught && !caught.already;
+    setTimeout(() => { if (gen === fxGen) finishScene(); }, (boss ? 1900 : 1500) + (catching ? 900 : 0));
+    if (catching) setTimeout(() => { if (gen === fxGen) (caught.caught ? sfx.reward : sfx.wrong)(); }, 1500);
   }
   scene.addEventListener('click', finishScene);
   $('#cont').onclick = () => {
@@ -1261,6 +1506,7 @@ function loseRun() {
   sfx.lose();
   const acc = run.stats.correct + run.stats.wrong
     ? Math.round(run.stats.correct / (run.stats.correct + run.stats.wrong) * 100) : 0;
+  const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
   persist();
   render(`
     <div class="screen center">
@@ -1272,6 +1518,7 @@ function loseRun() {
           <li><b>${run.stats.correct}</b> right &middot; <b>${run.stats.wrong}</b> wrong (${acc}%)</li>
           <li>Deepest floor ever: <b>${profile.records.deepest}</b></li>
         </ul>
+        ${trophyLines(trophies)}
         <button class="btn primary big" id="again">Run again</button>
         <button class="btn ghost" id="home">Back to camp</button>
       </div>

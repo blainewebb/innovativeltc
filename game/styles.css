@@ -291,6 +291,8 @@ p { margin: 0 0 10px; line-height: 1.45; }
 
 .enemy-tags { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 5px; margin: 0; flex: none; }
 .tag { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: #1a1628; }
+/* The logo tagline also uses .tag and adds a 14px bottom margin, which a two-row tag list was paying twice. */
+.enemy-tags .tag { margin: 0; line-height: 1.3; display: inline-flex; align-items: center; gap: 3px; }
 .tag.ward { color: var(--purple); border-color: #573c8a; }
 .tag.armor { color: var(--blue); border-color: #2f5a8a; }
 .tag.shield { color: var(--gold); border-color: var(--gold-dk); }
@@ -658,4 +660,141 @@ details.danger .btn { width: auto; }
 @keyframes vFall {
   0% { opacity: 1; transform: translate(0, 0) rotate(0); }
   100% { opacity: 1; transform: translate(var(--x), 240px) rotate(540deg); }
+}
+
+/* ---------------------------------------------------- types and team */
+.topbar .team-chips { display: inline-flex; gap: 5px; background: none; border: 0; padding: 0; }
+.topbar .team-chips span { background: none; border: 0; padding: 0; border-radius: 0; }
+.tchip {
+  position: relative; display: inline-flex; align-items: center; gap: 1px;
+  min-height: 30px; padding: 0 8px; border-radius: 999px; line-height: 1;
+  background: var(--panel2); border: 2px solid var(--line); color: var(--ink); font: inherit; cursor: pointer;
+}
+.tchip .tc { font-size: 1.2rem; line-height: 1; }
+.tchip .tt { font-size: .7rem; }
+.tchip b { position: absolute; top: -8px; right: -4px; font-size: .62rem; padding: 0 3px; border-radius: 6px; background: var(--bg); }
+.tchip.strong b { color: var(--green); }
+.tchip.clash b { color: var(--gold); }
+.tchip.weak b, .tchip.risky b { color: #ff9aa6; }
+.tchip.on { border-color: var(--gold); background: #3a3050; }
+.log b.good { color: var(--green); }
+.log b.bad { color: #ff9aa6; }
+.eff { display: inline-block; font-weight: 900; }
+.eff.super { color: var(--gold); }
+.eff.weak { color: var(--muted); }
+
+.team-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+.slot-card { position: relative; }
+.slot-card.empty {
+  display: grid; place-items: center; min-height: 96px; border: 2px dashed var(--line);
+  border-radius: 12px; color: var(--muted); font-size: .8rem;
+}
+.slot-main {
+  width: 100%; min-height: 96px; display: grid; gap: 2px; place-items: center; padding: 8px 4px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 12px; color: var(--ink); font: inherit; cursor: pointer;
+}
+.slot-card.lead .slot-main { border-color: var(--gold); background: #3a3050; }
+.slot-main .lk { font-size: 2rem; line-height: 1; }
+.slot-main small { font-size: .66rem; text-align: center; line-height: 1.1; }
+.slot-main em { font-style: normal; font-size: .6rem; color: var(--gold); font-weight: 800; }
+.slot-card:not(.lead) .slot-main em { color: var(--muted); }
+.slot-x {
+  position: absolute; top: -8px; right: -6px; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--panel2); border: 1px solid var(--line); color: #ff9aa6; font: inherit; cursor: pointer;
+}
+.team-msg { text-align: center; color: #ffcf8a; font-weight: 700; font-size: .84rem; margin: 4px 0; }
+.type-key { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: .7rem; color: var(--muted); margin: 6px 0 4px; }
+.book-title { margin-top: 14px; }
+.book-h { font-size: .9rem; margin: 12px 0 6px; color: var(--muted); letter-spacing: .04em; }
+.look { position: relative; }
+.look .lt { position: absolute; top: 2px; right: 3px; font-size: .62rem; }
+.look.locked .lt { opacity: 1; }
+
+/* ------------------------------------------------------------- trophies */
+.trophy-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0 14px; }
+.trophy {
+  display: grid; gap: 2px; justify-items: center; text-align: center; padding: 10px 6px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 12px; opacity: .55;
+}
+.trophy.won { opacity: 1; border-color: var(--gold-dk); background: #2f2a45; }
+.trophy .ti { font-size: 1.8rem; line-height: 1.1; }
+.trophy b { font-size: .84rem; }
+.trophy small { font-size: .68rem; color: var(--muted); line-height: 1.2; }
+.trophy-line { text-align: center; margin: 6px 0; color: var(--gold); }
+.trophy-line small { display: block; color: var(--muted); font-size: .72rem; }
+#bookBtn small, #trophyBtn small { color: var(--muted); font-weight: 700; margin-left: 4px; }
+
+/* --------------------------------------------------------------- catching */
+.catch-line { text-align: center; margin: 4px 0 8px; font-weight: 700; }
+.catch-line.caught { color: var(--green); }
+.catch-line.escaped { color: #ffcf8a; font-size: .86rem; }
+.vorb {
+  position: absolute; bottom: 30px; right: 30px; z-index: 3; font-size: 30px; line-height: 1;
+  opacity: 0;
+}
+.win-scene.caught .vfoe { opacity: 0; }
+.win-scene.caught .dizzy { opacity: 0; }
+.win-scene.caught .vorb { opacity: 1; filter: drop-shadow(0 0 10px var(--gold)); }
+@media (prefers-reduced-motion: no-preference) {
+  .win-scene.catching:not(.done) .vorb { animation: vThrow .5s ease-out .55s backwards, vWobble .9s ease-in-out 1.05s; opacity: 1; }
+  .win-scene.caught:not(.done) .vfoe { animation: vSuck .35s ease-in 1.05s backwards reverse; }
+  .win-scene.escaped:not(.done) .vorb { animation: vThrow .5s ease-out .55s backwards, vWobble .7s ease-in-out 1.05s, vPopOut .3s ease-out 1.75s forwards; }
+  .win-scene.catching:not(.done) .vpanel { animation-delay: 1.9s; }
+  .win-scene.catching:not(.done) .reward { animation-delay: 2.2s; }
+}
+@keyframes vThrow { from { transform: translate(-150px, -60px) scale(.5); opacity: 0; } }
+@keyframes vWobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 50% { transform: rotate(18deg); } 75% { transform: rotate(-10deg); } }
+@keyframes vSuck { from { opacity: 0; transform: rotate(80deg) scale(.1); } }
+@keyframes vPopOut { to { transform: scale(1.8); opacity: 0; } }
+
+/* ---------------------------------------------------------------- seasons */
+.season-banner {
+  display: flex; gap: 10px; align-items: center; text-align: left;
+  border-radius: var(--radius); padding: 10px 12px; font-size: .86rem; line-height: 1.3;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.season-banner .sb-icon { font-size: 2rem; line-height: 1; }
+.season-banner small { display: block; color: var(--muted); font-size: .74rem; margin-top: 2px; }
+
+body[data-season="halloween"] {
+  --bg: #140d1c; --bg2: #1a1024; --panel: #261634; --panel2: #31203f; --line: #4e3168;
+  --gold: #ff9a2e; --gold-dk: #c0601a;
+  background-image:
+    radial-gradient(1000px 500px at 50% -10%, #45215a 0%, transparent 60%),
+    radial-gradient(700px 400px at 100% 100%, #3a1d0c 0%, transparent 60%);
+}
+body[data-season="halloween"] .season-banner { border-color: #ff9a2e; background: linear-gradient(90deg, #3a1d0c, #261634); }
+body[data-season="halloween"] .field:not(.boss) {
+  background:
+    radial-gradient(26px 26px at 95% 12%, #ffe6a8 0%, #ffd27a 40%, transparent 42%),
+    radial-gradient(120% 60% at 50% 115%, #3d2a1a 0%, transparent 60%),
+    linear-gradient(180deg, #1e1030 0%, #2e1a45 55%, #3a2626 100%);
+}
+
+body[data-season="harvest"] {
+  --bg: #1a120c; --bg2: #21170f; --panel: #2e2117; --panel2: #3a2a1d; --line: #5c432c;
+  --gold: #f2b04a; --gold-dk: #b07020;
+  background-image:
+    radial-gradient(1000px 500px at 50% -10%, #5a3518 0%, transparent 60%),
+    radial-gradient(700px 400px at 100% 100%, #3a2a10 0%, transparent 60%);
+}
+body[data-season="harvest"] .season-banner { border-color: #c27a2c; background: linear-gradient(90deg, #4a2c12, #2e2117); }
+body[data-season="harvest"] .field:not(.boss) {
+  background:
+    radial-gradient(120% 60% at 50% 115%, #6a4a1c 0%, transparent 60%),
+    linear-gradient(180deg, #3a2a40 0%, #6a3e2a 55%, #5a4a20 100%);
+}
+
+body[data-season="winter"] {
+  --bg: #0d1424; --bg2: #101a2e; --panel: #1a2640; --panel2: #22314f; --line: #3a5078;
+  --gold: #ffd76a; --gold-dk: #b8942a;
+  background-image:
+    radial-gradient(1000px 500px at 50% -10%, #1f3a66 0%, transparent 60%),
+    radial-gradient(700px 400px at 100% 100%, #1a2a4a 0%, transparent 60%);
+}
+body[data-season="winter"] .season-banner { border-color: #8fc4ff; background: linear-gradient(90deg, #1f3a66, #1a2640); }
+body[data-season="winter"] .field:not(.boss) {
+  background:
+    radial-gradient(120% 60% at 50% 115%, #dfefff 0%, #b9d6f2 30%, transparent 62%),
+    linear-gradient(180deg, #1a2a50 0%, #2a4270 55%, #6a8ab0 100%);
 }
