@@ -171,15 +171,20 @@
   const SF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js';
   const Stockfish = {
     ok: false, worker: null, handler: null, chain: Promise.resolve(),
-    init() {
+    // The bundled copy first (same origin, no CDN needed); the CDN copy if that fails.
+    async init() {
+      if (await this.tryStart(() => new Worker('vendor/stockfish.js'))) return true;
+      return this.tryStart(() => new Worker(URL.createObjectURL(new Blob([`importScripts("${SF_URL}");`], { type: 'text/javascript' }))));
+    },
+    tryStart(make) {
       return new Promise(res => {
-        let done = false; const finish = v => { if (!done) { done = true; this.ok = v; res(v); } };
+        let done = false;
+        const finish = v => { if (done) return; done = true; this.ok = v; if (!v && this.worker) { try { this.worker.terminate(); } catch (e) {} this.worker = null; } res(v); };
         try {
-          const blob = new Blob([`importScripts("${SF_URL}");`], { type: 'text/javascript' });
-          this.worker = new Worker(URL.createObjectURL(blob));
-          this.worker.onmessage = e => { const l = String(e.data); if (l === 'uciok') finish(true); if (this.handler) this.handler(l); };
-          this.worker.onerror = () => finish(false);
-          this.worker.postMessage('uci');
+          const w = this.worker = make();
+          w.onmessage = e => { const l = String(e.data); if (l === 'uciok') finish(true); if (this.handler) this.handler(l); };
+          w.onerror = () => finish(false);
+          w.postMessage('uci');
         } catch (e) { finish(false); }
         setTimeout(() => finish(false), 12000);
       });
