@@ -1,9 +1,10 @@
 // Offline support. The page is fetched fresh when online (so updates show up), and cached for offline play.
-// chess.js, Stockfish and the fonts come from CDNs, so they are cached on install too.
+// chess.js and Stockfish ship in vendor/. The fonts (and the CDN fallbacks) are cached on install too.
 // Bump CACHE when shipping changes to this file's list.
-const CACHE = 'knight-school-v1';
+const CACHE = 'knight-school-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png',
-  './app.js', './board.js', './coach.js', './lessons.js', './books/winning-chess-strategy-for-kids.js', './books/the-chess-course.js'];
+  './app.js', './board.js', './coach.js', './lessons.js', './books/winning-chess-strategy-for-kids.js', './books/the-chess-course.js',
+  './books/fischer-teaches-chess.js', './books/traps-and-zaps.js', './vendor/chess.min.js', './vendor/stockfish.js'];
 const CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js',

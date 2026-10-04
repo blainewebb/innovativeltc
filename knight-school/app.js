@@ -32,6 +32,30 @@
   });
   const playerName = () => (S.players.find(p => p.id === S.cur) || {}).name || 'friend';
 
+  // ---------- backup / restore (progress lives in this browser only) ----------
+  const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify({ app: 'knight-school', format: 1, saved: new Date().toISOString(), data: { players: S.players, cur: S.cur, prog: S.prog } }))));
+  function decode(code) {
+    let o; try { o = JSON.parse(decodeURIComponent(escape(atob(code.trim().replace(/\s+/g, ''))))); } catch (e) { throw new Error('That code could not be read. Make sure you copied all of it.'); }
+    if (!o || o.app !== 'knight-school' || !o.data || !Array.isArray(o.data.players)) throw new Error('That is not a Knight School backup code.');
+    return o.data;
+  }
+  let restoreArmed = false;
+  $('#backupBtn').addEventListener('click', () => { const p = $('#backupPanel'); p.hidden = !p.hidden; $('#backupOut').value = enc(); $('#backupMsg').textContent = ''; restoreArmed = false; $('#backupLoad').textContent = 'Restore progress'; });
+  $('#backupClose').addEventListener('click', () => { $('#backupPanel').hidden = true; });
+  $('#backupCopy').addEventListener('click', () => {
+    const t = $('#backupOut');
+    const done = () => { $('#backupMsg').textContent = 'Copied. Paste it somewhere safe.'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(t.value).then(done, () => { t.select(); $('#backupMsg').textContent = 'Select-all is on. Press Ctrl+C (or Copy) to copy it.'; });
+    else { t.select(); $('#backupMsg').textContent = 'Select-all is on. Press Ctrl+C (or Copy) to copy it.'; }
+  });
+  $('#backupLoad').addEventListener('click', () => {
+    let d; try { d = decode($('#backupIn').value); } catch (e) { $('#backupMsg').textContent = e.message; return; }
+    if (!restoreArmed) { restoreArmed = true; $('#backupLoad').textContent = `Replace this device's progress with ${d.players.length} player${d.players.length > 1 ? 's' : ''}?`; return; }
+    S.players = d.players; S.cur = d.cur || d.players[0].id; S.prog = d.prog || {}; save();
+    restoreArmed = false; $('#backupLoad').textContent = 'Restore progress';
+    $('#backupMsg').textContent = 'Restored. Welcome back!'; $('#backupIn').value = ''; $('#backupOut').value = enc(); refresh();
+  });
+
   // ---------- voice and sound ----------
   let voice = null;
   function pickVoice() {
@@ -120,7 +144,8 @@
     if (book.kind === 'course') {
       book._items = [];
       book.sessions.forEach(s => s.items.forEach(it => { it.session = s; it.title = `Session ${s.n} · #${it.q}`; book._items.push(it); }));
-    } else book._items = book.puzzles.map(p => puzzleItem(book, p));
+    } else if (book.kind === 'items') book._items = book.items;
+    else book._items = book.puzzles.map(p => puzzleItem(book, p));
     return book._items;
   }
   function themesOf(book, it) {
@@ -138,7 +163,7 @@
         <div class="cover" style="background:${b.color}"><div><h3>${esc(b.title)}</h3><div class="by">${esc(b.author)}</div></div>
           <div class="glyph" aria-hidden="true">${b.glyph}</div>
           <div class="meter" aria-hidden="true"><i style="width:${Math.round(done / items.length * 100)}%"></i></div></div>
-        <div class="cap">${items.length} ${b.kind === 'course' ? 'exercises' : 'puzzles'}<small>${done} done · ${esc(b.level)}</small></div></button>`;
+        <div class="cap">${items.length} ${b.kind === 'puzzles' || !b.kind ? 'puzzles' : 'exercises'}<small>${done} done · ${esc(b.level)}</small></div></button>`;
     }).join('')}</div>`;
     $('#v-books').querySelectorAll('.book').forEach(el => el.addEventListener('click', () => openBook(+el.dataset.i)));
   }
@@ -264,6 +289,7 @@
       case 'pitfall': h = it.pre ? `<p>Watch this move. It looks fine, but it's a trap! Then find how to <b>punish it</b>.</p>`
         : `<p>${it.opening ? esc(it.opening) + ': ' : ''}the other side just played <b>${esc(it.trapShown || 'a natural-looking move')}</b>. It's a mistake! You are ${C}: <b>find the punishment</b>.</p>`; break;
       default:
+        if (it.intro) { h = `<p>${esc(it.intro)}</p><p>${C} to move.</p>`; break; }
         h = `<p>${C} to move. ${it.mate ? (it.mate === 1 ? 'Find <b>checkmate in one</b> move!' : `Find <b>checkmate in ${it.mate}</b> moves!`)
           : it.goal === 'draw' ? 'Find the move that <b>saves the game</b> (a draw).'
           : it.strategy ? 'Find the <b>best move</b>. This one is about a good plan.' : 'Find the move that <b>wins</b>.'}</p>`;
@@ -455,6 +481,7 @@
     else if (it.type === 'check' && m) body = `<p>${esc(KS.sayMove(m))} — that's check.</p>`;
     else if (it.type === 'playout') body = it.goal === 'win' ? '<p>You turned the advantage into a win!</p>' : it.goal === 'draw' ? '<p>You held the draw. That takes real defense!</p>' : `<p>Checkmate in ${T.moves + 1} moves. Practice it until you can do it fast!</p>`;
     else if (it.type === 'choice' && it.why) body = `<p>${esc(it.why)}</p>`;
+    if (it.lesson && it.type !== 'choice') body += `<p class="note">${esc(it.lesson)}</p>`;
     coach($('#trCoach'), `<p><b>${praise}</b> ${stars ? '<span style="color:var(--accent)">' + starStr(stars) + '</span>' : ''}</p>${body}`, stars ? 'good' : '', praise.replace(/<[^>]+>/g, '') + ' ' + $('#trCoach').textContent);
     const lb = $('#trLesson'); if (lb) lb.addEventListener('click', () => openLesson(LESSONS.indexOf(T._lesson)));
     $('#trHint').disabled = $('#trShow').disabled = true;
