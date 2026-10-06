@@ -3617,7 +3617,11 @@ function planFieldVals(carrier){
   if(carrier==='omniflex') return {mb:v('om_daily'), per:v('om_bp'), inf:v('om_infl')};
   return {};
 }
-function capturePlan(carrier){ try{
+// Short-term care plans (OmniFlex, and any STC carrier added later) open at their max daily benefits
+// (OmniFlex: $400 facility / $300 home care) and stay out of the long-term-care plan carry-over in both
+// directions, so an NGL or Mutual of Omaha $/mo never shrinks them.
+const STC_CARRIERS=new Set(['omniflex']);
+function capturePlan(carrier){ if(STC_CARRIERS.has(carrier)) return; try{
   var ap=(CLIENT._ap||{})[carrier], cur=planFieldVals(carrier);
   var chMb=!ap||cur.mb!==ap.mb, chPer=!ap||cur.per!==ap.per, chInf=!ap||cur.inf!==ap.inf;
   if(!chMb && !chPer && !chInf) return;                 // user didn't touch benefit/period/inflation — keep model as-is
@@ -3645,7 +3649,7 @@ function capturePlan(carrier){ try{
   if(chPer && years>0) CLIENT.years=years;
   if(chInf && pct!=null){ CLIENT.inflPct=pct; CLIENT.inflTerm=term; }
 }catch(e){} }
-function applyPlan(carrier){ if(CLIENT.mb==null && CLIENT.years==null && CLIENT.inflPct==null) return; try{
+function applyPlan(carrier){ if(STC_CARRIERS.has(carrier)) return; if(CLIENT.mb==null && CLIENT.years==null && CLIENT.inflPct==null) return; try{
   var mb=CLIENT.mb, years=CLIENT.years, pct=CLIENT.inflPct, term=CLIENT.inflTerm||'L';
   if(carrier==='ngl'){
     if(mb!=null&&$('s_benefit')) $('s_benefit').value=Math.min(12000,Math.max(300,Math.round(mb)));
@@ -3820,7 +3824,9 @@ function omniSyncState(){
     sel.innerHTML=bps.map(function(d){return '<option value="'+d+'">'+d+' days</option>';}).join('');
     sel.value=(bps.indexOf(cur)>=0?cur:bps[bps.length-1]); });
   var hasRx=!!S.rx, hasInfl=!!S.facility_infl, hasHosp=!!S.hospital, minAge=ST.min_age||45;
+  var rxWasHidden = !!($('om_rxbox') && $('om_rxbox').hidden);
   if($('om_rxbox')) $('om_rxbox').hidden = !hasRx;
+  if(hasRx && rxWasHidden && $('om_rx')) $('om_rx').value='700';   // offered again → back to the max
   if(!hasRx && $('om_rx')) $('om_rx').value='0';
   if($('om_infllbl')) $('om_infllbl').style.display = hasInfl?'':'none';
   if(!hasInfl && $('om_infl')) $('om_infl').checked=false;
@@ -3858,6 +3864,7 @@ function omniLimitedToggle(){
   // elimination period stays fully selectable (0/20/60/90) on limited benefit
   // inflation: not available on limited benefit
   if(on) $('om_infl').checked=false;
+  if(!on){ if(+$('om_daily').value<=100) $('om_daily').value=400; if(+$('om_hcdaily').value<=100) $('om_hcdaily').value=300; }   // back to the max amounts
   $('om_infl').disabled = on;
   $('om_infl').closest('label').style.opacity = on ? .45 : '';
 }
