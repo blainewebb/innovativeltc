@@ -707,10 +707,10 @@
   <div class="card" id="aetcard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">CLI <span style="color:var(--muted);font-weight:600;font-size:.9rem">Recovery Care Choice</span></h2>
-      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>2025 filings (AZ, AR, CO, CT, DE, GA, IN, IA, LA, MD, MI, MO, TX)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
+      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>2025 filings (AZ, AR, CO, CT, DE, GA, IN, IA, LA, MD, MI, MO, NC, TX)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>State</label><select id="aet_state" onchange="aetSyncState()"><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="GA">Georgia</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="LA">Louisiana</option><option value="MD">Maryland</option><option value="MI">Michigan</option><option value="MO">Missouri</option><option value="TX" selected>Texas</option></select></div>
+      <div class="field"><label>State</label><select id="aet_state" onchange="aetSyncState()"><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="GA">Georgia</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="LA">Louisiana</option><option value="MD">Maryland</option><option value="MI">Michigan</option><option value="MO">Missouri</option><option value="NC">North Carolina</option><option value="TX" selected>Texas</option></select></div>
       <div class="field"><label>Issue age (40–89)</label><input id="aet_age" type="number" value="65" min="40" max="89"></div>
       <div class="field"><label>Premium mode</label><select id="aet_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
@@ -752,7 +752,7 @@
       <div class="field"><label>Home modification ($ lifetime · $500 steps, 0 = none)</label><input id="aet_hm" type="number" value="0" step="500" min="0"></div>
     </div>
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Multiple Policy Discount (<span id="aet_mplabel">5%</span> — owns another CLI individual policy)</label></div>
-    <div class="warn" style="margin-top:6px">Rates from the CLI-025 filings (2025) for Arizona, Arkansas, Colorado, Connecticut, Delaware, Georgia, Indiana, Iowa, Louisiana, Maryland, Michigan, Missouri and Texas. Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
+    <div class="warn" style="margin-top:6px">Rates from the CLI-025 filings (2025) for Arizona, Arkansas, Colorado, Connecticut, Delaware, Georgia, Indiana, Iowa, Louisiana, Maryland, Michigan, Missouri, North Carolina and Texas. Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
     <div class="actions"><button class="run" onclick="aetRun()">Run Recovery Care Choice quote</button></div>
   </div>
 
@@ -3560,6 +3560,7 @@ CLI_RCC_STATES.DE={name:'Delaware', hosp:{"3":[2.92,3.48,4.2,4.33,5.32,6.51,7.7,
 CLI_RCC_STATES.LA={name:'Louisiana', hosp:CLI_RCC_STATES.AR.hosp};   // Louisiana's manual is identical to Arkansas's (verified, all 7 pages)
 CLI_RCC_STATES.MI={name:'Michigan', hosp:CLI_RCC_STATES.CO.hosp, rates:CLI_RCC_STATES.CO.rates};   // Michigan's manual is identical to Colorado's (verified, all 7 pages)
 CLI_RCC_STATES.MD={name:'Maryland', hosp:CLI_RCC_STATES.CO.hosp, rates:CLI_RCC_STATES.CO.rates, mpFactor:0.85};   // Maryland's tables = Colorado's (verified); its rating steps give a 0.85 multi-policy factor
+CLI_RCC_STATES.NC={name:'North Carolina', hosp:CLI_RCC_STATES.AR.hosp};   // North Carolina's manual is identical to Arkansas's (verified, all 7 pages)
 CLI_RCC_STATES.MO={name:'Missouri', hosp:{}, riders:['mental','adc'], noHC:true};   // Missouri: Texas facility/inflation/Rx/mental/ADC rates (verified); no home care, hospital, pet, home-mod, ambulance or rehab riders filed
 window.AET=(function(){
   const BPS=[90,180,270,360], EPS=[0,20,100], HCEPS=[0,20];
@@ -3934,7 +3935,7 @@ function setCarrier(c){
   if($('mooccard')) $('mooccard').hidden = !mooc;
   if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
   if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
-  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, LA, MD, MI, MO, TX)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, LA, MD, MI, MO, NC, TX)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
