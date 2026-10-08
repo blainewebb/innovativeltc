@@ -774,7 +774,7 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Home care benefit</div>
     <div class="grid">
-      <div class="field"><label>Weekly benefit ($150–$1,500, $150 steps)</label><input id="hcp_weekly" type="number" value="1500" step="150" min="150" max="1500"></div>
+      <div class="field"><label>Weekly benefit ($150 steps, up to $1,500)</label><select id="hcp_weekly"><option value="150">$150</option><option value="300">$300</option><option value="450">$450</option><option value="600">$600</option><option value="750">$750</option><option value="900">$900</option><option value="1050">$1,050</option><option value="1200">$1,200</option><option value="1350">$1,350</option><option value="1500" selected>$1,500</option></select></div>
       <div class="field"><label>Benefit period</label><select id="hcp_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
       <div class="field"><label>Waiting period</label><select id="hcp_ep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
     </div>
@@ -830,7 +830,7 @@
       <div class="field"><label>Premium mode</label><select id="hr_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Weekly benefit ($150–$750 · up to $3,000/month)</label><input id="hr_weekly" type="number" value="750" step="150" min="150" max="750"></div>
+      <div class="field"><label>Weekly benefit ($150 steps, up to $750 · $3,000/month)</label><select id="hr_weekly"><option value="150">$150</option><option value="300">$300</option><option value="450">$450</option><option value="600">$600</option><option value="750" selected>$750</option></select></div>
       <div class="field"><label>Benefit period</label><select id="hr_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
     </div>
     <div class="warn" style="margin-top:6px">The one-page Texas rate guide lists annual rates by benefit period only — no waiting period, hospital or riders — and doesn’t print the unit. Its rates match CLI’s $150/week home care rider, so the tool prices per $150/week. Premium = rate × units × the mode factor, rounded to the penny.</div>
