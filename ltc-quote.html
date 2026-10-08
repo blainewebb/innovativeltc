@@ -716,16 +716,16 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Facility benefit</div>
     <div class="grid">
-      <div class="field"><label>Facility daily benefit ($10 steps)</label><input id="aet_daily" type="number" value="300" step="10" min="10"></div>
+      <div class="field"><label>Facility daily benefit ($10–$700)</label><input id="aet_daily" type="number" value="700" step="10" min="10" max="700"></div>
       <div class="field"><label>Benefit period</label><select id="aet_bp"><option value="90">90 days</option><option value="180">180 days</option><option value="270">270 days</option><option value="360" selected>360 days</option></select></div>
       <div class="field"><label>Waiting period</label><select id="aet_ep"><option value="0" selected>0 days</option><option value="20">20 days</option><option value="100">100 days</option></select></div>
     </div>
     <div class="grid" style="margin-top:6px">
-      <div class="field"><label>Inflation rider (facility)</label><select id="aet_infl"><option value="none" selected>None</option><option value="c3">3% compound</option><option value="s3">3% simple</option><option value="c5">5% compound</option><option value="s5">5% simple</option></select></div>
+      <div class="field"><label>Inflation rider (facility only — home care stays level)</label><select id="aet_infl"><option value="none" selected>None</option><option value="c3">3% compound</option><option value="s3">3% simple</option><option value="c5">5% compound</option><option value="s5">5% simple</option></select></div>
     </div>
     <div class="riders" style="margin-top:8px"><label><input type="checkbox" id="aet_hc" checked onchange="$('aet_hcbox').hidden=!this.checked"> Home care rider</label></div>
     <div class="grid" id="aet_hcbox">
-      <div class="field"><label>Home care weekly benefit ($150 units)</label><input id="aet_hcweekly" type="number" value="1050" step="150" min="150"></div>
+      <div class="field"><label>Home care weekly benefit ($150–$2,100, $150 steps)</label><input id="aet_hcweekly" type="number" value="2100" step="150" min="150" max="2100"></div>
       <div class="field"><label>Home care waiting period</label><select id="aet_hcep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— units of coverage; 0 = not included</span></div>
@@ -748,7 +748,7 @@
       <div class="field"><label>Home modification ($500 lifetime units)</label><input id="aet_hm" type="number" value="0" step="1" min="0"></div>
     </div>
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Owns another Aetna individual policy (5% discount)</label></div>
-    <div class="warn" style="margin-top:6px">Texas rates only (CLI-025 filing, 2025). The filing doesn't state the minimum/maximum daily, weekly or rider amounts — the starting $300/day facility and $1,050/week home care are placeholders until confirmed. Rounding of the filed rates is assumed to the cent on the final premium.</div>
+    <div class="warn" style="margin-top:6px">Texas rates only (CLI-025 filing, 2025). Starts at Aetna's maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
     <div class="actions"><button class="run" onclick="aetRun()">Run Aetna quote</button></div>
   </div>
 
@@ -3553,11 +3553,13 @@ window.AET=(function(){
     if(bi<0) throw new Error('Benefit period must be 90, 180, 270 or 360 days.');
     if(ei<0) throw new Error('Waiting period must be 0, 20 or 100 days.');
     const fd=+o.facilityDaily||0; if(!(fd>=10) || fd%10) throw new Error('Facility daily benefit must be in $10 steps.');
+    if(fd>700) throw new Error('Aetna’s facility daily benefit goes up to $700/day.');
     const k=rowKey(age), col=bi*3+ei, units=fd/10, R=AET_RATES, b=band(age), steps=[];
     let ann=R.base[k][col]*units; steps.push(['Facility $'+fd+'/day · '+bp+'-day period · '+ep+'-day wait', ann]);
     const inf=INFL_LABEL[o.inflation]&&o.inflation!=='none'?o.inflation:null;
     if(inf){ const v=R[inf][k][col]*units; ann+=v; steps.push([INFL_LABEL[inf]+' inflation rider', v]); }
     if(o.homeCare && +o.hcWeekly>0){ const hw=+o.hcWeekly; if(hw%150) throw new Error('Home care is sold in $150/week units.');
+      if(hw>2100) throw new Error('Aetna’s home care benefit goes up to $2,100/week.');
       const he=HCEPS.indexOf(+o.hcEP||0); if(he<0) throw new Error('Home care waiting period must be 0 or 20 days.');
       const v=R.hc[k][bi*2+he]*(hw/150); ann+=v; steps.push(['Home care $'+hw+'/week', v]); }
     const R2=R.riders, add=(key,unitsN,label)=>{ if(unitsN>0){ const v=R2[key][b]*unitsN; ann+=v; steps.push([label, v]); } };
@@ -4232,7 +4234,7 @@ function aetRiderList(o){ const r=[];
   if(+o.adcUnits>0) r.push('adult day care'); if(+o.petUnits>0) r.push('pet boarding'); if(+o.homeModUnits>0) r.push('home modification');
   return r; }
 function aetConfigShort(o){ const r=aetRiderList(o);
-  return o.age+' · Aetna Short Term Care · $'+o.facilityDaily+'/day facility · '+o.facilityBP+'-day · '+(+o.facilityEP||0)+'-day wait'+(o.inflation&&o.inflation!=='none'?' · '+aetInflLabel(o)+' inflation':'')+(r.length?' · '+r.join(', '):'')+(o.multiPolicy?' · multi-policy −5%':'')+' · '+(o.state||'TX'); }
+  return o.age+' · Aetna Short Term Care · $'+o.facilityDaily+'/day facility · '+o.facilityBP+'-day · '+(+o.facilityEP||0)+'-day wait'+(o.inflation&&o.inflation!=='none'?' · '+aetInflLabel(o)+' facility inflation':'')+(r.length?' · '+r.join(', '):'')+(o.multiPolicy?' · multi-policy −5%':'')+' · '+(o.state||'TX'); }
 function aetOpts(){ const n=id=>+($(id)||{}).value||0;
   return {carrier:'aetna', state:$('aet_state').value||'TX', age:+$('aet_age').value, mode:$('aet_mode').value,
     facilityDaily:n('aet_daily'), facilityBP:n('aet_bp'), facilityEP:n('aet_ep'), inflation:$('aet_infl').value,
@@ -4240,7 +4242,7 @@ function aetOpts(){ const n=id=>+($(id)||{}).value||0;
     hospitalDaily:n('aet_hosp'), rxUnits:n('aet_rx'), ambulanceUnits:n('aet_amb'), ptUnits:n('aet_pt'), ptVisits:n('aet_ptv'),
     mentalUnits:n('aet_mh'), adcUnits:n('aet_adc'), adcDays:n('aet_adcd'), petUnits:n('aet_pet'), homeModUnits:n('aet_hm'),
     multiPolicy:!!$('aet_mp').checked}; }
-const AET_NOTE='Aetna Short Term Care is limited-benefit short-term recovery coverage paid as a daily/weekly indemnity — it is not long-term care insurance. Rates are from the Texas CLI-025 filing (2025).';
+const AET_NOTE='Aetna Short Term Care is limited-benefit short-term recovery coverage paid as a daily/weekly indemnity — it is not long-term care insurance. The inflation rider increases the facility benefit only; the home care benefit stays level. Rates are from the Texas CLI-025 filing (2025).';
 function aetRun(){ try{
   const o=aetOpts(); const q=AET.quote(o);
   show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">Aetna · Short Term Care</div></div><div class="config-line">'+aetConfigShort(o).replace(/·/g,'&middot;')+'</div>'
@@ -5105,7 +5107,7 @@ function waitGrow(o, yr){ const g=Math.pow(1.03, yr);
     if(o.homeCare) x.hcDaily=Math.min(300, fd, Math.max(10, Math.round((+o.hcDaily||fd)*g/10)*10)); }
   else if(isMoo(o)){ x.monthlyBenefit=Math.min(12000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/100)*100)); }
   else if(isNwm(o)){ x.monthlyBenefit=Math.max(100, Math.round((+o.monthlyBenefit)*g/100)*100); }
-  else if(isAet(o)){ x.facilityDaily=Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly)*g/150)*150); }
+  else if(isAet(o)){ x.facilityDaily=Math.min(700, Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.min(2100, Math.max(150, Math.round((+o.hcWeekly)*g/150)*150)); }
   else if(isMooc(o)){ const mb=Math.min(15000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/50)*50)); x.monthlyBenefit=mb; x.policyLimit=mb*12*(+o.years||3); }
   else { x.monthlyBenefit=SNAP(+(o._rawMb||o.monthlyBenefit)*g); delete x._rawMb; }
   return x; }
@@ -5401,8 +5403,8 @@ function qcConvert(op, target, state){
     return {carrier:'ngl', age, gender, monthlyBenefit:SNAP(c.mb), benefitPeriod:bp, elimination:'90', inflation:inf>0?inf:null, pay:'level', mode, state:st, riderSharedAdditional:false, maritalDiscount:c.spousal, totalBenefitPeriod:bp}; }
   if(target==='nwm'){ const pc=c.pct>0?nearestVal(c.pct,[3,4,5]):0;
     return {carrier:'nwm', state:st||'TX', age, gender, uwClass:'Standard', monthlyBenefit:Math.max(1000,Math.round(c.mb/100)*100), years:nearestVal(c.years,[3,6]), epWeeks:12, indexing:pc>0?'abi'+pc:'none', spousal:c.spousal, multiLife:false, nfb:false, mode}; }
-  if(target==='aetna'){ const fd=Math.min(300,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360,[90,180,270,360]);
-    return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:true, hcWeekly:Math.min(1050,Math.max(150,Math.round(fd*7/150)*150)), hcEP:0}; }
+  if(target==='aetna'){ const fd=Math.min(700,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360,[90,180,270,360]);
+    return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:true, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcEP:0}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
   if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
     return {carrier:'mooc', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:mb, years:yrs, policyLimit:mb*12*yrs, elimination:90, inflTerm:c.pct>0?canonToMoocTerm(c.term):'none', inflPct:c.pct>0?nearestVal(c.pct,MOOC_PCTS):0, mode, alfReduction:100, hhcReduction:100, proHHC:false, hhcWaiver:false, nfsbp:false, rop:'none'}; }
@@ -5801,7 +5803,7 @@ function fillNwmForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('nwm');
 function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
   set('aet_state',p.state||'TX'); set('aet_age',p.age); set('aet_mode',p.mode||'monthly'); set('aet_daily',p.facilityDaily); set('aet_bp',String(p.facilityBP||360)); set('aet_ep',String(p.facilityEP||0)); set('aet_infl',p.inflation||'none');
-  $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||1050); set('aet_hcep',String(p.hcEP||0));
+  $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||2100); set('aet_hcep',String(p.hcEP||0));
   set('aet_hosp',p.hospitalDaily||0); set('aet_rx',p.rxUnits||0); set('aet_amb',p.ambulanceUnits||0); set('aet_pt',p.ptUnits||0); set('aet_ptv',String(p.ptVisits||15));
   set('aet_mh',p.mentalUnits||0); set('aet_adc',p.adcUnits||0); set('aet_adcd',String(p.adcDays||15)); set('aet_pet',p.petUnits||0); set('aet_hm',p.homeModUnits||0); $('aet_mp').checked=!!p.multiPolicy; }
 function fillMoocForm(o){
@@ -5933,7 +5935,7 @@ const QCATS = {
   const A={ applicant:o=>o.__couple?null:(o.age+' · '+(o.state||'TX')), benefit:o=>'$'+o.facilityDaily+'/day ('+fmt0(o.facilityDaily*30)+'/mo)',
     period:o=>o.facilityBP+'-day benefit period', pool:o=>fmt0((+o.facilityDaily)*(+o.facilityBP)),
     projMonthly:o=>'$'+Math.round(AET.projDaily(o,QSHEET.projAge))+'/day', projPool:o=>fmt0(AET.projDaily(o,QSHEET.projAge)*(+o.facilityBP)),
-    elim:o=>(+o.facilityEP||0)+'-day wait', inflation:o=>aetInflLabel(o), inflationYN:o=>(o.inflation&&o.inflation!=='none')?ck:'',
+    elim:o=>(+o.facilityEP||0)+'-day wait', inflation:o=>(o.inflation&&o.inflation!=='none')?aetInflLabel(o)+' (facility only)':'None', inflationYN:o=>(o.inflation&&o.inflation!=='none')?ck:'',
     shared:o=>(o.homeCare&&+o.hcWeekly>0)?'$'+o.hcWeekly+'/week':'—', rxbenefit:o=>+o.rxUnits>0?ck+' $'+(100*o.rxUnits)+'/yr':'—',
     marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'Aetna' };
   Object.keys(QCATS).forEach(k=>{ const orig=QCATS[k].v;
