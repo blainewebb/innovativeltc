@@ -840,7 +840,7 @@
       <div class="field"><label>Premium mode</label><select id="hr_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Weekly benefit ($150 steps, up to $750 · $3,000/month)</label><select id="hr_weekly"><option value="150">$150</option><option value="300">$300</option><option value="450">$450</option><option value="600">$600</option><option value="750" selected>$750</option></select></div>
+      <div class="field"><label>Weekly benefit ($150 steps, up to $3,000)</label><select id="hr_weekly"><option value="150">$150</option><option value="300">$300</option><option value="450">$450</option><option value="600">$600</option><option value="750">$750</option><option value="900">$900</option><option value="1050">$1,050</option><option value="1200">$1,200</option><option value="1350">$1,350</option><option value="1500">$1,500</option><option value="1650">$1,650</option><option value="1800">$1,800</option><option value="1950">$1,950</option><option value="2100">$2,100</option><option value="2250">$2,250</option><option value="2400">$2,400</option><option value="2550">$2,550</option><option value="2700">$2,700</option><option value="2850">$2,850</option><option value="3000" selected>$3,000</option></select></div>
       <div class="field"><label>Benefit period</label><select id="hr_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
     </div>
     <div class="warn" style="margin-top:6px">The one-page Texas rate guide lists annual rates by benefit period only — no waiting period, hospital or riders — and doesn’t print the unit. Its rates match CLI’s $150/week home care rider, so the tool prices per $150/week. Premium = rate × units × the mode factor, rounded to the penny.</div>
@@ -3829,7 +3829,7 @@ window.HR=(function(){
     if(!(age>=50&&age<=89)) throw new Error('Home Recovery Care issues ages 50–89.');
     const wk=+o.hcWeekly||0, wi=R.weeks.indexOf(+o.hcWeeks||52);
     if(!(wk>=150) || wk%150) throw new Error('Home care is sold in $150/week units.');
-    if(wk>750) throw new Error('Home Recovery Care goes up to $750/week ($3,000/month).');
+    if(wk>3000) throw new Error('Home Recovery Care goes up to $3,000/week.');
     if(wi<0) throw new Error('Benefit period must be 13, 26, 39 or 52 weeks.');
     const steps=[['Home care $'+wk+'/week · '+R.weeks[wi]+' weeks', R.hc[String(age)][wi]*(wk/150)]];
     const mode=MODAL[o.mode]?o.mode:'monthly', annual=r2(steps[0][1]);
@@ -5456,7 +5456,7 @@ function waitGrow(o, yr){ const g=Math.pow(1.03, yr);
     if(o.homeCare) x.hcDaily=Math.min(300, fd, Math.max(10, Math.round((+o.hcDaily||fd)*g/10)*10)); }
   else if(isMoo(o)){ x.monthlyBenefit=Math.min(12000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/100)*100)); }
   else if(isNwm(o)){ x.monthlyBenefit=Math.max(100, Math.round((+o.monthlyBenefit)*g/100)*100); }
-  else if(isHr(o)){ x.hcWeekly=Math.min(750, Math.max(150, Math.round((+o.hcWeekly||750)*g/150)*150)); }
+  else if(isHr(o)){ x.hcWeekly=Math.min(3000, Math.max(150, Math.round((+o.hcWeekly||3000)*g/150)*150)); }
   else if(isRc(o)){ x.facilityDaily=Math.min(400, Math.max(10, Math.round((+o.facilityDaily||400)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly)*g/150)*150); }
   else if(isHcp(o)){ x.hcWeekly=Math.min(1500, Math.max(150, Math.round((+o.hcWeekly||1500)*g/150)*150)); }
   else if(isAet(o)){ x.facilityDaily=Math.min(700, Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.min(2100, Math.max(150, Math.round((+o.hcWeekly)*g/150)*150)); }
@@ -5774,7 +5774,7 @@ function qcConvert(op, target, state){
     return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:AET.opts(st||'TX').homeCare, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcBP:bp, hcEP:0, rxUnits:3}; }
   if(target==='clirc'){ const s2=CLI_RC_SETS[st]?st:'UT', O=RC.opts(s2), fd=Math.min(400,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360, O.bps);
     return {carrier:'clirc', state:s2, age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:O.eps.length?nearestVal(20,O.eps):0, hospitalDaily:O.hosp?50:0, homeCare:true, hcWeekly:Math.max(150,Math.round(fd*7/150)*150), hcWeeks:O.hcWeeks[0]}; }
-  if(target==='clihr') return {carrier:'clihr', state:'TX', age, mode, hcWeekly:Math.min(750,Math.max(150,Math.round(c.mb/30*7/150)*150)), hcWeeks:nearestVal(c.years*52, HR.WEEKS)};
+  if(target==='clihr') return {carrier:'clihr', state:'TX', age, mode, hcWeekly:Math.min(3000,Math.max(150,Math.round(c.mb/30*7/150)*150)), hcWeeks:nearestVal(c.years*52, HR.WEEKS)};
   if(target==='clihcp'){ const wk=Math.min(1500,Math.max(150,Math.round(c.mb/30*7/150)*150)), weeks=nearestVal(c.years*52, HCP.WEEKS);
     return {carrier:'clihcp', state:st||'TX', age, mode, hcWeekly:wk, hcWeeks:weeks, hcEP:0, hospitalDaily:HCP.hasHosp(st||'TX')?50:0, ambulanceUnits:0, cancerUnits:0}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
@@ -6195,7 +6195,7 @@ function fillRcForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clirc');
   set('rc_hosp',p.hospitalDaily||0); $('rc_hc').checked=!!p.homeCare; $('rc_hcbox').hidden=!p.homeCare; set('rc_hcweekly',p.hcWeekly||750); if(p.hcWeeks) set('rc_hcweeks',String(p.hcWeeks)); }
 function fillHrForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clihr');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
-  set('hr_age',p.age); set('hr_mode',p.mode||'monthly'); set('hr_weekly',p.hcWeekly||750); set('hr_weeks',String(p.hcWeeks||52)); }
+  set('hr_age',p.age); set('hr_mode',p.mode||'monthly'); set('hr_weekly',p.hcWeekly||3000); set('hr_weeks',String(p.hcWeeks||52)); }
 function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
