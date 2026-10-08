@@ -84,6 +84,50 @@ question builders from this folder. Anything changed in `js/data.js` or the
 question part of `js/engine.js` changes both games, so run both test suites
 after editing.
 
+## Prizes
+
+Every 3 wins earns a prize, in a fixed order: a boxer card, then gear, then
+a playable boxer, then round again (24 in all). Only wins at the boxer's own
+grade or higher count, and losses never take progress away. The hub shows a
+Prize Room bar with a 3-dot meter.
+
+- **Boxer cards** (8): made-up boxers for the card album.
+- **Gear** (8): golden, flame or galaxy gloves, neon or gold ring ropes, and
+  knockout celebrations (victory dance, glove spin, flex). One per slot.
+- **Playable boxers** (8): pick one and they box for you, with their own
+  gloves and headwear.
+
+The counting rules are in `js/rewards.js` (Word Kick uses the same file) and
+the prize list is in `js/prizes.js`.
+
+## Read-aloud voice
+
+Questions are read as short pieces ("Which word is a noun?", "apple", "cat",
+...). Each piece can have a clip recorded once with ElevenLabs, stored in
+`voice/` and listed in `voice/manifest.json`. A question plays from clips when
+every piece has one. Otherwise the device voice reads all of it, using the
+best English voice installed (an Enhanced or Premium one when the device has
+it). Word Kick uses the same clips.
+
+Nothing calls ElevenLabs while kids play. No API key is in the site, and
+nothing a kid does is sent anywhere.
+
+To record or update the clips (from the repo root):
+
+```
+node wordpunch/voice/make-voice.mjs --dry-run     # how many clips and characters
+ELEVENLABS_API_KEY=... node wordpunch/voice/make-voice.mjs
+```
+
+It records only what's missing and saves after every clip, so it can be
+stopped and re-run. After editing word lists or sentences, run it again to
+record the new lines, and `--prune` to delete clips no longer used. The voice
+is "Emma - Bright Kids Educator" (`VOICE_ID` to change it). The full set is
+about 1,240 clips and 17,800 characters.
+
+Played clips are saved for offline use as they're heard. A clip that has
+never been played on a device falls back to the device voice when offline.
+
 ## Learning from misses
 
 Every miss is logged against the specific word or sentence. Missed items come

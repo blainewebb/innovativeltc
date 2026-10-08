@@ -3,6 +3,8 @@
    version comes back with any new fields filled in instead of crashing. */
 import { newProfile, clampGrade, clampNumber } from './engine.js';
 import { KITS } from './data.js';
+import { hydrateRewards } from '../../wordpunch/js/rewards.js';
+import { PRIZES } from './prizes.js';
 
 export const KEY = 'wordkick-v1';
 
@@ -28,6 +30,7 @@ export function hydrateProfile(raw) {
   if (!Array.isArray(p.misses)) p.misses = [];
   p.matches = Number(p.matches) || 0;
   p.wins = Number(p.wins) || 0;
+  p.rewards = hydrateRewards(raw.rewards, PRIZES);
   return p;
 }
 

@@ -100,18 +100,42 @@ export function faceSVG(f) {
   </svg>`;
 }
 
+let uid = 0;
+
+/* What shows on top of the player's head from behind. */
+const HATS = {
+  none: () => '',
+  headband: c => `<rect x="112" y="62" width="76" height="12" rx="4" fill="${c}"/>
+    <path d="M150 72 Q160 92 170 100 M150 72 Q146 94 140 104" stroke="${c}" stroke-width="7" fill="none" stroke-linecap="round"/>`,
+  mohawk: (c, hair) => `<path d="M138 50 L142 30 L148 46 L152 26 L156 46 L162 30 L164 52 Z" fill="${hair}"/>
+    <rect x="140" y="44" width="22" height="30" rx="8" fill="${hair}"/>`,
+  bun: (c, hair) => `<circle cx="150" cy="44" r="16" fill="${hair}"/><rect x="138" y="54" width="24" height="7" rx="3" fill="${c}"/>`,
+  crown: () => `<path d="M122 52 L126 26 L138 40 L150 20 L162 40 L174 26 L178 52Z" fill="#facc15" stroke="#a16207" stroke-width="2"/>
+    <circle cx="150" cy="34" r="4" fill="#dc2626"/>`,
+  beanie: c => `<path d="M111 80 Q110 40 150 38 Q190 40 189 80Z" fill="${c}"/><rect x="109" y="72" width="82" height="12" rx="5" fill="rgba(0,0,0,.25)"/>
+    <circle cx="150" cy="36" r="8" fill="#f8fafc"/>`,
+};
+
 /* The player, seen from behind like the classic arcade view: back of the
-   head, shoulders, and two big gloves. */
-export function playerSVG(gloves = '#22c55e') {
+   head, shoulders, and two big gloves. `look` is a playable character's
+   { skin, hair, hat, band } and `style` special gloves { a, b } from the
+   Prize Room. */
+export function playerSVG(gloves = '#22c55e', look = {}, style = null) {
+  const skin = look.skin || '#e8b98f';
+  const hair = look.hair || '#3b2314';
+  const hat = (HATS[look.hat] || HATS.none)(look.band || '#ef4444', hair);
+  const gid = `pgl${++uid}`;
+  const fill = style ? `url(#${gid})` : gloves;
   return `<svg class="player-svg" viewBox="0 0 300 170" aria-hidden="true">
-  <path d="M60 170 Q70 112 150 104 Q230 112 240 170Z" fill="#e8b98f"/>
+  ${style ? `<defs><radialGradient id="${gid}" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="${style.a}"/><stop offset="1" stop-color="${style.b}"/></radialGradient></defs>` : ''}
+  <path d="M60 170 Q70 112 150 104 Q230 112 240 170Z" fill="${skin}"/>
   <path d="M150 116 L150 170" stroke="rgba(0,0,0,.12)" stroke-width="4"/>
-  <g class="p-head"><ellipse cx="150" cy="84" rx="38" ry="42" fill="#3b2314"/>
-    <ellipse cx="112" cy="88" rx="7" ry="10" fill="#e8b98f"/><ellipse cx="188" cy="88" rx="7" ry="10" fill="#e8b98f"/></g>
-  <g class="pg pg-l"><ellipse cx="72" cy="120" rx="40" ry="36" fill="${gloves}"/>
+  <g class="p-head"><ellipse cx="150" cy="84" rx="38" ry="42" fill="${hair}"/>
+    <ellipse cx="112" cy="88" rx="7" ry="10" fill="${skin}"/><ellipse cx="188" cy="88" rx="7" ry="10" fill="${skin}"/>${hat}</g>
+  <g class="pg pg-l"><ellipse cx="72" cy="120" rx="40" ry="36" fill="${fill}"/>
     <ellipse cx="60" cy="106" rx="12" ry="8" fill="rgba(255,255,255,.4)"/>
     <rect x="44" y="146" width="56" height="16" rx="6" fill="#fff"/></g>
-  <g class="pg pg-r"><ellipse cx="228" cy="120" rx="40" ry="36" fill="${gloves}"/>
+  <g class="pg pg-r"><ellipse cx="228" cy="120" rx="40" ry="36" fill="${fill}"/>
     <ellipse cx="216" cy="106" rx="12" ry="8" fill="rgba(255,255,255,.4)"/>
     <rect x="200" y="146" width="56" height="16" rx="6" fill="#fff"/></g>
 </svg>`;
@@ -136,4 +160,27 @@ export function beltSVG(circuitId, { small = false, grade = '' } = {}) {
     <text x="120" y="${grade ? 52 : 64}" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="${circuitId === 'world' ? 22 : 18}" fill="${c.edge}">${circuitId === 'world' ? 'CHAMP' : circuitId.toUpperCase()}</text>
     ${grade ? `<text x="120" y="76" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="14" fill="${c.edge}">GRADE ${grade}</text>` : ''}
   </svg>`;
+}
+
+/* Little pictures for gear in the Prize Room. */
+export function gearSVG(g) {
+  const id = `gear${++uid}`;
+  if (g.slot === 'gloves') {
+    return `<svg class="gear-svg" viewBox="0 0 80 70" aria-hidden="true">
+      <defs><radialGradient id="${id}" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="${g.a}"/><stop offset="1" stop-color="${g.b}"/></radialGradient></defs>
+      <ellipse cx="40" cy="30" rx="28" ry="26" fill="url(#${id})" stroke="rgba(0,0,0,.35)" stroke-width="2"/>
+      <ellipse cx="30" cy="20" rx="8" ry="5" fill="rgba(255,255,255,.45)"/>
+      <rect x="20" y="52" width="40" height="12" rx="4" fill="#fff"/></svg>`;
+  }
+  if (g.slot === 'ropes') {
+    return `<svg class="gear-svg" viewBox="0 0 80 60" aria-hidden="true">
+      <rect x="6" y="6" width="8" height="50" rx="3" fill="#cbd5e1"/><rect x="66" y="6" width="8" height="50" rx="3" fill="#cbd5e1"/>
+      ${[16, 30, 44].map(y => `<rect x="10" y="${y}" width="60" height="6" rx="3" fill="${y === 30 ? g.b : g.a}"/>`).join('')}</svg>`;
+  }
+  const pose = { dance: 'rotate(-15 40 32)', spin: 'rotate(20 40 32)', flex: '' }[g.move] || '';
+  return `<svg class="gear-svg" viewBox="0 0 80 64" aria-hidden="true">
+    <path d="M40 2 L47 22 L70 16 L54 32 L70 48 L47 42 L40 62 L33 42 L10 48 L26 32 L10 16 L33 22 Z" fill="#facc15" opacity=".35"/>
+    <g transform="${pose}"><circle cx="40" cy="20" r="7" fill="#f8fafc"/>
+      <path d="M40 27 L40 44 M40 44 L32 58 M40 44 L48 58 M40 30 L28 20 M40 30 L52 20" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="26" cy="16" r="6" fill="#ef4444"/><circle cx="54" cy="16" r="6" fill="#ef4444"/></g></svg>`;
 }

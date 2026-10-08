@@ -7,6 +7,11 @@ import {
   createFight, resolveAnswer, resolveGetUp, newProfile, recordAnswer, finishFight, progressFor, fighterStats,
 } from '../js/engine.js';
 import { hydrate, load, save, KEY } from '../js/storage.js';
+import { PRIZES } from '../js/prizes.js';
+import { allSpeechLines } from '../js/engine.js';
+import { clipText, clipName, planClips, pickVoice } from '../js/voice.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { WINS_PER_PRIZE, newRewards, recordWin, winsToNext, toggleEquip, equipped, hydrateRewards } from '../js/rewards.js';
 
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
@@ -265,6 +270,108 @@ section('storage');
   bad.setItem(KEY, '{not json');
   const r = load(bad);
   ok('an unreadable save is not overwritten', r.readOnly && !save(r, bad) && bad.getItem(KEY) === '{not json');
+}
+
+/* --------------------------------------------------------------- voice -- */
+section('voice');
+{
+  const lines = new Set(allSpeechLines().map(clipText));
+  ok('there are lines to record', lines.size > 1000);
+  const rng = makeRng(21);
+  let n = 0, missing = [];
+  for (const g of [1, 2, 3, 4, 5, 6, 7, 8]) for (let idx = 0; idx < 8; idx++) {
+    const used = new Set();
+    for (let i = 0; i < 40; i++) {
+      const q = makeQuestion({ grade: g, idx, rng, missed: {}, used });
+      n++;
+      ok(`${q.type} reads as pieces`, Array.isArray(q.say) && q.say.length >= 2 && q.speak === q.say.join(' '));
+      for (const part of q.say) if (!lines.has(clipText(part))) missing.push(part);
+    }
+  }
+  ok('every piece any question says has a line to record', missing.length === 0, missing.slice(0, 5).join(' | '));
+  ok('spelling choices are never read out', ![...lines].some(l => SPELLING[3].some(s => s.split('|')[1].split(',').includes(l))));
+
+  ok('clip names are stable and short', clipName('apple') === clipName(' apple ') && /^[0-9a-f]{8}\.mp3$/.test(clipName('apple')));
+  ok('different text, different clip', clipName('apple') !== clipName('Apple'));
+  const m = { 'Which word is a noun?': 'a.mp3', cat: 'b.mp3', dog: 'c.mp3' };
+  ok('clips play when every piece has one', planClips(['Which word is a noun?', 'cat', 'dog'], m)?.join() === 'a.mp3,b.mp3,c.mp3');
+  ok('one missing piece means device voice for all of it', planClips(['Which word is a noun?', 'cat', 'bird'], m) === null);
+  ok('no manifest, no clips', planClips(['cat'], null) === null && planClips([], m) === null);
+
+  const v = pickVoice([
+    { name: 'Fred', lang: 'en-US', localService: true },
+    { name: 'Samantha (Enhanced)', lang: 'en-US', localService: true },
+    { name: 'Thomas', lang: 'fr-FR' },
+  ]);
+  ok('device fallback picks an enhanced English voice', v?.name === 'Samantha (Enhanced)');
+  ok('no English voice, no pick', pickVoice([{ name: 'Thomas', lang: 'fr-FR' }]) === null);
+  ok('novelty voices are avoided', pickVoice([{ name: 'Bubbles', lang: 'en-US' }, { name: 'Karen', lang: 'en-AU' }]).name === 'Karen');
+
+  const manifest = JSON.parse(readFileSync(new URL('../voice/manifest.json', import.meta.url), 'utf8'));
+  const files = Object.values(manifest);
+  ok('every clip in the manifest exists on disk', files.every(f => existsSync(new URL(`../voice/${f}`, import.meta.url))));
+  ok('the manifest only lists lines the games say', Object.keys(manifest).every(t => lines.has(t)));
+}
+
+/* -------------------------------------------------------------- prizes -- */
+section('prizes');
+{
+  ok('24 prizes', PRIZES.length === 24);
+  ok('prize ids are unique', new Set(PRIZES.map(p => p.id)).size === PRIZES.length);
+  ok('prizes go card, gear, character', PRIZES.every((p, i) => p.kind === ['card', 'gear', 'character'][i % 3]));
+  ok('gear slots are known', PRIZES.filter(p => p.kind === 'gear').every(g => ['gloves', 'ropes', 'celebration'].includes(g.slot)));
+  ok('celebrations have a move', PRIZES.filter(p => p.slot === 'celebration').every(g => ['dance', 'spin', 'flex'].includes(g.move)));
+  ok('cards have a full look', PRIZES.filter(p => p.kind === 'card').every(c => ['skin', 'hair', 'trunks', 'gloves', 'acc', 'brow'].every(k => c.look[k])));
+  ok('every prize has words to show', PRIZES.every(p => p.name && (p.fact || p.desc)));
+
+  const p = newProfile({ name: 'K', grade: 3, gloves: '#fff' });
+  ok('new boxers start with no prizes', p.rewards.wins === 0 && p.rewards.earned.length === 0);
+  ok('3 wins to the first prize', winsToNext(p, PRIZES) === WINS_PER_PRIZE && WINS_PER_PRIZE === 3);
+  let r = recordWin(p, 2, PRIZES);
+  ok('a win below their grade does not count', !r.counted && p.rewards.wins === 0);
+  r = recordWin(p, 3, PRIZES);
+  ok('a win at their grade counts', r.counted && !r.prize && winsToNext(p, PRIZES) === 2);
+  recordWin(p, 5, PRIZES);
+  ok('a win above their grade counts', p.rewards.wins === 2);
+  r = recordWin(p, 3, PRIZES);
+  ok('third win earns the first prize, a card', r.prize?.id === PRIZES[0].id && r.prize.kind === 'card');
+  ok('meter resets after a prize', winsToNext(p, PRIZES) === 3);
+  for (let i = 0; i < 3; i++) r = recordWin(p, 3, PRIZES);
+  ok('next prize is gear', r.prize?.kind === 'gear');
+  for (let i = 0; i < 3; i++) r = recordWin(p, 3, PRIZES);
+  ok('then a character', r.prize?.kind === 'character');
+
+  // A loss through finishFight never touches prizes.
+  const before = p.rewards.wins;
+  const out = finishFight(p, 3, 0, false);
+  ok('a loss earns nothing and takes nothing', p.rewards.wins === before && !out.reward.counted);
+  const win = finishFight(p, 3, 0, true);
+  ok('finishFight counts a win toward prizes', win.reward.counted && p.rewards.wins === before + 1);
+
+  // Switching things on.
+  const gear = PRIZES.find(x => x.kind === 'gear');
+  const ch = PRIZES.find(x => x.kind === 'character');
+  const card = PRIZES.find(x => x.kind === 'card');
+  ok('gear can be switched on', toggleEquip(p, gear) && equipped(p, PRIZES, gear.slot)?.id === gear.id);
+  ok('tapping it again switches it off', toggleEquip(p, gear) && !equipped(p, PRIZES, gear.slot));
+  ok('a character can be picked', toggleEquip(p, ch) && equipped(p, PRIZES, 'character')?.id === ch.id);
+  ok('cards cannot be switched on', !toggleEquip(p, card));
+  const unearned = PRIZES.filter(x => x.kind === 'gear')[3];
+  ok('unearned gear cannot be switched on', !toggleEquip(p, unearned));
+
+  // Everything earned: no more prizes, meter says done.
+  const q = newProfile({ name: 'Q', grade: 1 });
+  for (let i = 0; i < 24 * 3 + 5; i++) recordWin(q, 1, PRIZES);
+  ok('all 24 prizes can be earned', q.rewards.earned.length === 24);
+  ok('no next prize once all are earned', winsToNext(q, PRIZES) === null);
+
+  // Saves: junk cleaned, unearned or wrong-slot equips dropped.
+  const h = hydrateRewards({ wins: '7', earned: [PRIZES[1].id, 'nope', PRIZES[1].id], equip: { gloves: PRIZES[1].id, ropes: PRIZES[1].id, character: PRIZES[2].id } }, PRIZES);
+  ok('saved prizes are cleaned up', h.wins === 7 && h.earned.length === 1);
+  ok('only earned prizes in the right slot stay on', h.equip.gloves === PRIZES[1].id && !h.equip.ropes && !h.equip.character);
+  ok('missing rewards load as empty', JSON.stringify(hydrateRewards(undefined, PRIZES)) === JSON.stringify(newRewards()));
+  const old = hydrate({ boxers: [{ id: 'x', name: 'Old', grade: 2 }] });
+  ok('boxers saved before prizes existed load fine', old.boxers[0].rewards.wins === 0);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

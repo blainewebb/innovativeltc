@@ -2,6 +2,8 @@
    anywhere. Every load goes through hydrate(), so a save written by an older
    version comes back with any new fields filled in instead of crashing. */
 import { newProfile, clampGrade } from './engine.js';
+import { hydrateRewards } from './rewards.js';
+import { PRIZES } from './prizes.js';
 
 export const KEY = 'wordpunch-v1';
 
@@ -25,6 +27,7 @@ export function hydrateProfile(raw) {
   if (!Array.isArray(p.misses)) p.misses = [];
   p.fights = Number(p.fights) || 0;
   p.wins = Number(p.wins) || 0;
+  p.rewards = hydrateRewards(raw.rewards, PRIZES);
   return p;
 }
 

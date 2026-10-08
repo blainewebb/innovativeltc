@@ -45,7 +45,7 @@ export function shirtSVG(kit, { number = '', cls = 'shirt-svg' } = {}) {
 
 /* A player seen from behind, taking the kick: name and number on the back.
    `kit` is a player kit (from KITS) or a team kit with shirt/trim/shorts. */
-export function shooterSVG(kit, { number = 10, name = '', skin = '#e8b98f', hair = '#3b2314' } = {}) {
+export function shooterSVG(kit, { number = 10, name = '', skin = '#e8b98f', hair = '#3b2314', boots = '#111827' } = {}) {
   const k = normalizeKit(kit);
   const clip = nextId('bk');
   const torso = 'M26 58 Q30 50 44 48 L76 48 Q90 50 94 58 L108 90 L96 96 L88 80 L86 134 L34 134 L32 80 L24 96 L12 90 Z';
@@ -56,7 +56,7 @@ export function shooterSVG(kit, { number = 10, name = '', skin = '#e8b98f', hair
     <rect x="65" y="150" width="15" height="52" rx="6" fill="${skin}"/>
     <rect x="39" y="176" width="17" height="38" rx="5" fill="${k.socks}"/>
     <rect x="64" y="176" width="17" height="38" rx="5" fill="${k.socks}"/>
-    <path d="M36 212 h22 v10 h-26 Z M62 212 h22 l4 10 h-26 Z" fill="#111827"/>
+    <path d="M36 212 h22 v10 h-26 Z M62 212 h22 l4 10 h-26 Z" fill="${boots}"/>
     <path d="M32 128 L88 128 L92 162 L62 162 L60 148 L58 162 L28 162 Z" fill="${k.shorts}"/>
     <path d="M24 96 L14 128 M96 96 L106 128" stroke="${skin}" stroke-width="11" stroke-linecap="round"/>
     <path d="${torso}" fill="${k.shirt}"/>
@@ -97,8 +97,37 @@ export function keeperSVG({ shirt, alt = null, pattern = 'solid', shorts = '#111
 }
 
 /* The player's own keeper: their kit, bright gloves. */
-export function myKeeperSVG(kit) {
-  return keeperSVG({ shirt: kit.shirt, alt: kit.alt, pattern: kit.pattern, shorts: kit.shorts, socks: kit.socks, gloves: '#facc15', num: kit.num, hair: '#3b2314' });
+export function myKeeperSVG(kit, { gloves = '#facc15', skin = '#e8b98f', hair = '#3b2314', number = 1 } = {}) {
+  return keeperSVG({ shirt: kit.shirt, alt: kit.alt, pattern: kit.pattern, shorts: kit.shorts, socks: kit.socks, gloves, num: kit.num, skin, hair, number });
+}
+
+/* A star player facing the camera, arms up celebrating: cards and
+   characters in the Prize Room. Same body as a keeper, bare hands. */
+export function starSVG(kit, { skin = '#e8b98f', hair = '#3b2314', number = 10 } = {}) {
+  return keeperSVG({ shirt: kit.shirt, alt: kit.alt, pattern: kit.pattern, shorts: kit.shorts, socks: kit.socks, gloves: skin, num: kit.num, skin, hair, number });
+}
+
+/* Little pictures for gear in the Prize Room. */
+export function gearSVG(g) {
+  if (g.slot === 'ball') return ballSVG(g);
+  if (g.slot === 'boots') {
+    return `<svg class="gear-svg" viewBox="0 0 60 40" aria-hidden="true">
+      <path d="M6 10 L28 10 L30 22 Q44 22 54 28 Q56 34 50 34 L6 34 Z" fill="${g.color}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
+      <path d="M10 34 v4 M20 34 v4 M34 34 v4 M46 34 v4" stroke="#111" stroke-width="3"/>
+      <path d="M14 14 L26 20 M14 20 L26 14" stroke="rgba(0,0,0,.35)" stroke-width="2"/></svg>`;
+  }
+  if (g.slot === 'gloves') {
+    return `<svg class="gear-svg" viewBox="0 0 60 50" aria-hidden="true">
+      <path d="M10 44 L10 20 Q10 8 18 8 Q22 2 28 8 Q34 2 38 10 Q46 8 46 20 L50 26 Q52 32 46 34 L44 44 Z" fill="${g.color}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
+      <rect x="8" y="40" width="38" height="8" rx="3" fill="#f8fafc"/></svg>`;
+  }
+  // A celebration: a little star-burst with a stick figure mid-move.
+  const pose = { slide: 'rotate(-20 30 30)', flip: 'rotate(180 30 30)', airplane: 'rotate(15 30 30)' }[g.move] || '';
+  return `<svg class="gear-svg" viewBox="0 0 60 60" aria-hidden="true">
+    <path d="M30 2 L36 20 L56 14 L42 30 L56 46 L36 40 L30 58 L24 40 L4 46 L18 30 L4 14 L24 20 Z" fill="#facc15" opacity=".35"/>
+    <g transform="${pose}" stroke="#f8fafc" stroke-width="4" stroke-linecap="round" fill="none">
+      <circle cx="30" cy="16" r="6" fill="#f8fafc"/><path d="M30 22 L30 38 M30 38 L22 50 M30 38 L38 50"/>
+      <path d="${g.move === 'airplane' ? 'M14 28 L46 28' : 'M30 26 L18 16 M30 26 L42 16'}"/></g></svg>`;
 }
 
 /* A rival team's keeper, in their keeper color. */
@@ -107,11 +136,11 @@ export function rivalKeeperSVG(team) {
   return keeperSVG({ shirt: team.gk, shorts: '#111827', gloves: '#f8fafc', skin: team.skin, hair: team.hair, num: dark });
 }
 
-export function ballSVG() {
+export function ballSVG({ fill = '#fff', patch = '#111' } = {}) {
   return `<svg class="ball-svg" viewBox="0 0 40 40" aria-hidden="true">
-    <circle cx="20" cy="20" r="18" fill="#fff" stroke="#111" stroke-width="2"/>
-    <path d="M20 12 L27 17 L24 25 L16 25 L13 17 Z" fill="#111"/>
-    <path d="M20 12 L20 3 M27 17 L36 14 M24 25 L29 33 M16 25 L11 33 M13 17 L4 14" stroke="#111" stroke-width="2"/>
+    <circle cx="20" cy="20" r="18" fill="${fill}" stroke="${patch}" stroke-width="2"/>
+    <path d="M20 12 L27 17 L24 25 L16 25 L13 17 Z" fill="${patch}"/>
+    <path d="M20 12 L20 3 M27 17 L36 14 M24 25 L29 33 M16 25 L11 33 M13 17 L4 14" stroke="${patch}" stroke-width="2"/>
   </svg>`;
 }
 

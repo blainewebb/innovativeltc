@@ -2,6 +2,8 @@
    resolving punches, tracking what a boxer gets wrong. No DOM, no storage,
    so all of it can be tested in Node. Randomness always comes in as `rng`. */
 import { POS, POS_ORDER, posForGrade, FIGHTERS, CIRCUITS, WORDS, SENTENCES, SPELLING } from './data.js';
+import { newRewards, recordWin } from './rewards.js';
+import { PRIZES } from './prizes.js';
 
 /* ----------------------------------------------------------------- random */
 export function makeRng(seed = Date.now()) {
@@ -171,7 +173,7 @@ export function makeQuestion(ctx) {
   const formats = formatsFor(idx, grade);
   const spell = rng() < fighter.spell;
   const fmt = weightedPick(rng, spell ? formats.spell : formats.pos, f => f.w).type;
-  const q = BUILDERS[fmt](ctx, fighter);
+  const q = withSpeak(BUILDERS[fmt](ctx, fighter));
   ctx.used?.add(q.key);
   return q;
 }
@@ -223,7 +225,7 @@ const BUILDERS = {
       prompt: `Which word is ${article(label)} ${label}?`,
       choices, sentence: null,
       explain: `"${target.word}" is ${article(POS[T].label)} ${POS[T].label.toLowerCase()}. Remember, ${ruleFor(T, grade)}.`,
-      speak: `Which word is ${article(label)} ${POS[T].label}? ${choices.map(c => c.label).join(', ')}.`,
+      say: [`Which word is ${article(label)} ${POS[T].label.toLowerCase()}?`, ...choices.map(c => c.label)],
     };
   },
 
@@ -248,7 +250,7 @@ const BUILDERS = {
       prompt: 'What part of speech is the highlighted word?',
       choices, sentence,
       explain: note || `"${tok.word}" is ${article(POS[pos].label)} ${POS[pos].label.toLowerCase()} here. ${cap(ruleFor(pos, grade))}.`,
-      speak: `${plainSentence(s.tokens)} What part of speech is the word ${tok.word}?`,
+      say: [plainSentence(s.tokens), 'What part of speech is the word', tok.word],
     };
   },
 
@@ -278,7 +280,7 @@ const BUILDERS = {
       explain: (many
         ? `The ${POS[pos].label.toLowerCase()}s here are ${listed}. `
         : `The ${POS[pos].label.toLowerCase()} is ${listed}. `) + (noted || `${cap(ruleFor(pos, grade))}.`),
-      speak: `Tap the ${POS[pos].label}. ${plainSentence(s.tokens)}`,
+      say: [`Tap the ${POS[pos].label.toLowerCase()}.`, plainSentence(s.tokens)],
     };
   },
 
@@ -297,7 +299,7 @@ const BUILDERS = {
       explain: item.homophone
         ? `"${item.word}" is the one that fits: ${filled}`
         : `It's spelled ${item.word.split('').join('-')}.`,
-      speak: item.homophone ? `Which word fits? ${filled}` : `Spell ${item.word}. ${filled}`,
+      say: item.homophone ? ['Which word fits?', filled] : [`Spell ${item.word}.`, filled],
     };
   },
 
@@ -318,20 +320,57 @@ const BUILDERS = {
       prompt: item.homophone ? 'One word is the WRONG word. Tap it!' : 'One word is spelled wrong. Tap it!',
       choices, sentence,
       explain: `"${atStart ? cap(bad) : bad}" should be "${good}".`,
-      speak: `Find the mistake. ${item.sentence.replace('___', item.word)}`,
+      say: ['Find the mistake.', item.sentence.replace('___', item.word)],
     };
   },
 };
 
 export const QUESTION_TYPES = Object.keys(BUILDERS);
 export function buildQuestion(type, ctx) {
-  return BUILDERS[type](ctx, FIGHTERS[ctx.idx]);
+  return withSpeak(BUILDERS[type](ctx, FIGHTERS[ctx.idx]));
 }
 
 /* Same builders without the fighter ladder, for other games that share this
    content (Word Kick). `lean` is { focus } like a fighter's. */
 export function buildQuestionWith(type, ctx, lean = {}) {
-  return BUILDERS[type](ctx, { focus: null, ...lean });
+  return withSpeak(BUILDERS[type](ctx, { focus: null, ...lean }));
+}
+
+/* `say` is the read-aloud as pieces, so each piece can have its own recorded
+   clip (voice.js). `speak` is the same thing as one string. */
+function withSpeak(q) {
+  q.speak = q.say.join(' ');
+  return q;
+}
+
+/* Every piece any question can ask to be read aloud: the list the voice
+   clips are recorded from (voice/make-voice.mjs). It walks the same content
+   the builders use, and a test checks that thousands of real questions never
+   say anything missing from it. */
+export function allSpeechLines() {
+  const out = new Set();
+  for (const p of POS_ORDER) {
+    const low = POS[p].label.toLowerCase();
+    out.add(`Which word is ${article(POS[p].upper)} ${low}?`);
+    out.add(`Tap the ${low}.`);
+  }
+  out.add('What part of speech is the word');
+  out.add('Which word fits?');
+  out.add('Find the mistake.');
+  for (const g of Object.keys(WORDS)) {
+    for (const list of Object.values(WORDS[g])) for (const w of list) out.add(w);
+    for (const src of SENTENCES[g]) {
+      const { tokens } = parseSentence(src);
+      out.add(plainSentence(tokens));
+      for (const t of tokens) if (t.ask) out.add(t.word);
+    }
+    for (const line of SPELLING[g]) {
+      const item = parseSpelling(line);
+      if (!item.homophone) out.add(`Spell ${item.word}.`);
+      out.add(item.sentence.replace('___', item.word));
+    }
+  }
+  return [...out];
 }
 
 /* ------------------------------------------------------------------ fight --
@@ -454,6 +493,7 @@ export function newProfile({ name, grade, gloves }) {
     missed: {},        // item key -> how many more rights it needs
     misses: [],        // recent misses for the coach's corner
     fights: 0, wins: 0,
+    rewards: newRewards(),   // prizes: every 3 wins at their grade or above
   };
 }
 
@@ -482,9 +522,10 @@ export function recordAnswer(profile, q, correct) {
 /* A fight is over: move the ladder on and hand out a belt if one was won. */
 export function finishFight(profile, grade, idx, won) {
   profile.fights++;
-  const out = { belt: null, gradeChamp: false, nextUnlocked: null };
+  const out = { belt: null, gradeChamp: false, nextUnlocked: null, reward: { counted: false, prize: null } };
   if (!won) return out;
   profile.wins++;
+  out.reward = recordWin(profile, grade, PRIZES);
   const p = progressFor(profile, grade);
   if (idx + 1 > p.next) {
     p.next = Math.min(FIGHTERS.length, idx + 1);
