@@ -789,10 +789,13 @@
     <div class="grid">
       <div class="field"><label>Daily hospital benefit ($/day · $10 steps)</label><input id="hcp_hosp" type="number" value="50" step="10" min="0"></div>
     </div>
-    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— 0 = not included</span></div>
+    <div style="margin:12px 0 4px"><button type="button" id="hcp_moretoggle" onclick="hcpToggleMore()" style="background:none;border:1px solid var(--border);border-radius:9px;padding:7px 12px;font-weight:700;color:var(--primary-d);cursor:pointer">＋ More options</button> <span id="hcp_moresum" class="hint" style="margin-left:6px"></span></div>
+    <div id="hcp_more" hidden oninput="hcpMoreSummary()" onchange="hcpMoreSummary()">
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:6px 0 4px">More options <span style="color:var(--muted);font-weight:600">— optional riders; 0 = not included</span></div>
     <div class="grid">
       <div class="field"><label>Ambulance / ER benefit ($ · $200 steps)</label><input id="hcp_amb" type="number" value="0" step="200" min="0"></div>
       <div class="field"><label>Lump-sum cancer benefit ($ · $2,500 steps)</label><input id="hcp_cancer" type="number" value="0" step="2500" min="0"></div>
+    </div>
     </div>
     <div class="warn" style="margin-top:6px" id="hcp_formnote">Rate guide CLIHM03695. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.</div>
     <div class="actions"><button class="run" onclick="hcpRun()">Run Home Care Plus quote</button></div>
@@ -4582,7 +4585,13 @@ function hcpSyncState(){ const st=($('hcp_state')||{}).value, f=HCP.formFor(st),
   const cf=($('hcp_cancer')||{closest:()=>null}).closest('.field'); if(cf){ cf.hidden=!HCP.hasCancer(st); if(cf.hidden) $('hcp_cancer').value=0; }   // Virginia, New Hampshire: no cancer rider
   const cu=HCP.cancerUnit(st), ci=$('hcp_cancer'); if(ci){ const v=+ci.value||0; ci.step=cu; ci.value=Math.round(v/cu)*cu; const lb=ci.closest('.field')&&ci.closest('.field').querySelector('label'); if(lb) lb.textContent='Lump-sum cancer benefit ($ · $'+cu.toLocaleString()+' steps)'; }   // Utah sells cancer per $1,000
   const hf=($('hcp_hosp')||{closest:()=>null}).closest('.grid'); if(hf){ const had=!hf.hidden; hf.hidden=!HCP.hasHosp(st); if(hf.previousElementSibling) hf.previousElementSibling.hidden=hf.hidden; if(hf.hidden) $('hcp_hosp').value=0; else if(!had && !(+$('hcp_hosp').value)) $('hcp_hosp').value=50; }   // New Hampshire: no daily hospital benefit
+  if($('hcp_more') && typeof hcpMoreSummary==='function') hcpMoreSummary();
   if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.'; }
+// "More options": ambulance/ER and lump-sum cancer live in a collapsible box; the button says what's in it.
+function hcpMoreSummary(){ const st=($('hcp_state')||{}).value, n=['hcp_amb','hcp_cancer'].filter(id=>+(($(id)||{}).value||0)>0).length, open=!$('hcp_more').hidden;
+  if($('hcp_moretoggle')) $('hcp_moretoggle').textContent=open?'− Fewer options':'＋ More options';
+  if($('hcp_moresum')) $('hcp_moresum').textContent=(n?n+' added':'none added')+(open?'':' — ambulance/ER'+(HCP.hasCancer(st)?', lump-sum cancer':'')); }
+function hcpToggleMore(force){ const box=$('hcp_more'); if(!box) return; box.hidden=(force==null)?!box.hidden:!force; hcpMoreSummary(); }
 function hcpRun(){ try{
   const o=hcpOpts(); const q=HCP.quote(o);
   show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Home Care Plus</div></div><div class="config-line">'+hcpConfigShort(o).replace(/·/g,'&middot;')+'</div>'
@@ -6178,7 +6187,8 @@ function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
 function fillHcpForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clihcp');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
   set('hcp_state',p.state||'TX'); hcpSyncState(); set('hcp_age',p.age); set('hcp_mode',p.mode||'monthly'); set('hcp_weekly',p.hcWeekly||1500); set('hcp_weeks',String(p.hcWeeks||52)); set('hcp_ep',String(p.hcEP||0));
-  set('hcp_hosp',p.hospitalDaily||0); set('hcp_amb',200*(p.ambulanceUnits||0)); set('hcp_cancer',HCP.cancerUnit(p.state)*(p.cancerUnits||0)); }
+  set('hcp_hosp',p.hospitalDaily||0); set('hcp_amb',200*(p.ambulanceUnits||0)); set('hcp_cancer',HCP.cancerUnit(p.state)*(p.cancerUnits||0));
+  hcpToggleMore(+(p.ambulanceUnits||0)>0 || +(p.cancerUnits||0)>0); }
 function fillRcForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clirc');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
   set('rc_state',p.state||'UT'); rcSyncState(); set('rc_age',p.age); set('rc_mode',p.mode||'monthly'); set('rc_daily',p.facilityDaily||400); set('rc_bp',String(p.facilityBP||180)); if(p.facilityEP!=null) set('rc_ep',String(p.facilityEP));
