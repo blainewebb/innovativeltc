@@ -726,6 +726,7 @@
     <div class="riders" style="margin-top:8px"><label><input type="checkbox" id="aet_hc" checked onchange="$('aet_hcbox').hidden=!this.checked"> Home care rider</label></div>
     <div class="grid" id="aet_hcbox">
       <div class="field"><label>Home care weekly benefit ($150–$2,100, $150 steps)</label><input id="aet_hcweekly" type="number" value="2100" step="150" min="150" max="2100"></div>
+      <div class="field"><label>Home care benefit period</label><select id="aet_hcbp"><option value="90">13 weeks</option><option value="180">26 weeks</option><option value="270">39 weeks</option><option value="360" selected>52 weeks</option></select></div>
       <div class="field"><label>Home care waiting period</label><select id="aet_hcep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— units of coverage; 0 = not included</span></div>
@@ -3561,7 +3562,8 @@ window.AET=(function(){
     if(o.homeCare && +o.hcWeekly>0){ const hw=+o.hcWeekly; if(hw%150) throw new Error('Home care is sold in $150/week units.');
       if(hw>2100) throw new Error('Aetna’s home care benefit goes up to $2,100/week.');
       const he=HCEPS.indexOf(+o.hcEP||0); if(he<0) throw new Error('Home care waiting period must be 0 or 20 days.');
-      const v=R.hc[k][bi*2+he]*(hw/150); ann+=v; steps.push(['Home care $'+hw+'/week', v]); }
+      const hb=BPS.indexOf(+o.hcBP||bp); if(hb<0) throw new Error('Home care benefit period must be 13, 26, 39 or 52 weeks.');   // its own period, separate from the facility's
+      const v=R.hc[k][hb*2+he]*(hw/150); ann+=v; steps.push(['Home care $'+hw+'/week · '+(BPS[hb]/90*13)+' weeks · '+(+o.hcEP||0)+'-day wait', v]); }
     const R2=R.riders, add=(key,unitsN,label)=>{ if(unitsN>0){ const v=R2[key][b]*unitsN; ann+=v; steps.push([label, v]); } };
     add('hosp', (+o.hospitalDaily||0)/10, 'Hospital $'+(+o.hospitalDaily||0)+'/day');
     const rxU=Math.max(3, Math.round(+o.rxUnits||0));   // the base policy requires at least the $300/yr prescription drug benefit
@@ -4229,7 +4231,7 @@ const NWM_NOTE='Northwestern rates are from the Texas UU-series filing (March 20
 /* ---------- Aetna Short Term Care — form, results ---------- */
 function aetInflLabel(o){ return AET.INFL_LABEL[o.inflation]||'None'; }
 function aetRiderList(o){ const r=[];
-  if(o.homeCare&&+o.hcWeekly>0) r.push('home care $'+o.hcWeekly+'/wk');
+  if(o.homeCare&&+o.hcWeekly>0) r.push('home care $'+o.hcWeekly+'/wk · '+((+o.hcBP||+o.facilityBP||360)/90*13)+' wks');
   if(+o.hospitalDaily>0) r.push('hospital $'+o.hospitalDaily+'/day'); r.push('Rx $'+(100*Math.max(3,+o.rxUnits||0))+'/yr');
   if(+o.ambulanceUnits>0) r.push('ambulance'); if(+o.ptUnits>0) r.push('physical therapy'); if(+o.mentalUnits>0) r.push('mental health');
   if(+o.adcUnits>0) r.push('adult day care'); if(+o.petUnits>0) r.push('pet boarding'); if(+o.homeModUnits>0) r.push('home modification');
@@ -4239,7 +4241,7 @@ function aetConfigShort(o){ const r=aetRiderList(o);
 function aetOpts(){ const n=id=>+($(id)||{}).value||0;
   return {carrier:'aetna', state:$('aet_state').value||'TX', age:+$('aet_age').value, mode:$('aet_mode').value,
     facilityDaily:n('aet_daily'), facilityBP:n('aet_bp'), facilityEP:n('aet_ep'), inflation:$('aet_infl').value,
-    homeCare:!!$('aet_hc').checked, hcWeekly:n('aet_hcweekly'), hcEP:n('aet_hcep'),
+    homeCare:!!$('aet_hc').checked, hcWeekly:n('aet_hcweekly'), hcBP:n('aet_hcbp'), hcEP:n('aet_hcep'),
     hospitalDaily:n('aet_hosp'), rxUnits:n('aet_rx'), ambulanceUnits:n('aet_amb'), ptUnits:n('aet_pt'), ptVisits:n('aet_ptv'),
     mentalUnits:n('aet_mh'), adcUnits:n('aet_adc'), adcDays:n('aet_adcd'), petUnits:n('aet_pet'), homeModUnits:n('aet_hm'),
     multiPolicy:!!$('aet_mp').checked}; }
@@ -5405,7 +5407,7 @@ function qcConvert(op, target, state){
   if(target==='nwm'){ const pc=c.pct>0?nearestVal(c.pct,[3,4,5]):0;
     return {carrier:'nwm', state:st||'TX', age, gender, uwClass:'Standard', monthlyBenefit:Math.max(1000,Math.round(c.mb/100)*100), years:nearestVal(c.years,[3,6]), epWeeks:12, indexing:pc>0?'abi'+pc:'none', spousal:c.spousal, multiLife:false, nfb:false, mode}; }
   if(target==='aetna'){ const fd=Math.min(700,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360,[90,180,270,360]);
-    return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:true, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcEP:0, rxUnits:3}; }
+    return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:true, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcBP:bp, hcEP:0, rxUnits:3}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
   if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
     return {carrier:'mooc', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:mb, years:yrs, policyLimit:mb*12*yrs, elimination:90, inflTerm:c.pct>0?canonToMoocTerm(c.term):'none', inflPct:c.pct>0?nearestVal(c.pct,MOOC_PCTS):0, mode, alfReduction:100, hhcReduction:100, proHHC:false, hhcWaiver:false, nfsbp:false, rop:'none'}; }
@@ -5804,7 +5806,7 @@ function fillNwmForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('nwm');
 function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
   set('aet_state',p.state||'TX'); set('aet_age',p.age); set('aet_mode',p.mode||'monthly'); set('aet_daily',p.facilityDaily); set('aet_bp',String(p.facilityBP||360)); set('aet_ep',String(p.facilityEP||0)); set('aet_infl',p.inflation||'none');
-  $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||2100); set('aet_hcep',String(p.hcEP||0));
+  $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||2100); set('aet_hcbp',String(p.hcBP||p.facilityBP||360)); set('aet_hcep',String(p.hcEP||0));
   set('aet_hosp',p.hospitalDaily||0); set('aet_rx',Math.max(3,p.rxUnits||3)); set('aet_amb',p.ambulanceUnits||0); set('aet_pt',p.ptUnits||0); set('aet_ptv',String(p.ptVisits||15));
   set('aet_mh',p.mentalUnits||0); set('aet_adc',p.adcUnits||0); set('aet_adcd',String(p.adcDays||15)); set('aet_pet',p.petUnits||0); set('aet_hm',p.homeModUnits||0); $('aet_mp').checked=!!p.multiPolicy; }
 function fillMoocForm(o){
@@ -5937,7 +5939,7 @@ const QCATS = {
     period:o=>o.facilityBP+'-day benefit period', pool:o=>fmt0((+o.facilityDaily)*(+o.facilityBP)),
     projMonthly:o=>'$'+Math.round(AET.projDaily(o,QSHEET.projAge))+'/day', projPool:o=>fmt0(AET.projDaily(o,QSHEET.projAge)*(+o.facilityBP)),
     elim:o=>(+o.facilityEP||0)+'-day wait', inflation:o=>(o.inflation&&o.inflation!=='none')?aetInflLabel(o)+' (facility only)':'None', inflationYN:o=>(o.inflation&&o.inflation!=='none')?ck:'',
-    shared:o=>(o.homeCare&&+o.hcWeekly>0)?'$'+o.hcWeekly+'/week':'—', rxbenefit:o=>ck+' $'+(100*Math.max(3,+o.rxUnits||0))+'/yr',
+    shared:o=>(o.homeCare&&+o.hcWeekly>0)?'$'+o.hcWeekly+'/week · '+((+o.hcBP||+o.facilityBP||360)/90*13)+' weeks':'—', rxbenefit:o=>ck+' $'+(100*Math.max(3,+o.rxUnits||0))+'/yr',
     marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'Aetna' };
   Object.keys(QCATS).forEach(k=>{ const orig=QCATS[k].v;
     QCATS[k].v=(o,q)=>{ const T=isNwm(o)?N:isAet(o)?A:null; if(T&&T[k]){ const r=T[k](o,q); if(r!=null) return r; } return orig(o,q); }; });
