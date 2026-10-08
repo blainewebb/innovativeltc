@@ -8,6 +8,9 @@ import {
 } from '../js/engine.js';
 import { hydrate, load, save, KEY } from '../js/storage.js';
 import { PRIZES } from '../js/prizes.js';
+import { allSpeechLines } from '../js/engine.js';
+import { clipText, clipName, planClips, pickVoice } from '../js/voice.js';
+import { readFileSync, existsSync } from 'node:fs';
 import { WINS_PER_PRIZE, newRewards, recordWin, winsToNext, toggleEquip, equipped, hydrateRewards } from '../js/rewards.js';
 
 let passed = 0, failed = 0;
@@ -267,6 +270,47 @@ section('storage');
   bad.setItem(KEY, '{not json');
   const r = load(bad);
   ok('an unreadable save is not overwritten', r.readOnly && !save(r, bad) && bad.getItem(KEY) === '{not json');
+}
+
+/* --------------------------------------------------------------- voice -- */
+section('voice');
+{
+  const lines = new Set(allSpeechLines().map(clipText));
+  ok('there are lines to record', lines.size > 1000);
+  const rng = makeRng(21);
+  let n = 0, missing = [];
+  for (const g of [1, 2, 3, 4, 5, 6, 7, 8]) for (let idx = 0; idx < 8; idx++) {
+    const used = new Set();
+    for (let i = 0; i < 40; i++) {
+      const q = makeQuestion({ grade: g, idx, rng, missed: {}, used });
+      n++;
+      ok(`${q.type} reads as pieces`, Array.isArray(q.say) && q.say.length >= 2 && q.speak === q.say.join(' '));
+      for (const part of q.say) if (!lines.has(clipText(part))) missing.push(part);
+    }
+  }
+  ok('every piece any question says has a line to record', missing.length === 0, missing.slice(0, 5).join(' | '));
+  ok('spelling choices are never read out', ![...lines].some(l => SPELLING[3].some(s => s.split('|')[1].split(',').includes(l))));
+
+  ok('clip names are stable and short', clipName('apple') === clipName(' apple ') && /^[0-9a-f]{8}\.mp3$/.test(clipName('apple')));
+  ok('different text, different clip', clipName('apple') !== clipName('Apple'));
+  const m = { 'Which word is a noun?': 'a.mp3', cat: 'b.mp3', dog: 'c.mp3' };
+  ok('clips play when every piece has one', planClips(['Which word is a noun?', 'cat', 'dog'], m)?.join() === 'a.mp3,b.mp3,c.mp3');
+  ok('one missing piece means device voice for all of it', planClips(['Which word is a noun?', 'cat', 'bird'], m) === null);
+  ok('no manifest, no clips', planClips(['cat'], null) === null && planClips([], m) === null);
+
+  const v = pickVoice([
+    { name: 'Fred', lang: 'en-US', localService: true },
+    { name: 'Samantha (Enhanced)', lang: 'en-US', localService: true },
+    { name: 'Thomas', lang: 'fr-FR' },
+  ]);
+  ok('device fallback picks an enhanced English voice', v?.name === 'Samantha (Enhanced)');
+  ok('no English voice, no pick', pickVoice([{ name: 'Thomas', lang: 'fr-FR' }]) === null);
+  ok('novelty voices are avoided', pickVoice([{ name: 'Bubbles', lang: 'en-US' }, { name: 'Karen', lang: 'en-AU' }]).name === 'Karen');
+
+  const manifest = JSON.parse(readFileSync(new URL('../voice/manifest.json', import.meta.url), 'utf8'));
+  const files = Object.values(manifest);
+  ok('every clip in the manifest exists on disk', files.every(f => existsSync(new URL(`../voice/${f}`, import.meta.url))));
+  ok('the manifest only lists lines the games say', Object.keys(manifest).every(t => lines.has(t)));
 }
 
 /* -------------------------------------------------------------- prizes -- */

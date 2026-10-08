@@ -261,7 +261,7 @@ function match(grade, idx) {
     persist();
     hub();
   });
-  on('#speak', () => current && speak(current.speak));
+  on('#speak', () => current && speak(current.say));
   helpEl.addEventListener('click', () => {
     if (!answering || helpUsed || !current || !useStar(M)) return;
     sfx.star();
@@ -559,7 +559,7 @@ function match(grade, idx) {
         ? `<b>Your kick!</b> Answer right to score.${M.stats.reach > 0 && p.settings.clock ? ` ${esc(t.keeper)} saves slow shots, so be quick!` : ''}`
         : `<b>${esc(t.short)}</b> step up with a <b>${esc(q.kick)}</b>. Answer right to save it!`;
       renderQuestion(q);
-      if (p.settings.readAloud) speak(q.speak);
+      if (p.settings.readAloud) speak(q.say);
       const seconds = clockFor();
       const res = await answer(seconds);
       if (!live()) return;

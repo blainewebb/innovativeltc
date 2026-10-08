@@ -9,6 +9,8 @@ import {
 import { makeRng, poolFor } from '../../wordpunch/js/engine.js';
 import { hydrate, load, save, KEY } from '../js/storage.js';
 import { PRIZES } from '../js/prizes.js';
+import { allSpeechLines } from '../../wordpunch/js/engine.js';
+import { clipText } from '../../wordpunch/js/voice.js';
 
 let passed = 0, failed = 0;
 const ok = (name, cond, extra = '') => {
@@ -260,6 +262,20 @@ section('storage');
   const bad = { getItem: () => '{nope', setItem: () => {} };
   const r = load(bad);
   ok('unreadable save is left alone and read-only', r.readOnly && !save(r, bad));
+}
+
+/* --------------------------------------------------------------- voice -- */
+section('voice');
+{
+  const lines = new Set(allSpeechLines().map(clipText));
+  const rng = makeRng(5);
+  const missing = [];
+  for (const g of GRADES) for (let idx = 0; idx < 8; idx++) for (let i = 0; i < 30; i++) {
+    const q = makeKick({ grade: g, idx, rng, missed: {}, used: new Set() });
+    for (const part of q.say) if (!lines.has(clipText(part))) missing.push(part);
+    if (g === 1 && q.type === 'pick_pos') ok('grade 1 reads only the 3 choices it shows', q.say.length === 4);
+  }
+  ok('every piece Word Kick says has a line to record', missing.length === 0, missing.slice(0, 5).join(' | '));
 }
 
 /* -------------------------------------------------------------- prizes -- */

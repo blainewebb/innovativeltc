@@ -229,7 +229,7 @@ function fight(grade, idx) {
     persist();
     hub();
   });
-  on('#speak', () => current && speak(current.speak));
+  on('#speak', () => current && speak(current.say));
   powerEl.addEventListener('click', () => {
     if (!F.stars) return;
     powerArmed = !powerArmed;
@@ -439,7 +439,7 @@ function fight(grade, idx) {
       }
       if (!live()) return;
       renderQuestion(q, { getUp });
-      if (b.settings.readAloud) speak(q.speak);
+      if (b.settings.readAloud) speak(q.say);
       const seconds = clockFor();
       const res = await answer(seconds);
       if (!live()) return;

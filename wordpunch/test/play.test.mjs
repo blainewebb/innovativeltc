@@ -188,6 +188,51 @@ try {
   ok('a right answer makes the opponent flinch', sawHit);
   ok('the health bars never get fight animations', !(await p2.$('.hud .idle, .hud .hurt, .hud .windup')));
   await ctx2.close();
+
+  // Recorded voice: with a clip for every line, questions play clips and the
+  // device voice stays quiet. With one line missing, the device voice reads it.
+  const { allSpeechLines } = await import('../js/engine.js');
+  const wav = (() => {
+    const n = 400, b = Buffer.alloc(44 + n);
+    b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVE', 8); b.write('fmt ', 12);
+    b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24);
+    b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40);
+    b.fill(128, 44);
+    return b;
+  })();
+  async function voiceRun(dropLine) {
+    const ctxV = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const pv = await ctxV.newPage();
+    const all = Object.fromEntries(allSpeechLines().map(t => [t, 'beep.wav']));
+    await pv.route('**/voice/manifest.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(all) }));
+    await pv.route('**/voice/beep.wav', r => r.fulfill({ contentType: 'audio/wav', body: wav }));
+    await pv.addInitScript(() => {
+      window.__played = []; window.__spoken = [];
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function () { if (!this.src.startsWith('data:')) window.__played.push(this.src); return play.call(this); };
+      if (window.speechSynthesis) window.speechSynthesis.speak = u => window.__spoken.push(u.text);
+    });
+    await pv.goto(`http://127.0.0.1:${PORT}/index.html?test&seed=5`);
+    await pv.fill('#name', 'Listener');
+    await pv.click('.grade-pick .chip[data-g="1"]');
+    await pv.click('#create');
+    if (dropLine) {
+      // Drop every line from the manifest that the first question will need.
+      await pv.route('**/voice/manifest.json', r => r.fulfill({ contentType: 'application/json', body: '{}' }));
+    }
+    await pv.reload();
+    await pv.click('#go');
+    await pv.click('#fight');
+    await pv.waitForFunction(() => window.__wp.n > 0 && (window.__spoken.length || window.__played.length >= window.__wp.q.say.length), null, { timeout: 8000 }).catch(() => {});
+    await pv.waitForTimeout(300);
+    const out = await pv.evaluate(() => ({ played: window.__played.length, spoken: window.__spoken.length, say: window.__wp.q.say }));
+    await ctxV.close();
+    return out;
+  }
+  let v = await voiceRun(false);
+  ok('with clips, a question plays one clip per piece', v.played === v.say.length && v.spoken === 0, JSON.stringify(v));
+  v = await voiceRun(true);
+  ok('without clips, the device voice reads it', v.played === 0 && v.spoken === 1, JSON.stringify(v));
 } finally {
   await browser.close();
 }

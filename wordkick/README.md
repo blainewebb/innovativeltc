@@ -43,6 +43,12 @@ bar with a 3-dot meter.
 The counting rules live in `../wordpunch/js/rewards.js`, shared with Word
 Punch. The prize list is `js/prizes.js`. Every player is made up.
 
+## Read-aloud voice
+
+Word Kick reads questions with Word Punch's recorded ElevenLabs clips
+(`../wordpunch/voice/`), falling back to the best voice on the device. See
+Word Punch's README for how the clips are recorded.
+
 ## One grade easier than Word Punch
 
 | player grade | questions from | notes |

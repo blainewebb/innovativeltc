@@ -56,11 +56,12 @@ export function makeKick(ctx) {
 function trimChoices(q, rng, n) {
   if (q.type !== 'pick_pos' && q.type !== 'spell_pick') return;
   if (q.choices.length <= n) return;
-  const before = q.choices.map(c => c.label).join(', ');
   const right = q.choices.find(c => c.correct);
   const keep = new Set([right, ...shuffle(rng, q.choices.filter(c => !c.correct)).slice(0, n - 1)]);
   q.choices = q.choices.filter(c => keep.has(c));
-  q.speak = q.speak.replace(before, q.choices.map(c => c.label).join(', '));
+  // Only pick-a-word reads its choices out loud.
+  if (q.type === 'pick_pos') q.say = [q.say[0], ...q.choices.map(c => c.label)];
+  q.speak = q.say.join(' ');
 }
 
 /* A star clears away wrong answers. Multiple choice keeps the right answer
