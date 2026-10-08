@@ -4969,7 +4969,13 @@ function grabAges(t){ const a=[]; let m; const re=/\b(\d{2})\s*(?:[- ]?(?:year|y
 function grabBenefit(t){ let m=t.match(/\$?\s*(\d(?:\.\d)?)\s*k\b/i); if(m) return SNAP(parseFloat(m[1])*1000); const re=/\$\s*([\d,]{3,7})|\b([\d,]{4,7})\b/g; let x; while(x=re.exec(t)){ const n=parseInt((x[1]||x[2]).replace(/,/g,'')); if(n>=1000&&n<=20000) return SNAP(n);} return null; }
 function grabBP(t){ let m=t.match(/(\d)\s*[- ]?(?:year|yr)s?\b(?!\s*old)/i); if(m){ const mo=String(+m[1]*12); if(['24','36','48','60','72'].includes(mo)) return mo;} m=t.match(/\b(24|36|48|60|72)\s*[- ]?month/i); if(m) return m[1]; return null; }
 function grabInfl(t){ if(/\b(no inflation|without inflation|level|no cola)\b/i.test(t)) return 0; const m=t.match(/(\d)\s*(?:%|percent)/i); if(m){ const v=+m[1]/100; if(v>=0.01&&v<=0.05) return v;} return null; }
-function grabState(t){ return /\bcolorado\b|\bco\b/i.test(t)?'CO':null; }
+// A state in a typed command: full name in any case ("oklahoma", "West Virginia"), or a CAPITAL two-letter
+// code ("OK", "TX") — lowercase "ok"/"in"/"me" stay ordinary words. ("co" still means Colorado, as before.)
+function grabState(t){
+  const names=US_STATES.slice().sort((a,b)=>b[1].length-a[1].length);   // "West Virginia" before "Virginia"
+  for(const [c,n] of names){ if(new RegExp('\\b'+n.replace(/ /g,'\\s+')+'\\b','i').test(t)) return c; }
+  const codes=t.match(/\b[A-Z]{2}\b/g)||[]; for(const c of codes){ if(US_STATES.some(x=>x[0]===c)) return c; }
+  return /\bco\b/i.test(t)?'CO':null; }
 function grabTarget(t){ let m=t.match(/\$\s*([\d,]{2,5})/); if(m){ const n=parseInt(m[1].replace(/,/g,'')); if(n>=50&&n<=1500) return n;} m=t.match(/\b(\d{2,4})\s*(?:\/mo|\/month|a month|per month|monthly|month)\b/i); if(m){ const n=+m[1]; if(n>=50&&n<=1500) return n;} return null; }
 function interpret(text){
   const t=' '+text.trim()+' '; const gender=grabGender(t), ages=grabAges(t), state=grabState(t);
@@ -5029,7 +5035,8 @@ function runPattern(p, raw){
     if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
     // One age + gender typed → one applicant: joint / couple / shared-care options run as a one-person policy.
     const married=/\bmarried\b/i.test(t);
-    const items=p.options.map(op=> Object.assign({}, qcSingle(op, married||qcSavedMarried(op)), {age:+age, gender}));
+    const st=grabState(t);   // a typed state overrides each option's saved state (OmniFlex fitted to what it files)
+    const items=p.options.map(op=> Object.assign({}, qcConvert(qcSingle(op, married||qcSavedMarried(op)), 'saved', st), {age:+age, gender}));
     setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+items.length+' option'+(items.length>1?'s':'')+'.');
     showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)});
     return;
@@ -5038,7 +5045,7 @@ function runPattern(p, raw){
   if(!gender) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need a <b>gender</b> (add “male” or “female”).');
   if(!age) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — I still need an <b>age</b>.');
   if(!list.length) return setInterp('Quick command <b>'+esc(p.trigger)+'</b> — give me one or more benefit amounts, e.g. “7000 5000 4000”.');
-  const items=list.map(mb=>({age:+age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:p.state||null, riderSharedAdditional:false, maritalDiscount:!!p.maritalDiscount||/\bmarried\b/i.test(t), totalBenefitPeriod:p.benefitPeriod}));
+  const items=list.map(mb=>({age:+age, gender, monthlyBenefit:mb, benefitPeriod:p.benefitPeriod, elimination:p.elimination||'90', inflation:(p.inflation??null), pay:p.pay||'level', mode:p.mode||'monthly', state:grabState(t)||p.state||null, riderSharedAdditional:false, maritalDiscount:!!p.maritalDiscount||/\bmarried\b/i.test(t), totalBenefitPeriod:p.benefitPeriod}));
   setInterp('Quick command <b>'+esc(p.trigger)+'</b>'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+list.map(fmt0).join(', ')+'.');
   showCompare(items, {title:'Quick command “'+esc(p.trigger)+'”'+(p.name?' — '+esc(p.name):'')+' · '+age+' '+gL(gender)+' · '+bpL(p.benefitPeriod)+' · '+pctL(p.inflation??null)+(p.maritalDiscount?' · spousal −'+(MARITAL_DISCOUNT*100)+'%':'')});
 }
