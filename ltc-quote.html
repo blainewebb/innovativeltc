@@ -5112,9 +5112,20 @@ function qcCanon(op){
   const bp=parseInt(op.benefitPeriod||op.totalBenefitPeriod||'36')||36, inf=+op.inflation||0;
   return {mb:+(op._rawMb||op.monthlyBenefit)||4500, years:bp/12, pct:inf*100, term:inf>0?'L':'none', spousal:!!op.maritalDiscount};
 }
+// A saved OmniFlex option moved to another state: snap anything that state doesn't file to its closest option.
+function omniFitState(op, st){ const S=OMNI_RATES.rates[st]; if(!S) return Object.assign({}, op, {state:st});   // not offered there → the quote says so
+  const o=Object.assign({}, op, {state:st}), bps=omniBPs(st);
+  const eps=(S.facility_none?Object.keys(S.facility_none).map(Number):[0]).filter(d=>[0,20,60,90].indexOf(d)>=0);
+  const ep=d=>eps.indexOf(+d)>=0 ? +d : nearestVal(+d||0, eps.length?eps:[0]);
+  o.facilityBP=nearestVal(+o.facilityBP||360, bps); o.facilityEP=ep(o.facilityEP);
+  if(o.homeCare){ o.hcBP=nearestVal(+o.hcBP||o.facilityBP, bps); o.hcEP=ep(o.hcEP); }
+  if(!S.rx) o.rxMax=0; if(!S.facility_infl) o.inflation=false; if(!S.hospital) o.hospital=false;
+  return o; }
 function qcConvert(op, target, state){
-  if(!target||target==='saved') return op;
-  if(qcCarrierOf(op)===target) return state ? Object.assign({}, op, {state}) : op;
+  const pick=String(state||'').toUpperCase();
+  // "As saved" keeps the saved design but always quotes the state picked for this client
+  if(!target||target==='saved') return pick ? (isOmni(op) ? omniFitState(op, pick) : Object.assign({}, op, {state:pick})) : op;
+  if(qcCarrierOf(op)===target) return pick ? (isOmni(op) ? omniFitState(op, pick) : Object.assign({}, op, {state:pick})) : op;
   const c=qcCanon(op), age=op.age, gender=op.gender, st=String(state||op.state||'').toUpperCase()||null, mode='monthly';
   if(target==='ngl'){ const bp=String(nearestVal(c.years*12,[24,36,48,60,72])), inf=nearestVal(c.pct/100,[0,0.01,0.02,0.03,0.04,0.05]);
     return {carrier:'ngl', age, gender, monthlyBenefit:SNAP(c.mb), benefitPeriod:bp, elimination:'90', inflation:inf>0?inf:null, pay:'level', mode, state:st, riderSharedAdditional:false, maritalDiscount:c.spousal, totalBenefitPeriod:bp}; }
