@@ -15,7 +15,11 @@ import {
 import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          ASKED, ASKED_SKILLS, simplifyFraction, RUNES,
          AVATARS, unlockedAvatars, nextAvatar, avatarsEarnedBetween,
-         FLOORS_PER_AVATAR } from '../js/data.js';
+         FLOORS_PER_AVATAR, TYPES, typeMult, TYPE_STRONG, TYPE_WEAK, ENEMIES, BOSSES,
+         SEASONAL_MONSTERS, ALL_MONSTERS, seasonFor } from '../js/data.js';
+import { CHARACTERS, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
+         TROPHIES, checkTrophies, TEAM_SIZE } from '../js/collection.js';
+import { newProfile } from '../js/storage.js';
 
 /** A drill is either a calculation off the tiles or a written question. */
 function drillIsUsable(d) {
@@ -720,6 +724,47 @@ test('a strong player who starts low still climbs to the top', () => {
   }
 });
 
+test('a kid getting nearly everything right is never dropped below their grade', () => {
+  /* A real report card: a 4th grader, 60 problems, 98% right, 4 to 11
+     seconds an answer. His record alone rated him 3rd grade, because a few
+     tries on a skill count for little and he had only been served 3rd grade
+     tables and division so far. So once the grade floor began to fade he was
+     handed easier work while getting almost everything right. The floor may
+     only fall for a kid who is actually getting problems wrong. */
+  const m = blankMastery();
+  const card = [
+    ['add_small', '3+4', 8, 4100], ['sub_small', '9-4', 13, 5600], ['add_big', '23+18', 4, 11100],
+    ['mult_hard', '7*8', 24, 6300], ['div_easy', '12/3', 8, 6100],
+    ['word_1step', null, 1, 15000], ['word_2step', null, 1, 20000], ['place_est', null, 1, 15000],
+  ];
+  for (const [skill, fact, n, ms] of card) {
+    for (let i = 0; i < n; i++) {
+      recordAttempt(m, { skill, fact, correct: !(skill === 'mult_hard' && i === 5), ms });
+    }
+  }
+  assert.equal(totalAttempts(m), 60);
+  assert.equal(difficultyLevel(m, 4), 4);
+  // Keep playing at the same accuracy and speed, sticking to favourites the
+  // way a kid building their own strikes can: subtraction and times tables.
+  const mix = card.filter(c => c[0] === 'sub_small' || c[0] === 'mult_hard');
+  for (let i = 0; i < 150; i++) {
+    const [skill, fact, , ms] = mix[i % mix.length];
+    recordAttempt(m, { skill, fact, correct: i % 40 !== 39, ms });
+    assert.ok(difficultyLevel(m, 4) >= 4,
+      `fell to level ${difficultyLevel(m, 4)} after ${totalAttempts(m)} problems at 97% right`);
+  }
+});
+
+test('a kid who is struggling still has the grade fade, gradually', () => {
+  // Mostly right is not the same as struggling, but a parent's guess must not
+  // hold a kid who gets a third of it wrong.
+  const m = blankMastery();
+  for (let i = 0; i < GRADE_GRACE_ATTEMPTS + GRADE_DECAY_ATTEMPTS * 6; i++) {
+    recordAttempt(m, { skill: 'mult_easy', fact: '3*4', correct: i % 3 !== 0, ms: 9000 });
+  }
+  assert.ok(difficultyLevel(m, 6) < 6, `stayed at ${difficultyLevel(m, 6)} while getting a third wrong`);
+});
+
 test('a kid who races ahead is never held back by the grade', () => {
   const m = blankMastery();
   for (let i = 0; i < 20; i++) recordAttempt(m, { skill: 'div_hard', fact: '56/8', correct: true, ms: 1400 });
@@ -1230,6 +1275,133 @@ test('the biggest number is often NOT the best play', () => {
     assert.ok(avgGap < 2.2,
       `${label}: picking the obvious play costs ${(avgGap * 100).toFixed(0)}% damage, which punishes an 8 year old far too hard`);
   }
+});
+
+/* ------------------------------------------------------------- types -- */
+test('every type beats exactly one other, and the chart reads like Pokemon', () => {
+  for (const t of Object.values(TYPES)) assert.equal(t.beats.length, 1, t.id);
+  assert.equal(typeMult('water', 'fire'), TYPE_STRONG, 'water puts out fire');
+  assert.equal(typeMult('fire', 'grass'), TYPE_STRONG, 'fire burns grass');
+  assert.equal(typeMult('grass', 'storm'), TYPE_STRONG, 'grass grounds storm');
+  assert.equal(typeMult('storm', 'water'), TYPE_STRONG, 'storm zaps water');
+  assert.equal(typeMult('fire', 'water'), TYPE_WEAK, 'and the other way round is weak');
+  assert.equal(typeMult('light', 'shadow'), TYPE_STRONG);
+  assert.equal(typeMult('shadow', 'light'), TYPE_STRONG, 'light and shadow hurt each other');
+  assert.equal(typeMult('fire', 'light'), 1);
+  assert.equal(typeMult('fire', 'nonsense'), 1, 'an unknown type is neutral, never NaN');
+  assert.equal(matchup('light', 'shadow').edge, 'clash');
+  assert.equal(matchup('water', 'fire').edge, 'strong');
+  assert.equal(matchup('fire', 'water').edge, 'weak');
+});
+
+test('the type bonus multiplies a hit and can punch through armor', () => {
+  const base = { result: 20, op: '+', ward: 'none', resist: 'none', resistAt: 0, armor: 10, relics: [], combo: 0, ms: 3000, isFirstHit: false };
+  const even = computeDamage(base).damage;
+  const strong = computeDamage({ ...base, typeMult: TYPE_STRONG }).damage;
+  const weak = computeDamage({ ...base, typeMult: TYPE_WEAK }).damage;
+  assert.equal(even, 10);
+  assert.equal(strong, 20, '30 before armor');
+  assert.equal(weak, 5, '15 before armor');
+});
+
+test('an enemy with the type edge hits harder, and the warning shows the real number', () => {
+  const rng = makeRng(5);
+  const e = spawnEnemy(rng, 3, { level: 3, playerMaxHp: 50 });
+  e.intents = [{ type: 'attack', dmg: 10 }];
+  e.typeEdge = TYPE_STRONG;
+  assert.match(describeIntent(e).text, /15/);
+  const p = { hp: 50, relics: [] };
+  enemyAct(e, p, rng);
+  assert.equal(p.hp, 35);
+});
+
+/* ---------------------------------------------------------- monsters -- */
+test('every monster is complete and typed, and ids never clash', () => {
+  for (const m of ALL_MONSTERS) {
+    assert.ok(TYPES[m.type], `${m.id} type`);
+    assert.ok(m.ward.every(w => WARDS[w]), `${m.id} wards`);
+    assert.ok(m.resist.every(r => RESISTS[r]), `${m.id} resists`);
+    assert.ok(m.intents.length && m.hpW > 0 && m.armorFrac >= 0, `${m.id} stats`);
+    assert.ok(m.art && m.name, `${m.id} looks`);
+  }
+  const ids = CHARACTERS.map(c => c.id);
+  assert.equal(new Set(ids).size, ids.length, 'a character id is used twice');
+  assert.ok(ENEMIES.length >= 18 && BOSSES.length >= 6, 'enough monsters that runs stay fresh');
+  for (const t of Object.keys(TYPES)) {
+    assert.ok(ENEMIES.some(m => m.type === t && m.tier === 1), `a ${t} monster can be met on floor 1`);
+  }
+  assert.ok(AVATARS.every(a => TYPES[a.type]), 'every hero has a type');
+});
+
+test('seasons follow the calendar, and can be previewed', () => {
+  assert.equal(seasonFor(new Date(2026, 9, 3)).id, 'halloween');
+  assert.equal(seasonFor(new Date(2026, 10, 26)).id, 'harvest');
+  assert.equal(seasonFor(new Date(2026, 11, 25)).id, 'winter');
+  assert.equal(seasonFor(new Date(2027, 0, 5)), null);
+  assert.equal(seasonFor(new Date(2026, 8, 20)), null);
+  assert.equal(seasonFor(new Date(2026, 8, 20), 'winter').id, 'winter');
+  assert.equal(seasonFor(new Date(2026, 9, 3), 'none'), null);
+  for (const id of ['halloween', 'harvest', 'winter']) {
+    const set = SEASONAL_MONSTERS.filter(m => m.season === id);
+    assert.ok(set.some(m => m.boss), `${id} has a boss`);
+    assert.ok(set.filter(m => !m.boss && m.tier === 1).length >= 2, `${id} has floor 1 monsters`);
+  }
+});
+
+test('seasonal monsters turn up only in their season, about half the time', () => {
+  let seasonalIn = 0, seasonalOut = 0, bossIn = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    if (spawnEnemy(makeRng(seed), 2, { season: 'halloween' }).season === 'halloween') seasonalIn++;
+    if (spawnEnemy(makeRng(seed), 2, {}).season) seasonalOut++;
+    if (spawnEnemy(makeRng(seed), 3, { season: 'halloween', boss: true }).season === 'halloween') bossIn++;
+  }
+  assert.equal(seasonalOut, 0);
+  assert.ok(seasonalIn > 140 && seasonalIn < 260, `${seasonalIn} of 400`);
+  assert.ok(bossIn > 140 && bossIn < 260, `${bossIn} of 400 bosses`);
+});
+
+/* ---------------------------------------------------------- catching -- */
+test('catching rewards the maths: better fights catch more, flawless nearly always', () => {
+  const sloppy = catchChance({ right: 3, wrong: 4, best: 1, fastMs: 9000 });
+  const decent = catchChance({ right: 6, wrong: 2, best: 3, fastMs: 5000 });
+  const flawless = catchChance({ right: 6, wrong: 0, best: 6, fastMs: 4000 });
+  assert.ok(sloppy < decent && decent < flawless, `${sloppy} ${decent} ${flawless}`);
+  assert.ok(flawless >= 0.9);
+  assert.ok(catchChance({ right: 6, wrong: 0, best: 6 }, { boss: true }) < flawless, 'bosses are harder');
+  assert.ok(catchChance({ right: 6, wrong: 0, best: 6 }, { elite: true }) < flawless, 'elites are harder');
+  assert.ok(catchChance({ right: 0, wrong: 5 }) > 0, 'never hopeless');
+  assert.ok(catchChance({ right: 50, wrong: 0, best: 50, fastMs: 100 }) <= 0.95, 'never quite certain');
+});
+
+test('the team is owned characters only, lead first, never empty, at most three', () => {
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(leadOf(p).id, 'fox');
+  assert.deepEqual(teamOf(p).map(c => c.id), ['fox']);
+  p.party = ['fox', 'slime', 'wolf'];
+  assert.deepEqual(teamOf(p).map(c => c.id), ['fox'], 'not caught and not earned yet');
+  p.caught = ['slime'];
+  p.records.floorsBeaten = 5;
+  assert.deepEqual(teamOf(p).map(c => c.id), ['fox', 'slime', 'wolf']);
+  p.party = ['fox', 'slime', 'wolf', 'mage'];
+  assert.equal(teamOf(p).length, TEAM_SIZE);
+  assert.ok(ownedIds(p).includes('slime') && ownedIds(p).includes('wolf') && !ownedIds(p).includes('owl'));
+  p.caught = ['h_jack'];
+  assert.deepEqual(seasonProgress(p, 'halloween'), { total: 10, caught: 1 });
+});
+
+/* ---------------------------------------------------------- trophies -- */
+test('trophies come from the maths, once each', () => {
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.deepEqual(checkTrophies(p, 4).map(t => t.id), [], 'nothing for nothing');
+  p.records.fightsWon = 1;
+  p.records.bestStreak = 12;
+  assert.deepEqual(checkTrophies(p, 4).map(t => t.id).sort(), ['first_win', 'hot_streak']);
+  assert.deepEqual(checkTrophies(p, 4), [], 'never awarded twice');
+  for (let i = 0; i < 6; i++) recordAttempt(p.mastery, { skill: 'fractions', correct: true, ms: 9000 });
+  assert.ok(checkTrophies(p, 5).some(t => t.id === 'fractions'));
+  assert.ok(p.trophies.level5, 'climbing counts');
+  assert.ok(TROPHIES.length >= 20);
+  assert.equal(new Set(TROPHIES.map(t => t.id)).size, TROPHIES.length);
 });
 
 console.log(`${passed} engine tests passed`);
