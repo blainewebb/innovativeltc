@@ -2,6 +2,7 @@
    Run: node test/play.test.mjs  (expects a static server on PORT, default 8124) */
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import { worldTurn } from './worldbot.mjs';
 
 // Playwright lives in the global npm root here, which ESM resolution ignores.
 const require = createRequire(import.meta.url);
@@ -107,8 +108,7 @@ async function toHand(page) {
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
     if (await page.$('#again')) { await page.click('#again'); continue; }
-    const n = await page.$('.node.battle') || await page.$('.node');
-    if (n) { await n.click(); continue; }
+    if (await page.$('#world')) { if ((await worldTurn(page)) === 'stuck') return false; continue; }
     return false;
   }
   return false;
@@ -150,22 +150,31 @@ try {
 
   /* ---- start a run, reach a battle ---- */
   await page.click('#startRun');
-  await page.waitForSelector('.node');
-  ok('run starts on floor 1 with path choices', (await page.$$('.node')).length >= 2);
+  await page.waitForSelector('#world');
+  ok('a run starts in a walkable world', !!(await page.$('#hero')) && (await page.$$('#world .wt')).length === 11 * 13);
+  ok('the area has tall grass and a way on',
+     !!(await page.$('#world [data-k="tall"]')) && !!(await page.$('#world [data-o="gate"], #world [data-o="boss"]')));
+  const heroAt = () => page.$eval('#hero', e => `${e.dataset.x},${e.dataset.y}`);
+  const startPos = await heroAt();
+  await page.keyboard.press('ArrowUp');
+  ok('the arrow keys walk the hero', (await heroAt()) !== startPos, `${startPos} -> ${await heroAt()}`);
+  const beforePad = await heroAt();
+  await page.click('.dk.down');
+  await page.waitForTimeout(80);
+  ok('the on-screen arrow pad walks the hero too', (await heroAt()) !== beforePad);
+  // The gate stays shut until a fight here is won.
+  for (let i = 0; i < 6 && !(await page.$('#wdialog:not([hidden])')); i++) await worldTurn(page, { want: 'gate' });
+  const sealed = await page.$eval('#wdialog', e => e.textContent).catch(() => '');
+  ok('the gate is sealed until a fight is won', /sealed/i.test(sealed), sealed.slice(0, 120));
+  while (await page.$('#wdialog:not([hidden])')) await worldTurn(page);
 
-  // Walk floors until a battle screen appears.
+  // Into the tall grass until something jumps out.
   let foundBattle = false;
-  for (let attempt = 0; attempt < 6 && !foundBattle; attempt++) {
-    const battleNode = await page.$('.node.battle');
-    if (battleNode) { await battleNode.click(); }
-    else { await page.click('.node'); }
+  for (let attempt = 0; attempt < 40 && !foundBattle; attempt++) {
     if (await page.$('.hand')) { foundBattle = true; break; }
-    // Non-battle node: answer it however we can, then continue.
-    if (await page.$('#go')) { await typeNumber(page, 1, '#go'); await page.click('#next'); }
-    else if (await page.$('#leave')) await page.click('#leave');
-    else if (await page.$('#heal')) await page.click('#heal');
-    await page.waitForSelector('.node, .hand');
+    await worldTurn(page, { skip: ['trainer', 'healer'] });
   }
+  ok('the tall grass leads to a wild monster', foundBattle && /A wild .+ appeared/.test(await page.$eval('.log', e => e.textContent).catch(() => '')));
   ok('reaches a battle with a hand of tiles', foundBattle);
 
   /* ---- a correct strike deals damage ---- */
@@ -296,7 +305,7 @@ try {
     if (await page.$('#go')) { await typeNumber(page, 7, '#go'); continue; }
     if (await page.$('#leave')) { await page.click('#leave'); continue; }
     if (await page.$('#again')) { await page.click('#again'); continue; }
-    if (await page.$('.node')) { const n = await page.$('.node.battle') || await page.$('.node'); await n.click(); continue; }
+    if (await page.$('#world')) { if ((await worldTurn(page)) === 'stuck') break; continue; }
     break;
   }
   ok('beating a floor earns the next hero', earnedScreen);
@@ -304,7 +313,7 @@ try {
     const panel = await page.$eval('.panel', e => e.textContent);
     ok('the earning screen names the hero and the floors', /is yours, for beating 5 floors/.test(panel), panel.slice(0, 160));
     await page.click('#wear');
-    await page.waitForSelector('.node, .drill-problem, .hand');
+    await page.waitForSelector('#world, .drill-problem, .hand');
     ok('wearing it carries on with the run', true);
   }
 
@@ -340,11 +349,7 @@ try {
     if (await page.$('#again')) { await page.click('#again'); continue; }
     if (await page.$('#wear')) { await page.click('#wear'); continue; }
     if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
-    if (await page.$('.node')) {
-      const n = await page.$('.node.battle') || await page.$('.node');
-      await n.click();
-      continue;
-    }
+    if (await page.$('#world')) { if ((await worldTurn(page)) === 'stuck') break; continue; }
     break;
   }
   ok('a written middle-school question comes up', !!askedSeen, String(askedSeen).slice(0, 120));
@@ -393,11 +398,7 @@ try {
     if (await page.$('#again')) { await page.click('#again'); continue; }
     if (await page.$('#wear')) { await page.click('#wear'); continue; }
     if (await page.$('#evoOk')) { await page.click('#evoOk'); continue; }
-    if (await page.$('.node')) {
-      const n = await page.$('.node.boss') || await page.$('.node.battle') || await page.$('.node');
-      await n.click();
-      continue;
-    }
+    if (await page.$('#world')) { if ((await worldTurn(page)) === 'stuck') break; continue; }
     break;
   }
   ok('a boss duel appears within the first few floors', sawDuel);
@@ -531,8 +532,8 @@ try {
   ok('an older save still loads straight into its hub', /Hudson/.test(oldHero), oldHero);
   ok('an older save keeps its deepest floor', /\b8\b/.test(oldHero), oldHero);
   await page.click('#startRun');
-  await page.waitForSelector('.node');
-  ok('an older save is playable, not just visible', (await page.$$('.node')).length >= 1);
+  await page.waitForSelector('#world');
+  ok('an older save is playable, not just visible', !!(await page.$('#hero')));
 
   /* ---- deleting a hero from the picker ---- */
   await page.goto(URL, { waitUntil: 'networkidle' });
@@ -599,16 +600,8 @@ try {
   await fxPage.click('#done');
   await fxPage.waitForSelector('#startRun');
   await fxPage.click('#startRun');
-  await fxPage.waitForSelector('.node');
-  for (let i = 0; i < 6 && !(await fxPage.$('.hand')); i++) {
-    const n = await fxPage.$('.node.battle');
-    await (n || await fxPage.$('.node')).click();
-    if (await fxPage.$('.hand')) break;
-    if (await fxPage.$('#go')) { await typeNumber(fxPage, 1, '#go'); await fxPage.click('#next'); }
-    else if (await fxPage.$('#leave')) await fxPage.click('#leave');
-    else if (await fxPage.$('#heal')) await fxPage.click('#heal');
-    await fxPage.waitForSelector('.node, .hand');
-  }
+  await fxPage.waitForSelector('#world');
+  for (let i = 0; i < 40 && !(await fxPage.$('.hand')); i++) await worldTurn(fxPage, { skip: ['trainer', 'healer'] });
   ok('the battle shows both fighters on a field',
      !!(await fxPage.$('.field #heroSprite')) && !!(await fxPage.$('.field #foeSprite')));
   ok('both fighters have a health bar', !!(await fxPage.$('#heroHp')) && !!(await fxPage.$('#foeHp')));
@@ -652,7 +645,7 @@ try {
     await fxPage.click('.fx-skip');
     ok('tapping skips straight to the next turn', !(await fxPage.$('#app[data-busy]')) && !(await fxPage.$('.fx-skip')));
     ok('after skipping the next turn is ready', !!(await fxPage.$('.hand')) || !!(await fxPage.$('.drill-problem'))
-       || !!(await fxPage.$('.node')) || !!(await fxPage.$('#cont, #next')));
+       || !!(await fxPage.$('#world')) || !!(await fxPage.$('#cont, #next')));
   }
 
   // Keep fighting until something faints, watching the caption for it. The
@@ -708,6 +701,55 @@ try {
     ok('a win gets a victory banner', false, 'no win scene after the knockout');
   }
   await fxPage.close();
+
+  /* ---- the world: grass, quests and the gate ---- */
+  const wp = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  wp.on('pageerror', e => errors.push(e.message));
+  await wp.goto(URL, { waitUntil: 'networkidle' });
+  await wp.fill('#newName', 'Walker');
+  await wp.click('.grade[data-grade="3"]');
+  await wp.click('#createProfile');
+  await wp.click('#startRun');
+  await wp.waitForSelector('#world');
+  // A townsperson offers a quest.
+  for (let i = 0; i < 8 && !(await wp.$('#wdialog:not([hidden])')); i++) await worldTurn(wp, { want: 'npc' });
+  const offer = await wp.$eval('#wdialog', e => e.textContent).catch(() => '');
+  ok('a townsperson offers a quest', /Could you help me\?/.test(offer), offer.slice(0, 120));
+  await wp.click('#wdialog [data-db="0"]');
+  await wp.waitForSelector('.wquest');
+  ok('the quest shows above the map with a counter', /\d+\/\d+/.test(await wp.$eval('.wquest', e => e.textContent)));
+  // Into the grass, win the fight, and come back to the same spot.
+  for (let i = 0; i < 40 && !(await wp.$('.hand, .drill-problem')); i++) await worldTurn(wp, { want: 'grass' });
+  for (let step = 0; step < 120 && !(await wp.$('.win-scene')); step++) {
+    if (await wp.$('.drill-problem')) { await clearDrill(wp); continue; }
+    if (await wp.$('.hand')) {
+      if (!(await buildLegalExpression(wp))) { if (await tryReshuffle(wp)) continue; break; }
+      const ex = await readExpression(wp);
+      await typeNumber(wp, ex.answer, '#strike');
+      continue;
+    }
+    break;
+  }
+  ok('a wild battle can be won', !!(await wp.$('.win-scene')));
+  for (let i = 0; i < 6 && !(await wp.$('#world')); i++) {
+    if (await wp.$('#cont')) await wp.click('#cont');
+    else if (await wp.$('#evoOk')) await wp.click('#evoOk');
+    else if (await wp.$('.choice')) await wp.click('.choice');
+  }
+  ok('winning goes back to the world, not on to the next floor',
+     !!(await wp.$('#world')) && /Floor 1\b/.test(await wp.$eval('.wtitle', e => e.textContent)));
+  // Wild monsters only jump out of tall grass, so the hero should be standing in it again.
+  ok('the hero is back where the fight started', await wp.evaluate(() => {
+    const h = document.getElementById('hero').dataset;
+    return document.querySelector(`#world .wt[data-x="${h.x}"][data-y="${h.y}"]`)?.dataset.k === 'tall';
+  }));
+  ok('a win opens the gate', !(await wp.$('.o-gate .wmark.lock')) && /Gate open/.test(await wp.$eval('.wtitle', e => e.textContent)));
+  for (let i = 0; i < 8 && !(await wp.$('#wdialog:not([hidden])')); i++) await worldTurn(wp, { want: 'gate' });
+  ok('the open gate offers the next floor', /On to floor 2/.test(await wp.$eval('#wdialog', e => e.textContent).catch(() => '')));
+  await wp.click('#wdialog [data-db="0"]');
+  await wp.waitForSelector('#world, #wear');
+  ok('through the gate is floor 2', /Floor 2\b/.test(await wp.$eval('.wtitle', e => e.textContent).catch(() => '')));
+  await wp.close();
 
   /* ---- evolving ---- */
   const evoPage = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });

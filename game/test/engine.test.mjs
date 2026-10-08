@@ -21,6 +21,7 @@ import { CHARACTERS, CHARACTER_BY_ID, ownedIds, teamOf, leadOf, matchup, catchCh
          TROPHIES, checkTrophies, TEAM_SIZE, EVOLVE_AT, STAGE_POWER, EVO_CHAINS, formOf, stageName,
          earnedStage, stageOf, pendingEvolutions, evolve, addXp, evolveProgress } from '../js/collection.js';
 import { newProfile } from '../js/storage.js';
+import { generateArea, areaIsSound, pathTo, objectAt, walkableAt, W as WW, H as WH } from '../js/world.js';
 
 /** A drill is either a calculation off the tiles or a written question. */
 function drillIsUsable(d) {
@@ -1544,6 +1545,42 @@ test('an evolved fighter hits harder through the same damage formula', () => {
   const base = { result: 30, op: '+', ward: 'none', resist: 'none', resistAt: 0, armor: 0, relics: [], combo: 0, ms: 3000, isFirstHit: false };
   assert.equal(computeDamage(base).damage, 30);
   assert.equal(computeDamage({ ...base, typeMult: STAGE_POWER[2] }).damage, 36);
+});
+
+/* ------------------------------------------------------------- world -- */
+test('every area is fully walkable: grass to fight in, and every house, person and gate reachable', () => {
+  for (let seed = 1; seed <= 300; seed++) {
+    for (const depth of [1, 2, 3, 4, 6, 9, 14, 20, 23]) {
+      const rng = makeRng(seed * 101 + depth);
+      const nodes = generateFloor(rng, depth);
+      const a = generateArea(rng, depth, nodes);
+      assert.ok(areaIsSound(a), `seed ${seed} floor ${depth}`);
+      for (const o of a.objects) assert.ok(pathTo(a, a.start, o), `seed ${seed} floor ${depth}: cannot reach ${o.kind}`);
+      assert.equal(a.tiles.length, WH);
+      assert.ok(a.tiles.every(r => r.length === WW));
+      assert.ok(walkableAt(a, a.start.x, a.start.y), 'the hero starts on open ground');
+    }
+  }
+});
+
+test('an area is built from its floor: one house per node, the boss tower every third floor', () => {
+  const rng = makeRng(42);
+  const a = generateArea(rng, 4, [{ type: 'elite' }, { type: 'rest' }, { type: 'shop' }]);
+  const kinds = a.objects.map(o => o.kind).sort();
+  assert.ok(kinds.includes('trainer') && kinds.includes('healer') && kinds.includes('shop'));
+  assert.ok(kinds.includes('gate') && !kinds.includes('boss'));
+  assert.ok(a.objects.find(o => o.kind === 'trainer').trainer.name, 'a trainer has a name');
+  const b = generateArea(makeRng(7), 3, generateFloor(makeRng(7), 3));
+  assert.ok(b.boss && b.objects.some(o => o.kind === 'boss') && !b.objects.some(o => o.kind === 'gate'));
+  assert.ok(!b.objects.some(o => ['trainer', 'shop', 'healer'].includes(o.kind)), 'a boss floor is just grass, people and the tower');
+});
+
+test('the same seed lays out the same area', () => {
+  const one = generateArea(makeRng(9), 5, [{ type: 'elite' }, { type: 'riddle' }]);
+  const two = generateArea(makeRng(9), 5, [{ type: 'elite' }, { type: 'riddle' }]);
+  assert.deepEqual(one.tiles, two.tiles);
+  assert.deepEqual(one.objects, two.objects);
+  assert.ok(objectAt(one, one.gate.x, one.gate.y), 'the gate sits on its tile');
 });
 
 console.log(`${passed} engine tests passed`);

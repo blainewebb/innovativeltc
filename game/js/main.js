@@ -8,7 +8,7 @@ import {
   unlockedOps, handSize, reshuffles, FINAL_DEPTH,
   pickDrill, drillAllowanceMs, bossFightMs, isBossFloor, expectedDrillDamage,
   bestHitEstimate, makeRng as engineRng, typeInto, checkAnswer, formatAnswer, parseAnswer,
-  nextLevelNeeds, GATE_TRIES,
+  nextLevelNeeds, GATE_TRIES, parseFactKey,
   SKILLS, WARDS, RESISTS, RELIC_BY_ID,
 } from './engine.js';
 import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
@@ -18,6 +18,7 @@ import { CHARACTERS, CHARACTER_BY_ID, TEAM_SIZE, ownedIds, leadOf, teamOf, match
          catchChance, seasonProgress, TROPHIES, checkTrophies,
          formOf, addXp, pendingEvolutions, evolve, evolveProgress } from './collection.js';
 import * as store from './storage.js';
+import { W as WORLD_W, H as WORLD_H, generateArea, walkableAt, objectAt, ONCE } from './world.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
 
 let data = store.load();
@@ -272,47 +273,298 @@ function levelUpLine() {
 
 function beginRun(endless = false) {
   run = newRun(Date.now() % 2147483647, profile, endless);
+  run.area = generateArea(run.rng, run.depth, run.floorNodes);
   profile.records.runs += 1;
   persist();
-  screenMap();
+  screenWorld();
 }
 
-/* ================================================================= map === */
-const NODE_LOOK = {
-  battle:   { icon: '⚔️', label: 'Monster', hint: 'A fight. Gold when you win.' },
-  elite:    { icon: '\u{1F480}', label: 'Elite', hint: 'Much tougher. Drops a relic.' },
-  boss:     { icon: '\u{1F451}', label: 'BOSS', hint: 'Beat it to unlock something permanent.' },
-  riddle:   { icon: '\u{1F52E}', label: 'Riddle shrine', hint: 'A word problem. Relic if you solve it.' },
-  treasure: { icon: '\u{1F4E6}', label: 'Locked chest', hint: 'Crack the number lock for loot.' },
-  shop:     { icon: '\u{1F3EA}', label: 'Trader', hint: 'Spend gold on relics and healing.' },
-  rest:     { icon: '\u{1F525}', label: 'Campfire', hint: 'Heal up, or train for more health.' },
+/* =============================================================== world === */
+/* Each floor is a small area to walk around, Pokemon style: tall grass with
+   wild monsters, houses with trainers, the healer, the shop and the riddle
+   hall, a locked chest, townspeople with quests and hints, and a gate on to
+   the next floor that opens once a fight here has been won. Every third
+   floor the gate is the boss tower. The layout comes from world.js. */
+const HEALER_SHARE = 0.25;
+const WORLD_LOOK = {
+  none:      { tree: '\u{1F333}', deco: ['\u{1F33C}', '\u{1F337}'] },
+  halloween: { tree: '\u{1F332}', deco: ['\u{1F383}', '\u{1F578}️', '\u{1F342}'] },
+  harvest:   { tree: '\u{1F333}', deco: ['\u{1F342}', '\u{1F33E}', '\u{1F341}'] },
+  winter:    { tree: '\u{1F332}', deco: ['❄️', '⛄'] },
 };
+const OBJ_ART = { trainer: '\u{1F3E0}', healer: '\u{1F3E5}', shop: '\u{1F3EA}', riddle: '\u{1F3DB}️',
+                  chest: '\u{1F9F0}', gate: '⛩️', boss: '\u{1F3F0}' };
+const ENCOUNTER_CHANCE = 0.2;   // per step in tall grass
+const ENCOUNTER_SURE = 6;       // steps in grass before one is certain
+let worldRepeat = null;
+let dialogQueue = null;
 
-function screenMap() {
-  const p = run.player;
+function stopWorldRepeat() { if (worldRepeat) { clearInterval(worldRepeat); worldRepeat = null; } }
+
+function worldTileHtml(a, x, y) {
+  const look = WORLD_LOOK[SEASON ? SEASON.id : 'none'];
+  const t = a.tiles[y][x];
+  const o = objectAt(a, x, y);
+  let inner = '';
+  let extra = '';
+  if (o) {
+    const done = ONCE.has(o.kind) && o.done;
+    if (o.kind === 'npc') inner = o.npc.art;
+    else if (o.kind === 'chest' && done) inner = '';
+    else inner = OBJ_ART[o.kind];
+    if (o.kind === 'trainer' && !done) extra = '<b class="wmark">!</b>';
+    if (o.kind === 'gate' && !a.wins) extra = '<b class="wmark lock">\u{1F512}</b>';
+    if (o.kind === 'npc' && !run.quest) extra = '<b class="wmark">?</b>';
+    return `<div class="wt t-${t} obj o-${o.kind} ${done ? 'used' : ''}" data-x="${x}" data-y="${y}" data-k="obj" data-o="${o.kind}" ${done ? 'data-done="1"' : ''}>${inner}${extra}</div>`;
+  }
+  if (t === 'tree') inner = look.tree;
+  else if (t === 'tall') inner = '<span class="blades"></span>';
+  else if (t === 'ground' && a.deco.includes(`${x},${y}`)) inner = look.deco[(x * 7 + y * 3) % look.deco.length];
+  return `<div class="wt t-${t}" data-x="${x}" data-y="${y}" data-k="${t}">${inner}</div>`;
+}
+
+function questLine() {
+  if (!run.quest) return '';
+  const q = run.quest;
+  return `<span class="wquest">\u{1F4DC} ${esc(q.text)} <b>${Math.min(q.have, q.need)}/${q.need}</b></span>`;
+}
+
+function screenWorld() {
+  stopWorldRepeat();
+  const a = run.area;
+  const lead = form(teamOf(profile)[0]);
+  const where = a.boss ? 'Boss floor' : `Route ${run.depth}`;
   render(`
-    <div class="screen">
+    <div class="screen world-screen">
       ${topBar()}
-      <div class="map">
-        <h2 class="floor-title">Floor ${run.depth}${run.endless ? '' : ` of ${FINAL_DEPTH}`}</h2>
-        <p class="muted center">Choose your path.</p>
-        <div class="nodes">
-          ${run.floorNodes.map((n, i) => `
-            <button class="node ${n.type}" data-i="${i}">
-              <span class="ni">${NODE_LOOK[n.type].icon}</span>
-              <span class="nbody">
-                <span class="nl">${NODE_LOOK[n.type].label}</span>
-                <small>${NODE_LOOK[n.type].hint}</small>
-              </span>
-            </button>`).join('')}
+      <div class="wtitle"><b>Floor ${run.depth}${run.endless ? '' : ` of ${FINAL_DEPTH}`}</b> <span>${where}</span>
+        <span class="wwins">${a.boss ? '\u{1F3F0} The boss is at the top' : a.wins ? '⛩️ Gate open' : '\u{1F33F} Win a fight to open the gate'}</span></div>
+      ${questLine()}
+      <div class="world-wrap">
+        <div class="world" id="world" data-w="${WORLD_W}" data-h="${WORLD_H}">
+          ${a.tiles.map((row, y) => row.map((_, x) => worldTileHtml(a, x, y)).join('')).join('')}
+          <div class="hero-w evo${lead.stage} t-${lead.type}" id="hero" data-x="${a.pos.x}" data-y="${a.pos.y}" style="--hx:${a.pos.x};--hy:${a.pos.y}">${lead.char}</div>
         </div>
-        <div class="relic-tray">
-          ${p.relics.length ? p.relics.map(id => `<span class="relic-mini" title="${esc(RELIC_BY_ID[id].text)}">${RELIC_BY_ID[id].art}</span>`).join('')
-            : '<span class="muted tiny">No relics yet. Beat elites and shrines to earn them.</span>'}
+        <div class="wdialog" id="wdialog" hidden></div>
+      </div>
+      <div class="wcontrols">
+        <div class="dpad">
+          <button class="dk up" data-d="0,-1" aria-label="Up">▲</button>
+          <button class="dk left" data-d="-1,0" aria-label="Left">◀</button>
+          <button class="dk right" data-d="1,0" aria-label="Right">▶</button>
+          <button class="dk down" data-d="0,1" aria-label="Down">▼</button>
         </div>
+        <p class="whelp">Walk into houses, people and the gate to use them. Tall grass \u{1F33F} hides wild monsters.</p>
       </div>
     </div>`);
-  $$('.node').forEach(b => b.onclick = () => { sfx.tap(); enterNode(run.floorNodes[+b.dataset.i]); });
+
+  $$('.dk').forEach(b => {
+    const [dx, dy] = b.dataset.d.split(',').map(Number);
+    const go = ev => {
+      ev.preventDefault();
+      stopWorldRepeat();
+      worldStep(dx, dy);
+      worldRepeat = setInterval(() => { if (!$('#world') || dialogOpen()) return stopWorldRepeat(); worldStep(dx, dy); }, 190);
+    };
+    b.addEventListener('pointerdown', go);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, stopWorldRepeat));
+  });
+}
+
+const dialogOpen = () => { const d = $('#wdialog'); return !!(d && !d.hidden); };
+
+/* A Pokemon-style text box. Lines are read one tap at a time; the last can
+   offer buttons. */
+function showDialog(lines, buttons = [{ label: 'OK' }]) {
+  stopWorldRepeat();
+  dialogQueue = { lines: [].concat(lines), buttons };
+  drawDialog();
+}
+
+function drawDialog() {
+  const d = $('#wdialog');
+  if (!d || !dialogQueue) return;
+  const { lines, buttons } = dialogQueue;
+  const last = lines.length === 1;
+  d.hidden = false;
+  d.innerHTML = `<p>${lines[0]}</p>
+    <div class="wdbtns">${last
+      ? buttons.map((b, i) => `<button class="btn ${i === 0 ? 'primary' : 'ghost'} small" data-db="${i}">${b.label}</button>`).join('')
+      : '<button class="btn primary small" data-db="next">▼</button>'}</div>`;
+  d.querySelectorAll('[data-db]').forEach(btn => btn.onclick = () => {
+    sfx.tap();
+    if (btn.dataset.db === 'next') { dialogQueue.lines.shift(); return drawDialog(); }
+    const b = buttons[Number(btn.dataset.db)];
+    closeDialog();
+    if (b && b.action) b.action();
+  });
+}
+
+function closeDialog() {
+  dialogQueue = null;
+  const d = $('#wdialog');
+  if (d) { d.hidden = true; d.innerHTML = ''; }
+}
+
+function moveHero() {
+  const a = run.area, h = $('#hero');
+  if (!h) return;
+  h.style.setProperty('--hx', a.pos.x);
+  h.style.setProperty('--hy', a.pos.y);
+  h.dataset.x = a.pos.x; h.dataset.y = a.pos.y;
+}
+
+function worldStep(dx, dy) {
+  if (!$('#world') || dialogOpen() || app.dataset.busy) return;
+  const a = run.area;
+  const nx = a.pos.x + dx, ny = a.pos.y + dy;
+  const obj = objectAt(a, nx, ny);
+  if (obj) { stopWorldRepeat(); return interact(obj); }
+  if (!walkableAt(a, nx, ny)) {
+    anim($('#hero'), [{ transform: 'translate(0,0)' }, { transform: `translate(${dx * 4}px,${dy * 4}px)` }, { transform: 'translate(0,0)' }], { duration: 120, composite: 'add' });
+    return;
+  }
+  a.pos = { x: nx, y: ny };
+  a.steps += 1;
+  moveHero();
+  if (a.calm > 0) { a.calm -= 1; return; }
+  if (a.tiles[ny][nx] === 'tall') {
+    a.grassSteps = (a.grassSteps || 0) + 1;
+    if (a.grassSteps >= ENCOUNTER_SURE || run.rng() < ENCOUNTER_CHANCE) {
+      a.grassSteps = 0;
+      stopWorldRepeat();
+      wildEncounter();
+    }
+  }
+}
+
+function wildEncounter() {
+  const w = $('#world');
+  app.dataset.busy = '1';
+  sfx.hurt();
+  if (w && !reducedMotion()) w.classList.add('encounter');
+  const gen = fxGen;
+  setTimeout(() => {
+    if (gen !== fxGen) return;
+    delete app.dataset.busy;
+    run.area.active = null;
+    enterNode({ type: 'battle', wild: true });
+  }, reducedMotion() ? 0 : 520);
+}
+
+/* Back from a house, a riddle or a fight: mark it used and return to the
+   spot in the world they left from. Outside the world (no area), old flow. */
+function leaveNode() {
+  const a = run.area;
+  if (!a) return nextFloor();
+  if (a.active && ONCE.has(a.active.kind)) a.active.done = true;
+  a.active = null;
+  a.calm = 2; // a couple of quiet steps after anything, so a fight never chains straight into another
+  screenWorld();
+}
+
+function interact(o) {
+  const a = run.area;
+  const used = ONCE.has(o.kind) && o.done;
+  const go = (fn) => () => { a.active = o; fn(); };
+  switch (o.kind) {
+    case 'npc': return talkTo(o);
+    case 'trainer':
+      if (used) return showDialog(`${o.trainer.art} <b>${esc(o.trainer.name)}</b>: You beat me fair and square. Good luck up ahead!`);
+      return showDialog([`${o.trainer.art} <b>${esc(o.trainer.name)}</b> wants to battle!`,
+                         `${o.trainer.art} "I have two monsters. Beat them both and you win a relic!"`],
+        [{ label: 'Battle!', action: go(() => enterNode({ type: 'trainer', trainer: o.trainer })) }, { label: 'Not yet' }]);
+    case 'healer':
+      if (used) return showDialog('\u{1F3E5} The healer is resting. There is another one on a later floor.');
+      return showDialog('\u{1F3E5} A healer! Rest here once to get some health back, or train to grow stronger.',
+        [{ label: 'Go in', action: go(screenRest) }, { label: 'Later' }]);
+    case 'shop':
+      if (used) return showDialog('\u{1F3EA} The trader has packed up for today.');
+      return showDialog('\u{1F3EA} A trader with relics and potions. You can come in once.',
+        [{ label: 'Go in', action: go(screenShop) }, { label: 'Later' }]);
+    case 'riddle':
+      if (used) return showDialog('\u{1F3DB}️ The riddle hall is closed. Its riddle has been answered.');
+      return showDialog('\u{1F3DB}️ The riddle hall. Solve its riddle for a relic, but a wrong answer stings.',
+        [{ label: 'Go in', action: go(screenRiddle) }, { label: 'Later' }]);
+    case 'chest':
+      if (used) return showDialog('An empty chest.');
+      return showDialog('\u{1F9F0} A chest with a number lock. Work out the code to open it.',
+        [{ label: 'Try the lock', action: go(screenTreasure) }, { label: 'Later' }]);
+    case 'gate':
+      if (!a.wins) return showDialog(['\u{1F512} The gate is sealed.', 'Win a fight in this area to open it. The tall grass \u{1F33F} is full of monsters!']);
+      return showDialog(`⛩️ The gate is open. On to floor ${run.depth + 1}?`,
+        [{ label: 'Go!', action: () => { sfx.tap(); nextFloor(); } }, { label: 'Stay here' }]);
+    case 'boss':
+      return showDialog(['\u{1F3F0} The boss waits inside.', 'Boss fights are all timed questions. Ready?'],
+        [{ label: 'Enter!', action: go(() => enterNode({ type: 'boss' })) }, { label: 'Not yet' }]);
+    default: return null;
+  }
+}
+
+/* ------------------------------------------------------- quests & hints */
+const QUESTS = [
+  { kind: 'wins', need: 2, text: 'Win 2 fights in the tall grass', reward: { gold: 20 } },
+  { kind: 'catch', need: 1, text: 'Catch a new monster', reward: { heal: 15 } },
+  { kind: 'flawless', need: 1, text: 'Win a fight with no wrong answers', reward: { gold: 30 } },
+  { kind: 'type', need: 1, text: 'Win a fight with a super effective matchup', reward: { gold: 20 } },
+  { kind: 'streak', need: 8, text: 'Get 8 right in a row', reward: { heal: 12 } },
+];
+
+function rewardText(r) {
+  return r.gold ? `\u{1FA99} +${r.gold} gold` : `❤️ +${r.heal} health`;
+}
+
+/* Called after every win. Returns a line for the win screen when a quest finishes. */
+function questProgress({ wild, caught, flawless, superEff, best }) {
+  const q = run.quest;
+  if (!q) return '';
+  if (q.kind === 'wins' && wild) q.have += 1;
+  if (q.kind === 'catch' && caught) q.have += 1;
+  if (q.kind === 'flawless' && flawless) q.have += 1;
+  if (q.kind === 'type' && superEff) q.have += 1;
+  if (q.kind === 'streak') q.have = Math.max(q.have, best);
+  if (q.have < q.need) return '';
+  const p = run.player;
+  if (q.reward.gold) p.gold += q.reward.gold;
+  if (q.reward.heal) p.hp = Math.min(p.maxHp, p.hp + q.reward.heal);
+  run.quest = null;
+  run.questsDone = (run.questsDone || 0) + 1;
+  return `<p class="quest-line">\u{1F4DC} Quest complete for ${esc(q.from)}: ${esc(q.text)}! ${rewardText(q.reward)}</p>`;
+}
+
+/* A useful thing to say: the fact they keep missing, what the next level
+   needs, or how types and catching work. */
+function hintLine() {
+  const tips = [];
+  const shaky = shakyFacts(profile.mastery, 5);
+  if (shaky.length) {
+    const f = parseFactKey(shaky[Math.floor(run.rng() * shaky.length)].key);
+    if (f) tips.push(`Psst. <b>${f.a} ${RUNES[f.op].glyph} ${f.b} = ${evaluate(f.a, f.op, f.b)}</b>. Say it three times and you'll never miss it again!`);
+  }
+  const n = nextLevelNeeds(profile.mastery, profile.grade);
+  if (n && !n.gate.passed) {
+    const todo = n.gate.skills.filter(x => !x.ok).map(x => x.label.toLowerCase());
+    if (todo.length) tips.push(`To reach level ${n.next}, practise ${todo.join(' and ')}. They come up in the timed problems.`);
+  }
+  const types = Object.values(TYPES);
+  const t = types[Math.floor(run.rng() * types.length)];
+  tips.push(`${t.icon} ${t.name} beats ${TYPES[t.beats[0]].icon} ${TYPES[t.beats[0]].name}. Switch fighters in battle to use it!`);
+  tips.push('A fight with no wrong answers almost always catches the monster.');
+  tips.push('Every right answer helps whoever is fighting evolve.');
+  return tips[Math.floor(run.rng() * tips.length)];
+}
+
+function talkTo(o) {
+  const who = `${o.npc.art} <b>${esc(o.npc.name)}</b>`;
+  const q = run.quest;
+  if (!q) {
+    const next = QUESTS[Math.floor(run.rng() * QUESTS.length)];
+    return showDialog([`${who}: Could you help me? ${esc(next.text)}, and I'll give you ${rewardText(next.reward)}.`],
+      [{ label: 'Sure!', action: () => { run.quest = { ...next, have: 0, from: o.npc.name }; sfx.reward(); screenWorld(); } },
+       { label: 'Just a hint', action: () => showDialog(`${who}: ${hintLine()}`) }]);
+  }
+  return showDialog([`${who}: ${hintLine()}`,
+                     `\u{1F4DC} Your quest for ${esc(q.from)}: ${esc(q.text)} (${Math.min(q.have, q.need)}/${q.need}).`]);
 }
 
 function topBar({ inBattle = false } = {}) {
@@ -341,10 +593,11 @@ function nextFloor() {
   if (run.depth > profile.records.deepest) profile.records.deepest = run.depth;
   if (run.endless && run.depth > (profile.records.bestEndless || 0)) profile.records.bestEndless = run.depth;
   run.floorNodes = generateFloor(run.rng, run.depth);
+  run.area = generateArea(run.rng, run.depth, run.floorNodes);
   persist();
 
   if (earned.length) return screenAvatarEarned(earned);
-  screenMap();
+  screenWorld();
 }
 
 /* Earning a hero is the one reward in the game that is not about the fight,
@@ -371,9 +624,9 @@ function screenAvatarEarned(earned) {
     profile.party = [a.id, ...ids].slice(0, TEAM_SIZE);
     profile.heroId = a.id;
     profile.avatar = a.char;
-    persist(); sfx.reward(); screenMap();
+    persist(); sfx.reward(); screenWorld();
   };
-  $('#later').onclick = () => { sfx.tap(); screenMap(); };
+  $('#later').onclick = () => { sfx.tap(); screenWorld(); };
 }
 
 /* Team and Monster Book in one place. The team (up to three) is who they
@@ -505,7 +758,14 @@ function enterNode(node) {
     : ctx;
 
   switch (node.type) {
-    case 'battle': return startBattle(spawnEnemy(run.rng, run.depth, mixed), { gold: 8 + run.depth * 2 });
+    case 'battle': return startBattle(spawnEnemy(run.rng, run.depth, mixed), { gold: 8 + run.depth * 2, wild: !!node.wild });
+    /* A trainer sends out two monsters, one after the other, with health
+       carrying over between them. Ordinary strength each: two ordinary fights
+       cost about what one elite used to, and pay the elite's relic. */
+    case 'trainer': return startBattle(spawnEnemy(run.rng, run.depth, mixed), {
+      gold: 16 + run.depth * 3, relic: true,
+      trainer: { ...node.trainer, queue: [spawnEnemy(run.rng, run.depth, mixed)] },
+    });
     case 'elite':  return startBattle(spawnEnemy(run.rng, run.depth, { ...mixed, elite: true }), { gold: 16 + run.depth * 3, relic: true });
     case 'boss':   return startBattle(spawnEnemy(run.rng, run.depth, { ...duelCtx, boss: true }), { gold: 30 + run.depth * 4, relic: true, boss: true });
     case 'riddle': return screenRiddle();
@@ -558,6 +818,8 @@ function startBattle(enemy, reward) {
   }
   applyFighter();
   const o = TYPES[enemy.type];
+  if (reward.trainer) battle.log[0] = `${reward.trainer.art} ${reward.trainer.name} sent out ${enemy.name}!`;
+  else if (reward.wild) battle.log[0] = `A wild ${enemy.name} appeared!`;
   battle.log[0] = battle.log[0].replace(enemy.name, `${enemy.name} (${o.icon} ${o.name})`);
   battle.log.push(matchupText(false));
   dealHand();
@@ -1138,6 +1400,7 @@ function tally(correct, ms) {
 /* Roll to catch the monster just beaten. The chance is the fight's maths.
    Returns null when there is nothing to catch (already in the book). */
 function tryCatch(e, st) {
+  if (battle.reward.trainer) return { trainer: true };
   const mon = MONSTER_BY_ID[e.id];
   profile.caught = profile.caught || [];
   if (!mon) return null;
@@ -1155,6 +1418,7 @@ function tryCatch(e, st) {
 
 function catchLine(c) {
   if (!c) return '';
+  if (c.trainer) return '<p class="catch-line muted">A trainer\'s monsters can\'t be caught. Catch your own in the tall grass!</p>';
   const t = TYPES[c.mon.type];
   if (c.already) return `<p class="catch-line muted">${c.mon.art} ${esc(c.mon.name)} is already in your Monster Book.</p>`;
   if (c.caught) return `<p class="catch-line caught">\u{1F389} Gotcha! <b>${esc(c.mon.name)}</b> (${t.icon} ${t.name}) is yours!${c.joined ? ' It joined your team.' : ' Add it to your team at camp.'}</p>`;
@@ -1441,6 +1705,9 @@ function resolveDrill(text) {
 
 function winBattle() {
   const p = run.player, e = battle.enemy;
+  // A trainer with another monster left sends it out: no rewards until the last.
+  const tr = battle.reward.trainer;
+  if (tr && tr.queue.length) return trainerNext();
   const goldBonus = p.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
     .reduce((s, r) => s + (r.goldBonus || 0), 0);
   const gold = (battle.reward.gold || 0) + goldBonus;
@@ -1459,6 +1726,11 @@ function winBattle() {
   const caught = tryCatch(e, st);
   const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
   const levelUp = levelUpLine();
+  if (run.area && !e.boss) run.area.wins += 1;
+  const questDone = questProgress({
+    wild: !!battle.reward.wild, caught: !!(caught && caught.caught), flawless: st.wrong === 0 && st.right >= 3,
+    superEff: typeMult(battle.fighter.type, e.type) > 1, best: st.best,
+  });
   persist();
   sfx.win();
 
@@ -1473,7 +1745,7 @@ function winBattle() {
     `<i style="left:${(i * 37) % 100}%;--d:${((i * 7) % 10) / 10}s;--c:${CONFETTI[i % CONFETTI.length]};--x:${((i * 53) % 60) - 30}px"></i>`).join('') : '';
 
   render(`
-    <div class="screen center win-scene ${boss ? 'boss' : ''} ${caught && !caught.already ? (caught.caught ? 'catching caught' : 'catching escaped') : ''}">
+    <div class="screen center win-scene ${boss ? 'boss' : ''} ${caught && caught.mon && !caught.already ? (caught.caught ? 'catching caught' : 'catching escaped') : ''}">
       ${topBar()}
       <div class="stage ${boss ? 'boss' : ''}">
         ${boss ? `<div class="rays"></div><div class="confetti">${confetti}</div>` : ''}
@@ -1482,7 +1754,7 @@ function winBattle() {
         <div class="vhero">${boss ? '<span class="crown">\u{1F451}</span>' : ''}${charSpan(form(battle.fighter))}</div>
         <div class="vfoe">${e.art}</div>
         <div class="dizzy">\u{1F4AB}</div>
-        ${caught && !caught.already ? '<div class="vorb">\u{1F52E}</div>' : ''}
+        ${caught && caught.mon && !caught.already ? '<div class="vorb">\u{1F52E}</div>' : ''}
       </div>
       <div class="panel win vpanel">
         <p class="vline">${esc(form(battle.fighter).name)} beat ${esc(e.name)}!</p>
@@ -1490,6 +1762,7 @@ function winBattle() {
         ${catchLine(caught)}
         <p class="reward">\u{1FA99} +${gold} gold${healAfter ? ` &middot; \u2764\uFE0F +${healAfter}` : ''}</p>
         ${unlockMsg ? `<p class="unlock">${unlockMsg}</p>` : ''}
+        ${questDone}
         ${levelUp}
         ${trophyLines(trophies)}
         <button class="btn primary" id="cont">Continue</button>
@@ -1504,7 +1777,7 @@ function winBattle() {
   if (reducedMotion()) finishScene();
   else {
     const gen = fxGen;
-    const catching = caught && !caught.already;
+    const catching = caught && caught.mon && !caught.already;
     setTimeout(() => { if (gen === fxGen) finishScene(); }, (boss ? 1900 : 1500) + (catching ? 900 : 0));
     if (catching) setTimeout(() => { if (gen === fxGen) (caught.caught ? sfx.reward : sfx.wrong)(); }, 1500);
   }
@@ -1514,8 +1787,10 @@ function winBattle() {
     sfx.tap();
     withEvolutions(() => {
       if (e.boss && !run.endless && run.depth >= FINAL_DEPTH) return screenRunComplete();
-      if (battle.reward.relic) return screenRelicPick(() => nextFloor());
-      nextFloor();
+      // The boss tower is the way off a boss floor; everything else is back to the world.
+      const after = e.boss ? nextFloor : leaveNode;
+      if (battle.reward.relic) return screenRelicPick(() => after());
+      after();
     });
   };
 }
@@ -1569,6 +1844,36 @@ function screenEvolve(ev, done) {
     ev2.stopPropagation();
     if (!scene.classList.contains('done')) return finish();
     sfx.tap(); done();
+  };
+}
+
+/* Between a trainer's monsters: count the win, then out comes the next one.
+   Health and combo carry over; gold, the relic and the win scene wait for the last. */
+function trainerNext() {
+  const e = battle.enemy, st = battle.stats, tr = battle.reward.trainer;
+  run.stats.battlesWon += 1;
+  const r = profile.records;
+  r.fightsWon = (r.fightsWon || 0) + 1;
+  if (st.wrong === 0 && st.right >= 5) r.flawlessFights = (r.flawlessFights || 0) + 1;
+  const trophies = checkTrophies(profile, difficultyLevel(profile.mastery, profile.grade));
+  persist();
+  sfx.win();
+  const next = tr.queue[0];
+  render(`
+    <div class="screen center">
+      ${topBar()}
+      <div class="panel win trainer-next">
+        <p class="vline">${esc(e.name)} fainted!</p>
+        <div class="big-art">${tr.art}</div>
+        <p class="center"><b>${esc(tr.name)}</b>: "Not bad! But can you beat this one?"</p>
+        <p class="center">${esc(tr.name)} is about to send out <b>${esc(next.name)}</b> (${TYPES[next.type].icon} ${TYPES[next.type].name}).</p>
+        ${trophyLines(trophies)}
+        <button class="btn primary" id="cont">Bring it on!</button>
+      </div>
+    </div>`);
+  $('#cont').onclick = () => {
+    sfx.tap();
+    withEvolutions(() => startBattle(tr.queue.shift(), battle.reward));
   };
 }
 
@@ -1721,7 +2026,7 @@ function screenRiddle() {
       resultCard({
         correct, answer: formatAnswer(r.answer), given: text,
         body: correct ? `The shrine opens.${heal ? ` ❤️ +${heal}` : ''}` : 'You take 6 damage and the shrine seals.',
-        onNext: () => correct ? screenRelicPick(() => nextFloor()) : nextFloor(),
+        onNext: () => correct ? screenRelicPick(() => leaveNode()) : leaveNode(),
       });
     },
   });
@@ -1765,7 +2070,7 @@ function screenTreasure() {
         sfx.reward();
       } else { sfx.wrong(); }
       persist();
-      resultCard({ correct, answer: formatAnswer(q.answer), given: text, body, onNext: () => nextFloor() });
+      resultCard({ correct, answer: formatAnswer(q.answer), given: text, body, onNext: () => leaveNode() });
     },
   });
 }
@@ -1811,7 +2116,7 @@ function screenShop() {
       if (s.kind === 'rune') p.runes.push(s.op);
       sfx.reward(); persist(); draw();
     });
-    $('#leave').onclick = () => { sfx.tap(); nextFloor(); };
+    $('#leave').onclick = () => { sfx.tap(); leaveNode(); };
   };
   draw();
 }
@@ -1823,16 +2128,16 @@ function screenRest() {
     <div class="screen center">
       ${topBar()}
       <div class="panel">
-        <h2>\u{1F525} Campfire</h2>
+        <h2>\u{1F3E5} Healer</h2>
         <p class="muted center">Take one.</p>
         <div class="choices">
-          <button class="choice" id="heal"><span class="ci">❤️</span><b>Rest</b><small>Heal ${Math.round(p.maxHp * 0.5)} health</small></button>
+          <button class="choice" id="heal"><span class="ci">❤️</span><b>Rest</b><small>Heal ${Math.round(p.maxHp * HEALER_SHARE)} health</small></button>
           <button class="choice" id="train"><span class="ci">\u{1F4AA}</span><b>Train</b><small>+8 max health, permanently this run</small></button>
         </div>
       </div>
     </div>`);
-  $('#heal').onclick = () => { p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.5)); sfx.reward(); persist(); nextFloor(); };
-  $('#train').onclick = () => { p.maxHp += 8; p.hp += 8; sfx.reward(); persist(); nextFloor(); };
+  $('#heal').onclick = () => { p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * HEALER_SHARE)); sfx.reward(); persist(); leaveNode(); };
+  $('#train').onclick = () => { p.maxHp += 8; p.hp += 8; sfx.reward(); persist(); leaveNode(); };
 }
 
 /* ========================================================== relic pick === */
@@ -2181,6 +2486,16 @@ function commitImport(heroes, mode) {
 /* Physical keyboards should work as well as the on-screen pad. */
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if ($('#world') && !app.dataset.busy) {
+    const dir = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+                  w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] }[ev.key];
+    if (dialogOpen()) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); $('#wdialog [data-db]')?.click(); }
+      return;
+    }
+    if (dir) { ev.preventDefault(); worldStep(dir[0], dir[1]); }
+    return;
+  }
   if (app.dataset.busy) { if (fxSkip) { ev.preventDefault(); fxSkip(); } return; }
   const scene = app.querySelector('.win-scene:not(.done), .evolve-screen:not(.done)');
   if (scene) { ev.preventDefault(); scene.classList.add('done'); return; }

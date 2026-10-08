@@ -320,6 +320,41 @@ ordinary Safari browsing is subject to.
 
 To move a hero between browsers, use the backup below rather than hoping.
 
+## The world
+
+Each floor of a run is a small area to walk around, Pokemon style, instead
+of a menu of choices. The area is built from the floor's nodes (`js/world.js`):
+
+- **Tall grass** 🌿 on every floor: each step in it has a 20% chance of a wild
+  monster, and the sixth step without one is certain. Wild monsters are the
+  ones that can be caught.
+- **Trainer houses** 🏠 (the old elite node): a named trainer sends out two
+  monsters one after the other, health carrying over. Their monsters cannot
+  be caught. Beating both pays gold and a relic.
+- **The healer** 🏥, **the shop** 🏪, **the riddle hall** 🏛 and a **locked
+  chest** 🧰: the old rest, shop, riddle and treasure nodes, each usable once.
+- **Townspeople** with quests (win 2 fights in the grass, catch a monster,
+  a flawless fight, a super effective win, 8 in a row) that pay gold or
+  health, and hints: the fact the kid keeps missing ("7 × 8 = 56, say it
+  three times"), what the next level needs, how types and catching work.
+- **The gate** ⛩ stays sealed until a fight in this area is won. Every third
+  floor the gate is the **boss tower** 🏰.
+
+Walking is the arrow pad on screen, or arrow keys / WASD; bumping into
+something uses it, and text comes up in a Pokemon-style box. The area is
+11 by 13 tiles so it all fits on a phone with no scrolling: time spent
+walking is time not spent on maths, so nothing is more than a few steps
+away and everything in it leads to a problem.
+
+Every layout is checked when it is made (everything reachable, enough grass)
+and the tests check 2,700 of them. Seasons change the ground colour and the
+decorations.
+
+**Balance.** On the old menu a kid picked one thing per floor; in the world
+they can do all of it, which means more healing and more prizes. The healer
+was cut from 50% to 25% of max health to compensate (see the numbers in the
+balance note below).
+
 ## Types, catching and the team
 
 Every hero and monster has a **type**, Pokemon style: Water puts out Fire,
@@ -579,10 +614,11 @@ lands without anyone having to know they must refresh twice. Bumping `CACHE` in
 | `js/engine.js` | mastery tracking, adaptation, damage, enemy budget, map, runs |
 | `js/main.js` | every screen, input handling, the run state machine |
 | `js/collection.js` | characters, teams, catch chance, trophies |
+| `js/world.js` | the walkable area for each floor, and path finding |
 | `js/storage.js` | hero profiles in localStorage |
 | `js/sfx.js` | WebAudio blips, no audio files to download |
 
-`data.js`, `engine.js` and `collection.js` never touch the DOM, which is why the logic is testable.
+`data.js`, `engine.js`, `collection.js` and `world.js` never touch the DOM, which is why the logic is testable.
 
 ## Adding English
 

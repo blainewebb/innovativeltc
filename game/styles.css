@@ -855,3 +855,81 @@ body[data-season="winter"] .field:not(.boss) {
   78%, 80% { opacity: 1; } 82%, 84% { opacity: 0; } 86%, 100% { opacity: 1; filter: brightness(1); }
 }
 @keyframes evoPop { from { transform: scale(.4); } }
+
+/* ---------------------------------------------------------------- world */
+.world-screen { gap: 6px; }
+.wtitle { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: .9rem; }
+.wtitle b { color: var(--gold); font-size: 1rem; }
+.wtitle span { color: var(--muted); }
+.wtitle .wwins { margin-left: auto; font-size: .78rem; }
+.wquest { display: block; font-size: .78rem; color: #ffcf8a; }
+.world-wrap { position: relative; align-self: center; flex: none; }
+.world {
+  --t: min(calc((100vw - 24px) / 11), calc((100vh - 330px) / 13), 44px);
+  position: relative; display: grid;
+  grid-template-columns: repeat(11, var(--t)); grid-template-rows: repeat(13, var(--t));
+  border-radius: 12px; overflow: hidden; border: 2px solid var(--line);
+  touch-action: none; user-select: none;
+}
+.wt {
+  position: relative; display: grid; place-items: center;
+  font-size: calc(var(--t) * .72); line-height: 1;
+}
+.wt.t-ground { background: #5aa84a; }
+.wt.t-path { background: #d9c08a; }
+.wt.t-tall { background: #3f8f3a; }
+.wt.t-tree { background: #4a9a40; }
+.wt.t-water { background: #3a86d6; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.wt .blades {
+  width: 80%; height: 70%;
+  background:
+    linear-gradient(60deg, transparent 45%, #2d6e2a 46% 54%, transparent 55%) 0 100% / 33% 100% repeat-x,
+    linear-gradient(-60deg, transparent 45%, #2d6e2a 46% 54%, transparent 55%) 50% 100% / 33% 100% repeat-x;
+}
+.wt.obj { z-index: 1; }
+.wt.used { filter: grayscale(.7) brightness(.85); }
+.wmark {
+  position: absolute; top: -2px; right: -2px; font-size: calc(var(--t) * .34);
+  background: #ffcf4a; color: #2a1c00; border-radius: 999px; padding: 0 4px; line-height: 1.2;
+}
+.wmark.lock { background: rgba(0,0,0,.55); top: auto; bottom: -2px; }
+.o-gate .wmark, .o-boss .wmark { top: auto; bottom: -2px; }
+.hero-w {
+  position: absolute; left: 0; top: 0; z-index: 2; width: var(--t); height: var(--t);
+  display: grid; place-items: center; font-size: calc(var(--t) * .78); line-height: 1;
+  transform: translate(calc(var(--hx) * var(--t)), calc(var(--hy) * var(--t)));
+  transition: transform .14s linear;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.45));
+}
+.world.encounter { animation: wFlash .52s steps(2) 1; }
+@keyframes wFlash { 0%, 50% { filter: invert(1) brightness(1.4); } 100% { filter: none; } }
+
+.wdialog {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 5;
+  background: #fffdf4; color: #1c1630; border: 3px solid #2b2550; border-radius: 12px;
+  padding: 10px 12px; font-size: .92rem; line-height: 1.35; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+}
+.wdialog p { margin: 0 0 8px; }
+.wdialog b { color: #2b2550; }
+.wdbtns { display: flex; gap: 8px; justify-content: flex-end; }
+.wdbtns .btn { width: auto; min-height: 40px; padding: 0 16px; }
+.wdbtns .btn.ghost { color: #2b2550; border-color: #b9b2d8; background: #f0edff; }
+
+.wcontrols { display: flex; align-items: center; gap: 14px; justify-content: center; margin-top: 2px; }
+.dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 52px); gap: 4px; flex: none; }
+.dk {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); color: var(--ink);
+  font-size: 1.3rem; touch-action: none; cursor: pointer;
+}
+.dk:active { background: #3a3050; }
+.dk.up { grid-area: 1 / 2; } .dk.left { grid-area: 2 / 1; } .dk.right { grid-area: 2 / 3; } .dk.down { grid-area: 3 / 2; }
+.whelp { font-size: .74rem; color: var(--muted); max-width: 150px; margin: 0; line-height: 1.35; }
+.quest-line { text-align: center; color: #ffcf8a; margin: 6px 0; }
+
+body[data-season="winter"] .wt.t-ground, body[data-season="winter"] .wt.t-tree { background: #dfe9f5; }
+body[data-season="winter"] .wt.t-tall { background: #b8cfe6; }
+body[data-season="harvest"] .wt.t-ground, body[data-season="harvest"] .wt.t-tree { background: #b8913a; }
+body[data-season="harvest"] .wt.t-tall { background: #8f6a28; }
+body[data-season="halloween"] .wt.t-ground, body[data-season="halloween"] .wt.t-tree { background: #4f6a3a; }
+body[data-season="halloween"] .wt.t-tall { background: #3a4f2a; }
+@media (prefers-reduced-motion: reduce) { .hero-w { transition: none; } }
