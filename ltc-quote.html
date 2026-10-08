@@ -313,6 +313,10 @@
   <div class="card" id="nameCard">
     <div class="cs-head" style="margin-bottom:8px"><h2 style="margin:0 0 2px">👤 Client</h2><p class="hint" style="margin:0">Optional — the name shown on the printed quote and the shared-care page. Leave blank to quote without a name.</p></div>
     <div class="grid">
+      <div class="field"><label>State <span style="color:var(--muted);font-weight:600">— pick first: only products sold there are shown</span></label><select id="cl_state" onchange="onClientState()"></select><div class="hint" id="cl_statehint" style="margin-top:4px"></div></div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="grid">
       <div class="field"><label>First name</label><input id="cl_first" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
       <div class="field"><label>Last name</label><input id="cl_last" placeholder="optional" autocomplete="off" oninput="onClientNameInput()"></div>
     </div>
@@ -3981,7 +3985,7 @@ function qcPushClient(){
   if(QC_SNAP!=null && qcClientVals()===QC_SNAP) return;   // nothing changed in Quick Commands
   const type=$('t_type').value, joint=type==='joint';
   CLIENT.age=$('t_age').value; CLIENT.gender= joint ? $('t_g1').value : (type.indexOf('female')>=0?'female':'male');
-  if($('t_state').value) CLIENT.state=$('t_state').value;
+  if($('t_state').value){ CLIENT.state=$('t_state').value; if($('cl_state') && $('cl_state').value!==CLIENT.state){ $('cl_state').value=CLIENT.state; onClientState(true); } }
   const d1=dobPickFor('t_age'); CLIENT.dob = d1&&d1.value ? d1.value : null;
   if(joint){ CLIENT.couple=true; CLIENT.age2=$('t_age2').value; CLIENT.gender2=$('t_g2').value; const d2=dobPickFor('t_age2'); CLIENT.dob2 = d2&&d2.value ? d2.value : null; }
   else CLIENT.couple=false;
@@ -4016,7 +4020,8 @@ function dobPickFor(ageId){ var a=$(ageId); if(!a)return null; var row=a.closest
 function captureClient(carrier){ var m=CLIENT_FIELDS[carrier]; if(!m)return;
   Object.keys(m).forEach(function(k){ for(var i=0;i<m[k].length;i++){ var el=$(m[k][i]); if(el&&el.value!==''&&el.value!=null){ CLIENT[k]=el.value; break; } } });
   var cid=CLIENT_COUPLE[carrier]; if(cid&&$(cid)) CLIENT.couple=$(cid).checked;
-  var sid=CLIENT_STATE[carrier]; if(sid&&$(sid)&&$(sid).value) CLIENT.state=$(sid).value;   // remember the last state the user set
+  var sid=CLIENT_STATE[carrier]; if(sid&&$(sid)&&$(sid).value){ var top=($('cl_state')||{}).value||'', v=$(sid).value;   // remember the last state the user set
+    if(!top || selHasOption($(sid),top)){ CLIENT.state=v; if(top && v!==top && $('cl_state')){ $('cl_state').value=v; onClientState(true); } } }
   // A birthday counts only while it's the one behind the age shown (not cleared or typed over since).
   var live=function(id){ var el=$(id), d=dobPickFor(id); return (el && d && d.value && parseDob(d.value) && el.dataset.shownAge===el.value) ? d.value : null; };
   var ai=CLIENT_AGEIDS[carrier]; if(ai){ var v0=live(ai[0]); if(v0) CLIENT.dob=v0; else delete CLIENT.dob;
@@ -6083,6 +6088,7 @@ function hydrateFormsFrom(items){
 }
 // Write the applicant (age / gender / state) into every tab's inputs, so switching tabs keeps them
 function setApplicant(age, gender, state){
+  if(state && $('cl_state') && selHasOption($('cl_state'),state)){ $('cl_state').value=state; onClientState(true); }
   const g=(gender==='male'?'male':'female'), st=state||'';
   const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=v; else if(el && (v===''||v===0)) el.value=v; };
   ['s_age','b_age','w_age','g_age','coc_age','t_age','sw_age','ba_age'].forEach(id=>setV(id,age));
@@ -6695,6 +6701,34 @@ function fillMooStates(){
   const opts=US_STATES.filter(([c])=>MOO_OFF_STATES.indexOf(c)<0).map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join('');
   document.querySelectorAll('select.moostatesel').forEach(s=>{ const cur=s.value||'TX'; s.innerHTML=opts; s.value=(MOO_OFF_STATES.indexOf(cur)<0?cur:'TX'); });
 }
+// Which products can be quoted in each state, from the rates loaded in this tool.
+function carrierStates(c){ const all=US_STATES.map(x=>x[0]);
+  switch(c){
+    case 'ngl': return all.filter(st=>st!=='CO');                                   // NGL's Colorado rates differ (not in this tool)
+    case 'carescout': return CS_IND_STATES;
+    case 'omniflex': return Object.keys(OMNI_RATES.rates);
+    case 'moo': case 'mooc': return all.filter(st=>MOO_OFF_STATES.indexOf(st)<0);  // CA, NY, MT, FL rates differ
+    case 'nwm': return ['TX'];
+    case 'aetna': return Object.keys(CLI_RCC_STATES);
+    case 'clihcp': return Object.keys(CLI_HCP_STATES);
+    case 'clirc': return Object.keys(CLI_RC_SETS);
+    case 'clihr': return Object.keys(CLI_HR_SETS);
+  } return null; }
+function carrierOffers(c, st){ if(!st) return true; const l=carrierStates(c); return !l || l.indexOf(st)>=0; }
+// Hide the carriers that don't sell in the picked state (header carrier menu + Quick Commands carrier menu).
+function filterCarriersByState(){ const st=($('cl_state')||{}).value||''; let n=0, tot=0;
+  ['carrier','qc_carrier'].forEach(id=>{ const sel=$(id); if(!sel) return;
+    [...sel.options].forEach(o=>{ if(o.value==='saved') return; const ok=carrierOffers(o.value, st); o.hidden=!ok; o.disabled=!ok; if(id==='carrier'){ tot++; if(ok) n++; } });
+    if(id==='qc_carrier' && sel.selectedOptions[0] && sel.selectedOptions[0].disabled){ sel.value='saved'; try{ qcSyncHealth(); }catch(e){} } });
+  const h=$('cl_statehint'); if(h) h.textContent = st ? (n+' of '+tot+' products sold in '+stateFull(st)) : 'All products shown — pick a state to narrow the list.'; }
+// The state picked at the top flows to every carrier form and to Quick Commands.
+function onClientState(fromForm){ const st=($('cl_state')||{}).value||''; try{ localStorage.setItem('ltc_state', st); }catch(e){}
+  filterCarriersByState(); if(!st) return;
+  CLIENT.state=st;
+  document.querySelectorAll('select.statesel').forEach(x=>{ if(selHasOption(x,st)) x.value=st; });
+  if(fromForm) return;
+  if(CARRIER && !carrierOffers(CARRIER, st)){ const first=[...$('carrier').options].find(o=>!o.disabled); if(first){ setCarrier(first.value); if(VIEW==='qc') setView('qc'); } }
+  else if(CARRIER) applyClient(CARRIER); }
 function stateFull(code){ code=(code||'TX').toUpperCase(); const f=US_STATES.find(x=>x[0]===code); return f?f[1]:code; }
 
 /* ---------- init ---------- */
@@ -6711,6 +6745,11 @@ document.querySelectorAll('.tenpaybox').forEach(b=>{ b.checked=SHOW_TENPAY; }); 
 ['moo','mooc'].forEach(pfx=>{ ['class','class2','couple','shared','benefit','benpick','bp','covbasis','totben'].forEach(f=>{ const e=document.getElementById(pfx+'_'+f);
   if(e){ e.addEventListener('change', ()=>mooEnforceClass(pfx)); if(f==='benefit'||f==='totben') e.addEventListener('blur', ()=>mooEnforceClass(pfx)); } }); mooEnforceClass(pfx); });
 setCarrier('ngl');   // start on NGL; switch carriers from the header
+// Top-of-page state picker (remembered on this device)
+if($('cl_state')){ $('cl_state').innerHTML='<option value="">All states — show every product</option>'+US_STATES.map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join('');
+  let saved=''; try{ saved=localStorage.getItem('ltc_state')||''; }catch(e){}
+  if(saved && selHasOption($('cl_state'),saved)){ $('cl_state').value=saved; onClientState(); } else filterCarriersByState();
+  if($('t_state')) $('t_state').addEventListener('change', ()=>{ const v=$('t_state').value; if(v && $('cl_state').value!==v){ $('cl_state').value=v; onClientState(true); } }); }
 </script>
 </body>
 </html>
