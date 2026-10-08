@@ -4153,6 +4153,15 @@ function applyPlan(carrier){ if(STC_CARRIERS.has(carrier)) return; if(CLIENT.mb=
   // Remember what we just put in each field, so a later capture can tell a snap from a real user edit.
   CLIENT._ap=CLIENT._ap||{}; CLIENT._ap[carrier]=planFieldVals(carrier);
 }catch(e){} }
+// Keep the header badge short: a long "(AL, AR, …)" state list becomes the picked state's name, or "N states";
+// the full list stays available on hover.
+function shortenCarrierBadge(){ const b=$('carrierBadge'); if(!b) return;
+  const full=b.dataset.full && b.textContent.indexOf(' · ')>=0 && b.dataset.short===b.textContent ? b.dataset.full : b.textContent;
+  const m=full.match(/^(.*?)\s*\(([A-Z]{2}(?:,\s*[A-Z]{2})+)\)\s*$/); b.dataset.full=full;
+  if(!m){ b.title=''; b.dataset.short=full; return; }
+  const list=m[2].split(/,\s*/), st=(($('cl_state')||{}).value)||'';
+  const txt=m[1]+' · '+((st && list.indexOf(st)>=0) ? stateFull(st) : list.length+' states');
+  b.textContent=txt; b.dataset.short=txt; b.title='Rates loaded for: '+list.join(', '); }
 function setCarrier(c){
   const prev=CARRIER; if(prev) captureClient(prev);
   CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc'||c==='nwm'||c==='aetna'||c==='clihcp'||c==='clirc'||c==='clihr') ? c : 'ngl';
@@ -4169,6 +4178,7 @@ function setCarrier(c){
   if($('rccard')) $('rccard').hidden = CARRIER!=='clirc';
   if($('hrcard')) $('hrcard').hidden = CARRIER!=='clihr';
   $('carrierBadge').textContent = CARRIER==='clihr' ? '✓ CLI · Home Recovery Care (TX)' : CARRIER==='clirc' ? '✓ CLI · Recovery Care (ID, MT, UT, VA)' : CARRIER==='clihcp' ? '✓ CLI · Home Care Plus (AL, AR, AZ, CO, DE, GA, IA, ID, IL, IN, KY, LA, MI, MO, MS, MT, NC, ND, NE, NH, NM, NV, OH, OK, OR, PA, RI, SC, SD, TN, TX, UT, VA, WI, WV, WY)' : CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, LA, MD, MI, MO, NE, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, TX, WV, WI)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  shortenCarrierBadge();
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -6750,6 +6760,7 @@ function filterCarriersByState(){ const st=($('cl_state')||{}).value||''; let n=
   ['carrier','qc_carrier'].forEach(id=>{ const sel=$(id); if(!sel) return;
     [...sel.options].forEach(o=>{ if(o.value==='saved') return; const ok=carrierOffers(o.value, st); o.hidden=!ok; o.disabled=!ok; if(id==='carrier'){ tot++; if(ok) n++; } });
     if(id==='qc_carrier' && sel.selectedOptions[0] && sel.selectedOptions[0].disabled){ sel.value='saved'; try{ qcSyncHealth(); }catch(e){} } });
+  try{ shortenCarrierBadge(); }catch(e){}
   const h=$('cl_statehint'); if(h) h.textContent = st ? (n+' of '+tot+' products sold in '+stateFull(st)) : 'All products shown — pick a state to narrow the list.'; }
 // The state picked at the top flows to every carrier form and to Quick Commands.
 function onClientState(fromForm){ const st=($('cl_state')||{}).value||''; try{ localStorage.setItem('ltc_state', st); }catch(e){}
