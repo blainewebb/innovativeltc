@@ -707,10 +707,10 @@
   <div class="card" id="aetcard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">CLI <span style="color:var(--muted);font-weight:600;font-size:.9rem">Recovery Care Choice</span></h2>
-      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>2025 filings (AZ, AR, CO, CT, DE, GA, IN, IA, TX)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
+      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>2025 filings (AZ, AR, CO, CT, DE, GA, IN, IA, KY, TX)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
     </div>
     <div class="grid">
-      <div class="field"><label>State</label><select id="aet_state" onchange="aetSyncState()"><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="GA">Georgia</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="TX" selected>Texas</option></select></div>
+      <div class="field"><label>State</label><select id="aet_state" onchange="aetSyncState()"><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="GA">Georgia</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KY">Kentucky</option><option value="TX" selected>Texas</option></select></div>
       <div class="field"><label>Issue age (40–89)</label><input id="aet_age" type="number" value="65" min="40" max="89"></div>
       <div class="field"><label>Premium mode</label><select id="aet_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
@@ -752,7 +752,7 @@
       <div class="field"><label>Home modification ($ lifetime · $500 steps, 0 = none)</label><input id="aet_hm" type="number" value="0" step="500" min="0"></div>
     </div>
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Multiple Policy Discount (5% — owns another CLI individual policy)</label></div>
-    <div class="warn" style="margin-top:6px">Rates from the CLI-025 filings (2025) for Arizona, Arkansas, Colorado, Connecticut, Delaware, Georgia, Indiana, Iowa and Texas. Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
+    <div class="warn" style="margin-top:6px">Rates from the CLI-025 filings (2025) for Arizona, Arkansas, Colorado, Connecticut, Delaware, Georgia, Indiana, Iowa, Kentucky and Texas. Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
     <div class="actions"><button class="run" onclick="aetRun()">Run Recovery Care Choice quote</button></div>
   </div>
 
@@ -3586,6 +3586,8 @@ window.AET=(function(){
       const hb=BPS.indexOf(+o.hcBP||bp); if(hb<0) throw new Error('Home care benefit period must be 13, 26, 39 or 52 weeks.');   // its own period, separate from the facility's
       const v=R.hc[k][hb*2+he]*(hw/150); ann+=v; steps.push(['Home care $'+hw+'/week · '+(BPS[hb]/90*13)+' weeks · '+(+o.hcEP||0)+'-day wait', v]); }
     const R2=R.riders, add=(key,unitsN,label)=>{ if(unitsN>0){ const v=R2[key][b]*unitsN; ann+=v; steps.push([label, v]); } };
+    const OK=offered(st), NAMES={hosp:'hospital',pet:'pet boarding',homeMod:'home modification',mental:'mental health',ambulance:'ambulance',pt:'outpatient rehab',adc:'adult day care'};
+    for(const [key,f] of RIDER_FIELDS) if(+o[f]>0 && !OK[key]) throw new Error(SD.name+' does not offer the '+NAMES[key]+' rider.');
     if(+o.hospitalDaily>0){ const dOpts=Object.keys(SD.hosp).map(Number).sort((a,b)=>a-b), d=String(dOpts.indexOf(+o.hospitalDays)>=0?+o.hospitalDays:dOpts[dOpts.length-1]);
       const v=SD.hosp[d][b]*((+o.hospitalDaily)/10); ann+=v; steps.push(['Hospital $'+o.hospitalDaily+'/day · '+d+' days', v]); }
     const rxU=Math.max(3, Math.round(+o.rxUnits||0));   // the base policy requires at least the $300/yr prescription drug benefit
@@ -3607,7 +3609,12 @@ window.AET=(function(){
     if(o.inflation==='s5') return fd*(1+0.05*yrs); if(o.inflation==='s3') return fd*(1+0.03*yrs); return fd; }
   function hospDays(st){ const SD=CLI_RCC_STATES[String(st||'TX').toUpperCase()]; return SD?Object.keys(SD.hosp).map(Number).sort((a,b)=>a-b):[31]; }
   function opts(st){ const SD=CLI_RCC_STATES[String(st||'TX').toUpperCase()]||{}; return {bps:SD.bps||BPS.slice(), eps:SD.eps||EPS.slice()}; }
-  return {quote, projDaily, INFL_LABEL, BPS, EPS, RIDER_UNIT, hospDays, opts};
+  // Optional riders a state offers (Rx is always there). SD.riders lists them when a state files fewer; hospital needs SD.hosp tables.
+  const RIDER_FIELDS=[['hosp','hospitalDaily'],['pet','petUnits'],['homeMod','homeModUnits'],['mental','mentalUnits'],['ambulance','ambulanceUnits'],['pt','ptUnits'],['adc','adcUnits']];
+  function offered(st){ const SD=CLI_RCC_STATES[String(st||'TX').toUpperCase()]||{}, out={};
+    for(const [k] of RIDER_FIELDS) out[k]=k==='hosp'?Object.keys(SD.hosp||{}).length>0:(!SD.riders||SD.riders.indexOf(k)>=0);
+    return out; }
+  return {quote, projDaily, INFL_LABEL, BPS, EPS, RIDER_UNIT, RIDER_FIELDS, hospDays, opts, offered};
 })();
 function isCS(o){ return !!o && o.carrier==='carescout'; }
 function isNwm(o){ return !!o && o.carrier==='nwm'; }
@@ -3922,7 +3929,7 @@ function setCarrier(c){
   if($('mooccard')) $('mooccard').hidden = !mooc;
   if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
   if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
-  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, TX)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, TX)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -4278,6 +4285,8 @@ function aetSyncState(){ const O=AET.opts(($('aet_state')||{}).value);
     el.innerHTML=list.map(d=>'<option value="'+d+'">'+d+' days</option>').join('');
     el.value=String((pickMax&&atMax)?list[list.length-1]:(list.indexOf(cur)>=0?cur:(pickMax?list[list.length-1]:list[0]))); };   // at a state's max → the new state's max
   fill('aet_bp',O.bps,true); fill('aet_ep',O.eps,false);
+  const OK=AET.offered(($('aet_state')||{}).value), RIDER_IDS={hosp:['aet_hosp','aet_hospdays'],pet:['aet_pet'],homeMod:['aet_hm'],mental:['aet_mh'],ambulance:['aet_amb'],pt:['aet_pt','aet_ptv'],adc:['aet_adc','aet_adcd']};
+  for(const k in RIDER_IDS) for(const id of RIDER_IDS[k]){ const el=$(id); if(!el) continue; const f=el.closest('.field'); if(f) f.hidden=!OK[k]; if(!OK[k] && el.type==='number') el.value=0; }   // riders the state doesn't file are hidden and zeroed
   const sel=$('aet_hospdays'); if(!sel) return; const cur=+sel.value, days=AET.hospDays(($('aet_state')||{}).value);
   sel.innerHTML=days.map(d=>'<option value="'+d+'">'+d+' days</option>').join(''); sel.value=String(days.indexOf(cur)>=0?cur:days[days.length-1]); }
 function aetRun(){ try{
@@ -5432,6 +5441,7 @@ function omniFitState(op, st){ const S=OMNI_RATES.rates[st]; if(!S) return Objec
   return o; }
 function aetFitState(op, st){ const o=Object.assign({}, op, {state:st}); if(!CLI_RCC_STATES[st]) return o;
   const O=AET.opts(st); o.facilityBP=nearestVal(+o.facilityBP||360, O.bps); o.facilityEP=nearestVal(+o.facilityEP||0, O.eps);
+  const OK=AET.offered(st); for(const [k,f] of AET.RIDER_FIELDS) if(!OK[k]) o[f]=0;   // drop riders that state doesn't file
   const hd=AET.hospDays(st); if(+o.hospitalDaily>0) o.hospitalDays=nearestVal(+o.hospitalDays||hd[hd.length-1], hd); return o; }
 function qcConvert(op, target, state){
   const pick=String(state||'').toUpperCase();
@@ -5842,7 +5852,7 @@ function fillNwmForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('nwm');
   if(o.__couple&&o.parts[1]){ set('nwm_age2',o.parts[1].age); set('nwm_g2',o.parts[1].gender); set('nwm_class2',o.parts[1].uwClass||'Standard'); $('nwm_surv').checked=!!p.survivorship; } }
 function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
-  set('aet_state',p.state||'TX'); aetSyncState(); set('aet_hospdays',String(p.hospitalDays||AET.hospDays(p.state).slice(-1)[0])); set('aet_age',p.age); set('aet_mode',p.mode||'monthly'); set('aet_daily',p.facilityDaily); set('aet_bp',String(p.facilityBP||360)); set('aet_ep',String(p.facilityEP||0)); set('aet_infl',p.inflation||'none');
+  set('aet_state',p.state||'TX'); aetSyncState(); set('aet_hospdays',String(p.hospitalDays||AET.hospDays(p.state).slice(-1)[0]||'')); set('aet_age',p.age); set('aet_mode',p.mode||'monthly'); set('aet_daily',p.facilityDaily); set('aet_bp',String(p.facilityBP||360)); set('aet_ep',String(p.facilityEP||0)); set('aet_infl',p.inflation||'none');
   $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||2100); set('aet_hcbp',String(p.hcBP||p.facilityBP||360)); set('aet_hcep',String(p.hcEP||0));
   set('aet_hosp',p.hospitalDaily||0); set('aet_rx',100*Math.max(3,p.rxUnits||3)); set('aet_amb',200*(p.ambulanceUnits||0)); set('aet_pt',50*(p.ptUnits||0)); set('aet_ptv',String(p.ptVisits||15));
   set('aet_mh',25*(p.mentalUnits||0)); set('aet_adc',10*(p.adcUnits||0)); set('aet_adcd',String(p.adcDays||15)); set('aet_pet',25*(p.petUnits||0)); set('aet_hm',500*(p.homeModUnits||0)); $('aet_mp').checked=!!p.multiPolicy; }
