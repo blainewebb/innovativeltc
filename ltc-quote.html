@@ -774,7 +774,7 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Home care benefit</div>
     <div class="grid">
-      <div class="field"><label>Weekly benefit ($150 steps)</label><input id="hcp_weekly" type="number" value="600" step="150" min="150"></div>
+      <div class="field"><label>Weekly benefit ($150–$1,500, $150 steps)</label><input id="hcp_weekly" type="number" value="1500" step="150" min="150" max="1500"></div>
       <div class="field"><label>Benefit period</label><select id="hcp_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
       <div class="field"><label>Waiting period</label><select id="hcp_ep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
     </div>
@@ -787,7 +787,7 @@
       <div class="field"><label>Ambulance / ER benefit ($ · $200 steps)</label><input id="hcp_amb" type="number" value="0" step="200" min="0"></div>
       <div class="field"><label>Lump-sum cancer benefit ($ · $2,500 steps)</label><input id="hcp_cancer" type="number" value="0" step="2500" min="0"></div>
     </div>
-    <div class="warn" style="margin-top:6px" id="hcp_formnote">Rate guide CLIHM03695. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.</div>
+    <div class="warn" style="margin-top:6px" id="hcp_formnote">Rate guide CLIHM03695. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.</div>
     <div class="actions"><button class="run" onclick="hcpRun()">Run Home Care Plus quote</button></div>
   </div>
 
@@ -803,7 +803,7 @@
     </div>
     <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Facility benefit</div>
     <div class="grid">
-      <div class="field"><label>Facility daily benefit ($10 steps)</label><input id="rc_daily" type="number" value="100" step="10" min="10"></div>
+      <div class="field"><label>Facility daily benefit ($10–$400, $10 steps)</label><input id="rc_daily" type="number" value="400" step="10" min="10" max="400"></div>
       <div class="field"><label>Benefit period</label><select id="rc_bp"></select></div>
       <div class="field"><label>Waiting period</label><select id="rc_ep"></select></div>
     </div>
@@ -815,7 +815,7 @@
       <div class="field"><label>Home care weekly benefit ($150 steps)</label><input id="rc_hcweekly" type="number" value="750" step="150" min="150"></div>
       <div class="field"><label>Home care benefit period</label><select id="rc_hcweeks"></select></div>
     </div>
-    <div class="warn" style="margin-top:6px" id="rc_formnote">Premium = (facility + hospital + home care) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.</div>
+    <div class="warn" style="margin-top:6px" id="rc_formnote">Premium = (facility + hospital + home care) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.</div>
     <div class="actions"><button class="run" onclick="rcRun()">Run Recovery Care quote</button></div>
   </div>
 
@@ -830,7 +830,7 @@
       <div class="field"><label>Premium mode</label><select id="hr_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Home care weekly benefit ($150 steps)</label><input id="hr_weekly" type="number" value="600" step="150" min="150"></div>
+      <div class="field"><label>Weekly benefit ($150–$750 · up to $3,000/month)</label><input id="hr_weekly" type="number" value="750" step="150" min="150" max="750"></div>
       <div class="field"><label>Benefit period</label><select id="hr_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
     </div>
     <div class="warn" style="margin-top:6px">The one-page Texas rate guide lists annual rates by benefit period only — no waiting period, hospital or riders — and doesn’t print the unit. Its rates match CLI’s $150/week home care rider, so the tool prices per $150/week. Premium = rate × units × the mode factor, rounded to the penny.</div>
@@ -3751,6 +3751,7 @@ window.HCP=(function(){
     if(!(age>=50&&age<=89)) throw new Error('Home Care Plus issues ages 50–89.');
     const R=CLI_HCP_SETS[key], wk=+o.hcWeekly||0, wi=WEEKS.indexOf(+o.hcWeeks||52), ei=R.oneEP?0:EPS.indexOf(+o.hcEP||0);
     if(!(wk>=150) || wk%150) throw new Error('Home care is sold in $150/week units.');
+    if(wk>1500) throw new Error('Home Care Plus goes up to $1,500/week.');
     if(wi<0) throw new Error('Benefit period must be 13, 26, 39 or 52 weeks.');
     if(ei<0) throw new Error('Waiting period must be 0 or 20 days.');
     const hd=+o.hospitalDaily||0; if(hd<0 || hd%10) throw new Error('Daily hospital benefit is sold in $10/day units.');
@@ -3792,6 +3793,7 @@ window.RC=(function(){
     if(bi<0) throw new Error('Benefit period must be '+R.bps.join(', ')+' days.');
     if(ei<0) throw new Error('Waiting period must be '+R.eps.join(', ')+' days.');
     const fd=+o.facilityDaily||0; if(!(fd>=10) || fd%10) throw new Error('Facility daily benefit is sold in $10/day units.');
+    if(fd>400) throw new Error('Recovery Care facility benefit goes up to $400/day.');
     const b=band(age), steps=[['Facility $'+fd+'/day · '+bp+'-day period · '+(one?'0-day wait (one rate filed)':R.eps[ei]+'-day wait'), R.fac[String(age)][one?bi:bi*3+ei]*(fd/10)]];
     const hd=+o.hospitalDaily||0;
     if(hd>0){ if(!R.hosp) throw new Error('Recovery Care in '+st+' has no daily hospital benefit.'); if(hd%10) throw new Error('Daily hospital benefit is sold in $10/day units.'); steps.push(['Daily hospital $'+hd+'/day', R.hosp[b]*(hd/10)]); }
@@ -3817,6 +3819,7 @@ window.HR=(function(){
     if(!(age>=50&&age<=89)) throw new Error('Home Recovery Care issues ages 50–89.');
     const wk=+o.hcWeekly||0, wi=R.weeks.indexOf(+o.hcWeeks||52);
     if(!(wk>=150) || wk%150) throw new Error('Home care is sold in $150/week units.');
+    if(wk>750) throw new Error('Home Recovery Care goes up to $750/week ($3,000/month).');
     if(wi<0) throw new Error('Benefit period must be 13, 26, 39 or 52 weeks.');
     const steps=[['Home care $'+wk+'/week · '+R.weeks[wi]+' weeks', R.hc[String(age)][wi]*(wk/150)]];
     const mode=MODAL[o.mode]?o.mode:'monthly', annual=r2(steps[0][1]);
@@ -4543,7 +4546,7 @@ function rcSyncState(){ const st=($('rc_state')||{}).value, O=RC.opts(st);
   fill('rc_bp',O.bps,'days',180); fill('rc_ep',O.eps,'days',20); fill('rc_hcweeks',O.hcWeeks,'weeks',13);
   const epf=$('rc_ep').closest('.field'); if(epf) epf.hidden=!O.eps.length;   // Idaho: one rate, no waiting-period choice
   if($('rc_hosprow')) $('rc_hosprow').hidden=!O.hosp;                       // Virginia: no daily hospital benefit
-  const f=RC.formFor(st), el=$('rc_formnote'); if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (facility + hospital + home care) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.'; }
+  const f=RC.formFor(st), el=$('rc_formnote'); if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (facility + hospital + home care) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.'; }
 function rcRun(){ try{
   const o=rcOpts(); const q=RC.quote(o);
   show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Recovery Care</div></div><div class="config-line">'+rcConfigShort(o).replace(/·/g,'&middot;')+'</div>'
@@ -4562,7 +4565,7 @@ function hcpSyncState(){ const st=($('hcp_state')||{}).value, f=HCP.formFor(st),
   const cf=($('hcp_cancer')||{closest:()=>null}).closest('.field'); if(cf){ cf.hidden=!HCP.hasCancer(st); if(cf.hidden) $('hcp_cancer').value=0; }   // Virginia, New Hampshire: no cancer rider
   const cu=HCP.cancerUnit(st), ci=$('hcp_cancer'); if(ci){ const v=+ci.value||0; ci.step=cu; ci.value=Math.round(v/cu)*cu; const lb=ci.closest('.field')&&ci.closest('.field').querySelector('label'); if(lb) lb.textContent='Lump-sum cancer benefit ($ · $'+cu.toLocaleString()+' steps)'; }   // Utah sells cancer per $1,000
   const hf=($('hcp_hosp')||{closest:()=>null}).closest('.grid'); if(hf){ const had=!hf.hidden; hf.hidden=!HCP.hasHosp(st); if(hf.previousElementSibling) hf.previousElementSibling.hidden=hf.hidden; if(hf.hidden) $('hcp_hosp').value=0; else if(!had && !(+$('hcp_hosp').value)) $('hcp_hosp').value=50; }   // New Hampshire: no daily hospital benefit
-  if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.'; }
+  if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. Opens at CLI’s maximum; click lower as needed.'; }
 function hcpRun(){ try{
   const o=hcpOpts(); const q=HCP.quote(o);
   show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Home Care Plus</div></div><div class="config-line">'+hcpConfigShort(o).replace(/·/g,'&middot;')+'</div>'
@@ -5427,9 +5430,9 @@ function waitGrow(o, yr){ const g=Math.pow(1.03, yr);
     if(o.homeCare) x.hcDaily=Math.min(300, fd, Math.max(10, Math.round((+o.hcDaily||fd)*g/10)*10)); }
   else if(isMoo(o)){ x.monthlyBenefit=Math.min(12000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/100)*100)); }
   else if(isNwm(o)){ x.monthlyBenefit=Math.max(100, Math.round((+o.monthlyBenefit)*g/100)*100); }
-  else if(isHr(o)){ x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly||600)*g/150)*150); }
-  else if(isRc(o)){ x.facilityDaily=Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly)*g/150)*150); }
-  else if(isHcp(o)){ x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly||600)*g/150)*150); }
+  else if(isHr(o)){ x.hcWeekly=Math.min(750, Math.max(150, Math.round((+o.hcWeekly||750)*g/150)*150)); }
+  else if(isRc(o)){ x.facilityDaily=Math.min(400, Math.max(10, Math.round((+o.facilityDaily||400)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly)*g/150)*150); }
+  else if(isHcp(o)){ x.hcWeekly=Math.min(1500, Math.max(150, Math.round((+o.hcWeekly||1500)*g/150)*150)); }
   else if(isAet(o)){ x.facilityDaily=Math.min(700, Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.min(2100, Math.max(150, Math.round((+o.hcWeekly)*g/150)*150)); }
   else if(isMooc(o)){ const mb=Math.min(15000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/50)*50)); x.monthlyBenefit=mb; x.policyLimit=mb*12*(+o.years||3); }
   else { x.monthlyBenefit=SNAP(+(o._rawMb||o.monthlyBenefit)*g); delete x._rawMb; }
@@ -5743,10 +5746,10 @@ function qcConvert(op, target, state){
     return {carrier:'nwm', state:st||'TX', age, gender, uwClass:'Standard', monthlyBenefit:Math.max(1000,Math.round(c.mb/100)*100), years:nearestVal(c.years,[3,6]), epWeeks:12, indexing:pc>0?'abi'+pc:'none', spousal:c.spousal, multiLife:false, nfb:false, mode}; }
   if(target==='aetna'){ const fd=Math.min(700,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360, AET.opts(st||'TX').bps);
     return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:AET.opts(st||'TX').homeCare, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcBP:bp, hcEP:0, rxUnits:3}; }
-  if(target==='clirc'){ const s2=CLI_RC_SETS[st]?st:'UT', O=RC.opts(s2), fd=Math.max(10,Math.round(c.mb/30/10)*10), bp=nearestVal(c.years*360, O.bps);
+  if(target==='clirc'){ const s2=CLI_RC_SETS[st]?st:'UT', O=RC.opts(s2), fd=Math.min(400,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360, O.bps);
     return {carrier:'clirc', state:s2, age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:O.eps.length?nearestVal(20,O.eps):0, hospitalDaily:O.hosp?50:0, homeCare:true, hcWeekly:Math.max(150,Math.round(fd*7/150)*150), hcWeeks:O.hcWeeks[0]}; }
-  if(target==='clihr') return {carrier:'clihr', state:'TX', age, mode, hcWeekly:Math.max(150,Math.round(c.mb/30*7/150)*150), hcWeeks:nearestVal(c.years*52, HR.WEEKS)};
-  if(target==='clihcp'){ const wk=Math.max(150,Math.round(c.mb/30*7/150)*150), weeks=nearestVal(c.years*52, HCP.WEEKS);
+  if(target==='clihr') return {carrier:'clihr', state:'TX', age, mode, hcWeekly:Math.min(750,Math.max(150,Math.round(c.mb/30*7/150)*150)), hcWeeks:nearestVal(c.years*52, HR.WEEKS)};
+  if(target==='clihcp'){ const wk=Math.min(1500,Math.max(150,Math.round(c.mb/30*7/150)*150)), weeks=nearestVal(c.years*52, HCP.WEEKS);
     return {carrier:'clihcp', state:st||'TX', age, mode, hcWeekly:wk, hcWeeks:weeks, hcEP:0, hospitalDaily:HCP.hasHosp(st||'TX')?50:0, ambulanceUnits:0, cancerUnits:0}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
   if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
@@ -6155,15 +6158,15 @@ function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
   set('aet_mh',25*(p.mentalUnits||0)); set('aet_adc',10*(p.adcUnits||0)); set('aet_adcd',String(p.adcDays||15)); set('aet_pet',25*(p.petUnits||0)); set('aet_hm',500*(p.homeModUnits||0)); $('aet_mp').checked=!!p.multiPolicy; }
 function fillHcpForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clihcp');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
-  set('hcp_state',p.state||'TX'); hcpSyncState(); set('hcp_age',p.age); set('hcp_mode',p.mode||'monthly'); set('hcp_weekly',p.hcWeekly||600); set('hcp_weeks',String(p.hcWeeks||52)); set('hcp_ep',String(p.hcEP||0));
+  set('hcp_state',p.state||'TX'); hcpSyncState(); set('hcp_age',p.age); set('hcp_mode',p.mode||'monthly'); set('hcp_weekly',p.hcWeekly||1500); set('hcp_weeks',String(p.hcWeeks||52)); set('hcp_ep',String(p.hcEP||0));
   set('hcp_hosp',p.hospitalDaily||0); set('hcp_amb',200*(p.ambulanceUnits||0)); set('hcp_cancer',HCP.cancerUnit(p.state)*(p.cancerUnits||0)); }
 function fillRcForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clirc');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
-  set('rc_state',p.state||'UT'); rcSyncState(); set('rc_age',p.age); set('rc_mode',p.mode||'monthly'); set('rc_daily',p.facilityDaily||100); set('rc_bp',String(p.facilityBP||180)); if(p.facilityEP!=null) set('rc_ep',String(p.facilityEP));
+  set('rc_state',p.state||'UT'); rcSyncState(); set('rc_age',p.age); set('rc_mode',p.mode||'monthly'); set('rc_daily',p.facilityDaily||400); set('rc_bp',String(p.facilityBP||180)); if(p.facilityEP!=null) set('rc_ep',String(p.facilityEP));
   set('rc_hosp',p.hospitalDaily||0); $('rc_hc').checked=!!p.homeCare; $('rc_hcbox').hidden=!p.homeCare; set('rc_hcweekly',p.hcWeekly||750); if(p.hcWeeks) set('rc_hcweeks',String(p.hcWeeks)); }
 function fillHrForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clihr');
   const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
-  set('hr_age',p.age); set('hr_mode',p.mode||'monthly'); set('hr_weekly',p.hcWeekly||600); set('hr_weeks',String(p.hcWeeks||52)); }
+  set('hr_age',p.age); set('hr_mode',p.mode||'monthly'); set('hr_weekly',p.hcWeekly||750); set('hr_weeks',String(p.hcWeeks||52)); }
 function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
