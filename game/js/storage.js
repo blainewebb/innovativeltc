@@ -53,6 +53,9 @@ export function newProfile(name, avatar, grade = 0) {
     party: [],
     caught: [],
     trophies: {},
+    // Right answers made with each character, and the stage each has evolved to.
+    xp: {},
+    stages: {},
     /* A starting point for difficulty, not a setting. Its influence fades as
        the child's own answers accumulate. 0 means it was never asked. */
     grade,
@@ -63,7 +66,8 @@ export function newProfile(name, avatar, grade = 0) {
        without changing anything for their brother. */
     prefs: { drills: true },
     records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0, floorsBeaten: 0,
-               fightsWon: 0, bestStreak: 0, flawlessFights: 0, flawlessBosses: 0, fastAnswers: 0 },
+               fightsWon: 0, bestStreak: 0, flawlessFights: 0, flawlessBosses: 0, fastAnswers: 0,
+               levelSeen: 0 },
     /* One entry per day the kid played: { date:'YYYY-MM-DD', ms, correct, wrong } */
     days: [],
   };
@@ -73,6 +77,15 @@ export function newProfile(name, avatar, grade = 0) {
    Anything coming from an export file, or from a store written by an older
    version of the game, gets filled in here. Missing fields would otherwise
    crash a screen much later, a long way from the cause. */
+/** A { name: whole number } map from a save, with junk dropped. */
+function cleanCounts(raw, max = Infinity) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw)
+    .map(([k, v]) => [k, Math.floor(Number(v))])
+    .filter(([, v]) => Number.isFinite(v) && v > 0)
+    .map(([k, v]) => [k, Math.min(max, v)]));
+}
+
 export function normalizeProfile(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const base = newProfile(String(raw.name || 'Hero').slice(0, 12), raw.avatar || '\u{1F9D9}', Number(raw.grade) || 0);
@@ -87,6 +100,8 @@ export function normalizeProfile(raw) {
     party: Array.isArray(raw.party) ? raw.party.filter(x => typeof x === 'string').slice(0, 3) : [],
     // Only monsters that still exist, so a renamed one cannot leave a blank card.
     caught: Array.isArray(raw.caught) ? [...new Set(raw.caught.filter(id => MONSTER_BY_ID[id]))] : [],
+    xp: cleanCounts(raw.xp),
+    stages: cleanCounts(raw.stages, 3),
     trophies: raw.trophies && typeof raw.trophies === 'object' && !Array.isArray(raw.trophies)
       ? Object.fromEntries(Object.entries(raw.trophies).filter(([, v]) => Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]))
       : {},

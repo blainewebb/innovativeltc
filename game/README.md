@@ -243,6 +243,30 @@ for little until there are a dozen), and he had mostly been playing
 subtraction and times tables, which count as 3rd grade skills. The engine
 test now replays his report card to keep it from coming back.
 
+**Levels go up one at a time.** To leave a level a kid has to show that
+level's own topics, each tried at least 5 times and right 80% of the time
+(the kinder of their lifetime rate and their recent one, so one slip never
+re-closes a level). The topics match the grade descriptions on the hero
+screen: adding and subtracting to 20; times tables 2-5; times tables 6-12
+and dividing by 2-5;
+dividing by 6-12; fractions and decimals; two of percentages, negatives and
+ratios; order of operations and powers; solving for x. Every gate topic has
+to be one its level can actually serve (a test checks): bigger adding and
+subtracting were 2nd grade's at first, but level 2 tiles only go to 10, so
+nobody without a declared grade could ever leave level 2. While a level's
+topics have not been tried enough, about a third of the timed problems aim
+at them, and the camp screen lists them with a 0/5 counter. Reaching a new
+level is announced on the next win or loss.
+
+Before this, the level came from the hardest skill tried four times, so four
+squaring problems with the power rune rated a 4th grader as 7th grade and
+skipped fractions, decimals and percentages. It also had a second check on
+the overall record that swung whenever a new skill was started, dropping a
+kid several levels and then jumping them back; that is gone. Simulated from
+a real 4th grader's report card at 97% right, 5th grade now arrives after
+about 60 more problems, 6th about 45 after that and 7th about 55 after that,
+in order.
+
 The school year can be **changed later** from the report card, since the best
 setting is often not obvious until you have watched a few runs. Changing it
 never touches their record.
@@ -296,6 +320,41 @@ ordinary Safari browsing is subject to.
 
 To move a hero between browsers, use the backup below rather than hoping.
 
+## The world
+
+Each floor of a run is a small area to walk around, Pokemon style, instead
+of a menu of choices. The area is built from the floor's nodes (`js/world.js`):
+
+- **Tall grass** 🌿 on every floor: each step in it has a 20% chance of a wild
+  monster, and the sixth step without one is certain. Wild monsters are the
+  ones that can be caught.
+- **Trainer houses** 🏠 (the old elite node): a named trainer sends out two
+  monsters one after the other, health carrying over. Their monsters cannot
+  be caught. Beating both pays gold and a relic.
+- **The healer** 🏥, **the shop** 🏪, **the riddle hall** 🏛 and a **locked
+  chest** 🧰: the old rest, shop, riddle and treasure nodes, each usable once.
+- **Townspeople** with quests (win 2 fights in the grass, catch a monster,
+  a flawless fight, a super effective win, 8 in a row) that pay gold or
+  health, and hints: the fact the kid keeps missing ("7 × 8 = 56, say it
+  three times"), what the next level needs, how types and catching work.
+- **The gate** ⛩ stays sealed until a fight in this area is won. Every third
+  floor the gate is the **boss tower** 🏰.
+
+Walking is the arrow pad on screen, or arrow keys / WASD; bumping into
+something uses it, and text comes up in a Pokemon-style box. The area is
+11 by 13 tiles so it all fits on a phone with no scrolling: time spent
+walking is time not spent on maths, so nothing is more than a few steps
+away and everything in it leads to a problem.
+
+Every layout is checked when it is made (everything reachable, enough grass)
+and the tests check 2,700 of them. Seasons change the ground colour and the
+decorations.
+
+**Balance.** On the old menu a kid picked one thing per floor; in the world
+they can do all of it, which means more healing and more prizes. The healer
+was cut from 50% to 25% of max health to compensate (see the numbers in the
+balance note below).
+
 ## Types, catching and the team
 
 Every hero and monster has a **type**, Pokemon style: Water puts out Fire,
@@ -328,6 +387,28 @@ Measured with the soak bots (default hero, never switching, so a neutral
 mix of matchups): the primary clear rate is unchanged at about 70%, and 8th
 grade is 52% over four runs against 55% before. A kid who always switches
 to the strong matchup will find it easier, which is the point.
+
+## Evolving
+
+Every right answer a character makes while it is the one fighting counts
+toward evolving it: 60 right answers for stage 2, 200 for stage 3. Each
+stage hits a little harder (1.1x, then 1.2x, on top of the type matchup),
+which is the reason to stick with a favourite and build it up.
+
+After the fight, it evolves on a screen of its own, Pokemon style: "What?
+Ember Newt is evolving!", a flicker between the old and new forms that
+speeds up, then the new one holds. It counts from that screen, not before,
+so nothing changes mid-fight without the kid seeing it. An evolution earned
+but never shown (the app closed mid-fight) plays the next time camp opens.
+
+Emoji only stretch so far. Nine characters have a real line where the
+picture changes (chick, hen, peacock; lizard, crocodile, dragon; crab,
+lobster, squid; tiger face, tiger; bat, vampire; sparkle, star, glowing
+star; rain cloud, thunderstorm, wave; candle, flame, comet; snowman,
+snowing snowman). Everything else keeps its picture and gets a new name
+by type (Ember Newt to Blaze Newt to Inferno Newt; Fox to Blaze Fox), a
+glow in its type's colour, and stars. The team screen shows a bar of right
+answers toward the next stage.
 
 ## Seasons
 
@@ -533,10 +614,11 @@ lands without anyone having to know they must refresh twice. Bumping `CACHE` in
 | `js/engine.js` | mastery tracking, adaptation, damage, enemy budget, map, runs |
 | `js/main.js` | every screen, input handling, the run state machine |
 | `js/collection.js` | characters, teams, catch chance, trophies |
+| `js/world.js` | the walkable area for each floor, and path finding |
 | `js/storage.js` | hero profiles in localStorage |
 | `js/sfx.js` | WebAudio blips, no audio files to download |
 
-`data.js`, `engine.js` and `collection.js` never touch the DOM, which is why the logic is testable.
+`data.js`, `engine.js`, `collection.js` and `world.js` never touch the DOM, which is why the logic is testable.
 
 ## Adding English
 

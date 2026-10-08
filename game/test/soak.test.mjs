@@ -2,6 +2,7 @@
    so every screen and node type gets exercised and any runtime error surfaces. */
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import { worldTurn } from './worldbot.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); }
@@ -293,8 +294,11 @@ try {
       await page.click('#wear');
     } else if (await page.$('#next')) {
       await page.click('#next');
+    } else if (await page.$('#evoOk')) {          // a character evolved
+      seen.add('evolved');
+      await page.click('#evoOk');
     } else if (await page.$('#cont')) {
-      seen.add('victory');
+      seen.add(await page.$('.trainer-next') ? 'trainer-next' : 'victory');
       await page.click('#cont');
     } else if (await page.$('.choice')) {
       seen.add(await page.$('#heal') ? 'rest' : 'relic');
@@ -303,16 +307,14 @@ try {
       seen.add('shop');
       const item = await page.$('.shop-item:not([disabled])');
       if (item) await item.click(); else await page.click('#leave');
-    } else if (await page.$('.node')) {
+    } else if (await page.$('#world')) {            // walking the floor's area
       seen.add('map');
-      const nodes = await page.$$eval('.node', els => els.map(e => e.className));
-      nodes.forEach(c => seen.add('node:' + c.split(' ')[1]));
-      if (await page.$('.node.boss')) seen.add('boss-floor');
-      // The bot cannot read word problems, so it avoids them where it can and
-      // the run length being measured stays a test of combat balance.
-      const n = await page.$('.node.battle') || await page.$('.node.rest')
-             || await page.$('.node.elite') || await page.$('.node');
-      await n.click();
+      const kinds = await page.$$eval('#world [data-o]', els => els.map(e => e.dataset.o));
+      kinds.forEach(k => seen.add('node:' + k));
+      if (kinds.includes('boss')) seen.add('boss-floor');
+      const did = await worldTurn(page);
+      if (did === 'stuck') { console.error('  STUCK in the world'); break; }
+      if (did === 'trainer') seen.add('trainer');
     } else if (await page.$('#again')) {
       const cleared = await page.$eval('h2', e => /CLEARED/.test(e.textContent)).catch(() => false);
       if (cleared) { runDepths.push({ end: 'clear', floor: current }); seen.add('cleared'); await page.click('#again'); await page.click('#startRun'); continue; }
@@ -351,8 +353,11 @@ try {
   ok('saw a boss duel', seen.has('boss-duel'), [...seen].join(','));
   // Twelve heroes across sixty floors, so several runs must produce some.
   ok('heroes are earned along the way', seen.has('avatar-earned'), [...seen].join(','));
-  ok('saw the map', seen.has('map'));
+  ok('walked the world', seen.has('map'));
+  ok('fought a trainer', seen.has('trainer'), [...seen].join(','));
+  ok('a trainer sent out a second monster', seen.has('trainer-next'), [...seen].join(','));
   ok('saw a victory screen', seen.has('victory'));
+  ok('a character evolved from the maths done with it', seen.has('evolved'));
   ok('saw a boss node', seen.has('node:boss'), [...seen].join(','));
   ok('saw a non-combat node', [...seen].some(t => /^node:(riddle|treasure|shop|rest)$/.test(t)), [...seen].join(','));
   // If the bot is mostly guessing at written problems, the clear rate below is

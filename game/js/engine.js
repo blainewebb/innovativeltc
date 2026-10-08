@@ -107,17 +107,6 @@ export function totalAttempts(mastery) {
   return SKILLS.reduce((n, s) => n + (mastery.skills[s.id]?.attempts || 0), 0);
 }
 
-/** Level from answers alone, ignoring whatever grade was declared. */
-function evidenceLevel(mastery) {
-  const active = SKILLS.filter(s => (mastery.skills[s.id]?.attempts || 0) >= 4);
-  if (active.length === 0) return 1;
-  const avg = active.reduce((sum, s) => sum + skillScore(mastery.skills[s.id], s.id), 0) / active.length;
-  const reach = Math.max(...active.map(s => s.tier));
-  // Level tracks the highest tier the player is working in, nudged by how well.
-  const level = reach + (avg > 0.72 ? 1 : avg < 0.45 ? -1 : 0);
-  return Math.max(1, Math.min(MAX_LEVEL, level));
-}
-
 /* The declared grade acts as a floor that erodes as real answers arrive: one
    level of it falls away every 30 attempts, so within roughly 150 problems
    the child's own record is the only thing setting difficulty. That gives a
@@ -154,16 +143,81 @@ export const GRADE_HOLD_ACCURACY = [
   { atLeast: 0.65, maxDrop: 2 },
 ];
 
-export function difficultyLevel(mastery, grade = 0) {
-  const evidence = evidenceLevel(mastery);
+/* One grade at a time. To move up from a level the kid has to have shown
+   that level's own topics: at least half of them, each answered GATE_TRIES
+   times and right GATE_ACCURACY of the time. Without this, four squaring
+   problems rated a 4th grader as 7th grade, skipping fractions, decimals and
+   percentages entirely.
+
+   "Right often enough" is whichever is kinder of the lifetime rate and the
+   recent one: the recent one alone let a single slip re-close a level they
+   had already passed, and the lifetime one alone made a kid who started
+   shaky and then got good wait far too long. Falling back takes both. */
+export const GATE_TRIES = 5;
+export const GATE_ACCURACY = 0.8;
+/** Share of drills aimed at the current level's gate while it is still shut. */
+export const DRILL_GATE_SHARE = 0.35;
+
+/* Each level's own topics, matching the grade descriptions on the hero
+   screen, and only topics that level can actually serve (a test checks). Skill tiers alone could not be used: 7th and 8th grade would both
+   have been solving for x, so passing it jumped two levels at once. */
+export const LEVEL_GATES = {
+  1: ['add_small', 'sub_small'],
+  // Bigger adding and subtracting cannot be gates here: level 2 tiles only
+  // go to 10, so they never come up and the climb stalled for good.
+  2: ['mult_easy'],
+  3: ['mult_hard', 'div_easy'],
+  4: ['div_hard'],
+  5: ['fractions', 'decimals'],
+  6: ['percent', 'integers', 'ratio'],
+  7: ['order_ops', 'exponents'],
+  8: ['solve_x'],
+};
+
+/** The topics a level has to show before the next one opens. */
+export function gateSkills(level) {
+  return (LEVEL_GATES[level] || []).map(id => SKILL_BY_ID[id]).filter(Boolean);
+}
+
+/** Where a kid stands on a level's gate: each topic's progress, and whether it is open. */
+export function gateStatus(mastery, level) {
+  const skills = gateSkills(level).map(s => {
+    const r = mastery.skills[s.id];
+    const tries = r?.attempts || 0;
+    const rate = tries ? Math.max(r.correct / tries, r.ema) : 0;
+    return { id: s.id, label: s.label, tries, ok: tries >= GATE_TRIES && rate >= GATE_ACCURACY };
+  });
+  // Two topics means both; three means any two.
+  const need = skills.length <= 2 ? skills.length : Math.ceil(skills.length / 2);
+  return { level, skills, need, passed: !skills.length || skills.filter(x => x.ok).length >= need };
+}
+
+function gradeFloor(mastery, grade) {
   const seeded = GRADE_BY_ID[grade]?.level || 0;
-  if (!seeded) return evidence;
+  if (!seeded) return 1;
   const past = Math.max(0, totalAttempts(mastery) - GRADE_GRACE_ATTEMPTS);
   const byCount = Math.floor(past / GRADE_DECAY_ATTEMPTS);
   const acc = overallAccuracy(mastery);
   const hold = GRADE_HOLD_ACCURACY.find(h => acc >= h.atLeast);
-  const floor = seeded - Math.min(byCount, hold ? hold.maxDrop : Infinity);
-  return Math.max(1, Math.min(MAX_LEVEL, Math.max(evidence, floor)));
+  return Math.max(1, Math.min(MAX_LEVEL, seeded - Math.min(byCount, hold ? hold.maxDrop : Infinity)));
+}
+
+/* The level is the grade floor, then up one for every gate in a row that has
+   been passed. There used to be a second cap from the overall record as well,
+   but it swung whenever a new skill was started (few tries count for little),
+   and every swing dropped the kid levels and then jumped them back. */
+export function difficultyLevel(mastery, grade = 0) {
+  let level = gradeFloor(mastery, grade);
+  while (level < MAX_LEVEL && gateStatus(mastery, level).passed) level += 1;
+  return level;
+}
+
+/** What stands between a kid and the next level, for the camp screen. Null at the top. */
+export function nextLevelNeeds(mastery, grade = 0) {
+  const level = difficultyLevel(mastery, grade);
+  if (level >= MAX_LEVEL) return null;
+  const gate = gateStatus(mastery, level);
+  return { level, next: level + 1, gate };
 }
 
 /** Which operator runes the profile is allowed to find, given where they are. */
@@ -358,6 +412,21 @@ export function pickDrill(rng, mastery, runes, level) {
     }
     return canAsk ? askedProblem(rng, skill.id) : null;
   };
+
+  /* Levels are climbed one at a time by showing the current level's own
+     topics, so drills aim at the ones still to show. Without this a topic
+     like dividing by 6-12 came up in 3% of drills and the climb stalled. */
+  const gate = gateStatus(mastery, level);
+  if (!gate.passed && rng() < DRILL_GATE_SHARE) {
+    // Only topics not yet tried enough: one tried plenty and still shaky is
+    // what the weak-fact drills below are for.
+    const open = gate.skills.filter(x => x.tries < GATE_TRIES).map(x => SKILL_BY_ID[x.id])
+      .filter(sk => all.includes(sk));
+    if (open.length) {
+      const p = fromSkill(open[Math.floor(rng() * open.length)]);
+      if (p) return { ...p, weak: false, gate: true };
+    }
+  }
 
   if (rng() < DRILL_WEAK_SHARE) {
     const shaky = shakyFacts(mastery, 12)
