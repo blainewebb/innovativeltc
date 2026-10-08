@@ -17,6 +17,9 @@
   .brand span{color:var(--primary)}
   .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
   .topright{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .mmrow{display:flex;gap:6px;margin-top:5px}
+  .mmrow button{border:1px solid var(--border);background:#fff;border-radius:999px;padding:2px 10px;font-size:.72rem;font-weight:700;color:var(--primary-d);cursor:pointer}
+  .mmrow button:hover{border-color:var(--primary)}
   .badge{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
   .badge.pending{background:#fffbeb;color:#b45309;border-color:#fde68a}
   .carriersel{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;color:var(--muted)}
@@ -6772,6 +6775,19 @@ function onClientState(fromForm){ const st=($('cl_state')||{}).value||''; try{ l
   else if(CARRIER) applyClient(CARRIER); }
 function stateFull(code){ code=(code||'TX').toUpperCase(); const f=US_STATES.find(x=>x[0]===code); return f?f[1]:code; }
 
+/* ---------- Min / Max buttons on the short-term care benefit amounts ----------
+   One click sets a benefit to its lowest or highest allowed amount (uses the field's live limits, so OmniFlex's
+   Limited Benefit cap, state hospital minimums, etc. are respected). */
+const STC_MINMAX_FIELDS=['om_daily','om_hcdaily','om_hospdaily','aet_daily','aet_hcweekly','hcp_weekly','hcp_hosp','rc_daily','rc_hcweekly','rc_hosp','hr_weekly'];
+function stcSetMinMax(id, which){ const el=$(id); if(!el) return;
+  if(el.tagName==='SELECT'){ const o=[...el.options].filter(x=>x.value!=='' && !x.disabled); if(!o.length) return; el.value=(which==='min'?o[0]:o[o.length-1]).value; }
+  else { const v=which==='min'?el.min:el.max; if(v===''||v==null) return; el.value=v; }
+  try{ el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+function addStcMinMax(){ STC_MINMAX_FIELDS.forEach(id=>{ const el=$(id); if(!el) return; const f=el.closest('.field'); if(!f || f.querySelector('.mmrow')) return;
+  const row=document.createElement('div'); row.className='mmrow';
+  const hasMax = el.tagName==='SELECT' || (el.max!=='' && el.max!=null);
+  row.innerHTML='<button type="button" title="Lowest allowed amount" onclick="stcSetMinMax(\''+id+'\',\'min\')">Min</button>'+(hasMax?'<button type="button" title="Highest allowed amount" onclick="stcSetMinMax(\''+id+'\',\'max\')">Max</button>':'');
+  f.appendChild(row); }); }
 /* ---------- init ---------- */
 fillStates();
 fillMooStates();
@@ -6781,6 +6797,7 @@ csInitStates(); csSyncState();   // populate CareScout state + option dropdowns
 omniInitStates(); omniSyncState();   // OmniFlex state picker + filed-states text from the rate data
 if(typeof moocFillPct==='function') moocFillPct();   // populate MutualCare Custom inflation-percent dropdown
 attachBirthdayPickers();   // add a birthday date-picker beside every age field (either/or entry)
+addStcMinMax();            // Min / Max buttons on the short-term care benefit amounts
 document.querySelectorAll('.tenpaybox').forEach(b=>{ b.checked=SHOW_TENPAY; });   // remembered "Show 10-pay too" choice
 // Class 1 limits follow every change that can affect them (class, spouse class, couple, Shared Care, benefit, period).
 ['moo','mooc'].forEach(pfx=>{ ['class','class2','couple','shared','benefit','benpick','bp','covbasis','totben'].forEach(f=>{ const e=document.getElementById(pfx+'_'+f);
