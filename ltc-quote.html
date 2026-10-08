@@ -291,7 +291,7 @@
           <option value="omniflex">Manhattan Life — OmniFlex™ STC</option>
           <option value="moo">Mutual of Omaha — MutualCare Secure</option>
           <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
-          <option value="nwm">Northwestern Mutual — Long-Term Care</option>
+          <option value="nwm">Northwestern Mutual — QuietCare</option>
           <option value="aetna">Aetna — Short Term Care</option>
         </select>
       </label>
@@ -334,7 +334,7 @@
         <option value="omniflex">Manhattan Life — OmniFlex™ STC</option>
         <option value="moo">Mutual of Omaha — MutualCare Secure</option>
         <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
-        <option value="nwm">Northwestern Mutual — Long-Term Care (TX)</option>
+        <option value="nwm">Northwestern Mutual — QuietCare (TX)</option>
         <option value="aetna">Aetna — Short Term Care (TX)</option>
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
@@ -672,7 +672,7 @@
 
   <div class="card" id="nwmcard" hidden>
     <div class="cs-head">
-      <h2 style="margin:0 0 2px">Northwestern Mutual <span style="color:var(--muted);font-weight:600;font-size:.9rem">Long-Term Care (UU series)</span></h2>
+      <h2 style="margin:0 0 2px">Northwestern Mutual <span style="color:var(--muted);font-weight:600;font-size:.9rem">QuietCare (UU 2016)</span></h2>
       <p class="hint" style="margin:0">Northwestern Long Term Care Insurance Company · comprehensive long-term care, lifetime pay. Rates from the <b>Texas filing (UU series, March 2016)</b>, applied exactly as the filed premium calculation. Issue ages 30–79.</p>
     </div>
     <div class="grid">
@@ -700,7 +700,7 @@
       <div class="field"><label>Inflation protection</label><select id="nwm_infl"><option value="none">None (level)</option><option value="abi3" selected>3% compound (automatic)</option><option value="abi4">4% compound (automatic)</option><option value="abi5">5% compound (automatic)</option><option value="aapb">5% buy-up offers (Automatic Additional Purchase)</option></select></div>
     </div>
     <div class="riders" style="margin-top:6px"><label title="Paid-up coverage if premiums stop on or after the 3rd policy anniversary"><input type="checkbox" id="nwm_nfb"> Paid-Up Nonforfeiture Benefit</label><label id="nwm_survwrap" hidden title="When both spouses own a policy: at the first death, the survivor's policy becomes fully paid up"><input type="checkbox" id="nwm_surv"> Survivorship Benefit (couples)</label></div>
-    <div class="warn" style="margin-top:6px">Texas rates only (UU series filing, March 2016). Northwestern's minimum and maximum monthly benefit aren't in the filing; confirm current rates and limits with Northwestern before presenting. The Automatic Additional Purchase option prices today's coverage; the 5% buy-up offers are priced at the insured's age when accepted.</div>
+    <div class="warn" style="margin-top:6px">Texas rates (QuietCare UU 2016), verified to the penny against Northwestern quotes. Northwestern's minimum and maximum monthly benefit aren't in the filing. The Automatic Additional Purchase option prices today's coverage; the 5% buy-up offers are priced at the insured's age when accepted.</div>
     <div class="actions"><button class="run" onclick="nwmRunSingle()">Run Northwestern quote</button></div>
   </div>
 
@@ -3898,7 +3898,7 @@ function setCarrier(c){
   if($('mooccard')) $('mooccard').hidden = !mooc;
   if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
   if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
-  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · TX filing' : CARRIER==='aetna' ? '✓ Aetna · Short Term Care (TX filing)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ Aetna · Short Term Care (TX filing)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -4202,7 +4202,7 @@ function nwmClassLabel(c){ return c==='Class 1'?'Class 1':c==='Class 2'?'Class 2
 function nwmEpLabel(o){ const w=NWM.epOf(o); return w+'-week ('+NWM.EP_DAYS[w]+'-day)'; }
 function nwmInflLabel(o){ return NWM.INDEX_LABEL[NWM.idxOf(o)]; }
 function nwmConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
-  return o.age+g+' · Northwestern LTC · '+fmt0(o.monthlyBenefit)+'/mo · '+(+o.years||3)+'-yr · '+NWM.epOf(o)+'-wk elim · '+nwmInflLabel(o).replace(' (automatic)','')+' · '+nwmClassLabel(o.uwClass)
+  return o.age+g+' · Northwestern QuietCare · '+fmt0(o.monthlyBenefit)+'/mo · '+(+o.years||3)+'-yr · '+NWM.epOf(o)+'-wk elim · '+nwmInflLabel(o).replace(' (automatic)','')+' · '+nwmClassLabel(o.uwClass)
     +(o.partner?' · both insured −20%':o.spousal?' · spousal −5%':'')+(o.multiLife?' · multi-life −5%':'')+(o.nfb?' · nonforfeiture':'')+(o.survivorship&&o.partner?' · survivorship':'')+' · '+(o.state||'TX'); }
 function nwmOpts(){
   return {carrier:'nwm', state:$('nwm_state').value||'TX', age:+$('nwm_age').value, gender:$('nwm_gender').value, uwClass:$('nwm_class').value,
@@ -4215,7 +4215,7 @@ function nwmCoupleToggle(){ const on=$('nwm_couple').checked;
 function nwmRunSingle(){ try{
   if($('nwm_couple').checked) return nwmRunCouple();
   const o=nwmOpts(); const q=NWM.quote(o);
-  show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">Northwestern Mutual · Long-Term Care</div></div><div class="config-line">'+nwmConfigShort(o).replace(/·/g,'&middot;')+'</div>'
+  show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">Northwestern Mutual · QuietCare</div></div><div class="config-line">'+nwmConfigShort(o).replace(/·/g,'&middot;')+'</div>'
     +'<div class="resbtns">'+addBtn(o)+waitBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+NWM_NOTE+' '+DISC+'</div>');
 }catch(e){ showErr(e.message); } }
 function nwmRunCouple(){ try{
@@ -4229,7 +4229,7 @@ function nwmRunCouple(){ try{
     +'<div class="config-line">'+who+' (couple) &middot; '+nwmConfigShort(partA).replace(/·/g,'&middot;')+' each</div><div class="resbtns">'+addBtn(item)+'</div>'
     +'<div class="disc">Two Northwestern policies (one per spouse), each with the 20% two-insured discount, combined into one household premium.'+(surv?' Survivorship Benefit added: at the first death, the survivor’s policy becomes fully paid up.':'')+' '+NWM_NOTE+' '+DISC+'</div>');
 }catch(e){ showErr(e.message); } }
-const NWM_NOTE='Northwestern rates are from the Texas UU-series filing (March 2016) and should be confirmed against a current Northwestern illustration.';
+const NWM_NOTE='Northwestern Mutual QuietCare (UU 2016) rates from the Texas filing; verified against Northwestern quotes.';
 /* ---------- Aetna Short Term Care — form, results ---------- */
 function aetInflLabel(o){ return AET.INFL_LABEL[o.inflation]||'None'; }
 function aetRiderList(o){ const r=[];
