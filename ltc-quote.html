@@ -3704,7 +3704,8 @@ window.AET=(function(){
     if(+o.adcUnits>0) add('adc'+([15,30,45].indexOf(+o.adcDays)>=0?+o.adcDays:15), +o.adcUnits, 'Adult day care $'+(10*o.adcUnits)+'/day · '+(+o.adcDays||15)+' days/yr');
     // CLI prices each benefit line separately: line × discount × mode factor, rounded to the cent, then summed.
     const mode=MODAL[o.mode]?o.mode:'monthly', mpf=SD.mpFactor||0.95, disc=o.multiPolicy?mpf:1;
-    let modal=0, annual=0; for(const st of steps){ modal+=r2(st[1]*disc*MODAL[mode]); annual+=r2(st[1]*disc); }
+    // CLI's quoter rounds each line's modal premium, then applies the multi-policy discount and rounds again (verified on a Maryland 15% quote).
+    let modal=0, annual=0; for(const st of steps){ modal+=r2(r2(st[1]*MODAL[mode])*disc); annual+=r2(r2(st[1])*disc); }
     if(o.multiPolicy) steps.push([Math.round((1-mpf)*100)+'% multiple-policy discount (each line)', -(steps.reduce((a,x)=>a+x[1],0)*(1-mpf))]);
     return {carrier:'aetna', age, annualPremium:r2(annual), modalPayment:r2(modal), mode, pay:'Level', steps};
   }
