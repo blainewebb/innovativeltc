@@ -293,6 +293,7 @@
           <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
           <option value="nwm">Northwestern Mutual — QuietCare</option>
           <option value="aetna">CLI — Recovery Care Choice (STC)</option>
+          <option value="clihcp">CLI — Home Care Plus</option>
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
@@ -335,7 +336,8 @@
         <option value="moo">Mutual of Omaha — MutualCare Secure</option>
         <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
         <option value="nwm">Northwestern Mutual — QuietCare (TX)</option>
-        <option value="aetna">CLI — Recovery Care Choice (TX)</option>
+        <option value="aetna">CLI — Recovery Care Choice</option>
+        <option value="clihcp">CLI — Home Care Plus</option>
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
       <div class="field"><label>Inflation</label><select id="qc_infl"></select></div>
@@ -754,6 +756,35 @@
     <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Multiple Policy Discount (<span id="aet_mplabel">5%</span> — owns another CLI individual policy)</label></div>
     <div class="warn" style="margin-top:6px">Rates from the CLI-025 filings (2025) for Arizona, Arkansas, Colorado, Connecticut, Delaware, Georgia, Indiana, Iowa, Kentucky, Louisiana, Maryland, Michigan, Missouri, Nebraska, North Carolina, North Dakota, Ohio, Oklahoma, Oregon, Pennsylvania, Rhode Island, South Carolina, South Dakota, Tennessee, Texas, West Virginia and Wisconsin. Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
     <div class="actions"><button class="run" onclick="aetRun()">Run Recovery Care Choice quote</button></div>
+  </div>
+
+  <div class="card" id="hcpcard" hidden>
+    <div class="cs-head">
+      <h2 style="margin:0 0 2px">CLI <span style="color:var(--muted);font-weight:600;font-size:.9rem">Home Care Plus</span></h2>
+      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI), an Aetna company · Protection Series home care indemnity — a separate product from Recovery Care Choice. Rates from the CLI rate guides for <b>AL, AR, AZ, DE, GA, IA, IL, IN, KY, LA, MI, MO, MS, ND, NE, NM, NV, OH, OK, OR, PA, SC, TN, TX, WI, WV, WY</b>. Issue ages 50–89, unisex, one health class. Not long-term care insurance.</p>
+    </div>
+    <div class="grid">
+      <div class="field"><label>State</label><select id="hcp_state" onchange="hcpSyncState()"><option value="AL">Alabama</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="DE">Delaware</option><option value="GA">Georgia</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="MI">Michigan</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NM">New Mexico</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="SC">South Carolina</option><option value="TN">Tennessee</option><option value="TX" selected>Texas</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select></div>
+      <div class="field"><label>Issue age (50–89)</label><input id="hcp_age" type="number" value="65" min="50" max="89"></div>
+      <div class="field"><label>Premium mode</label><select id="hcp_mode"><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Semi-annual</option><option value="annual">Annual</option></select></div>
+    </div>
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Home care benefit</div>
+    <div class="grid">
+      <div class="field"><label>Weekly benefit ($150 steps)</label><input id="hcp_weekly" type="number" value="600" step="150" min="150"></div>
+      <div class="field"><label>Benefit period</label><select id="hcp_weeks"><option value="13">13 weeks</option><option value="26">26 weeks</option><option value="39">39 weeks</option><option value="52" selected>52 weeks</option></select></div>
+      <div class="field"><label>Waiting period</label><select id="hcp_ep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
+    </div>
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Daily hospital benefit <span style="color:var(--muted);font-weight:600">— part of the base plan in the rate guide</span></div>
+    <div class="grid">
+      <div class="field"><label>Daily hospital benefit ($/day · $10 steps)</label><input id="hcp_hosp" type="number" value="50" step="10" min="0"></div>
+    </div>
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— 0 = not included</span></div>
+    <div class="grid">
+      <div class="field"><label>Ambulance / ER benefit ($ · $200 steps)</label><input id="hcp_amb" type="number" value="0" step="200" min="0"></div>
+      <div class="field"><label>Lump-sum cancer benefit ($ · $2,500 steps)</label><input id="hcp_cancer" type="number" value="0" step="2500" min="0"></div>
+    </div>
+    <div class="warn" style="margin-top:6px" id="hcp_formnote">Rate guide CLIHM03695. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.</div>
+    <div class="actions"><button class="run" onclick="hcpRun()">Run Home Care Plus quote</button></div>
   </div>
 
   <div class="card" id="budgetCard" hidden>
@@ -3639,21 +3670,55 @@ window.AET=(function(){
     return out; }
   return {quote, projDaily, INFL_LABEL, BPS, EPS, RIDER_UNIT, RIDER_FIELDS, hospDays, opts, offered};
 })();
+/* ---------- CLI (Continental Life, an Aetna company) — Home Care Plus ----------
+   A separate product from Recovery Care Choice. Rate guides: CLIHM03695 (09/27/22), CLIHM03697 (09/19/23),
+   CLIHM03698AL (09/19/23), CLIHM03699KY (07/21/25). Issue ages 50–89, unisex, one class.
+   Modal premium = (A home care + B daily hospital + C ambulance/ER + D lump-sum cancer) × modal factor, rounded to the penny.
+   hc[age] = [13wk 0d, 13wk 20d, 26wk 0d, 26wk 20d, 39wk 0d, 39wk 20d, 52wk 0d, 52wk 20d] per $150/week; riders by band 50,55,…,85. */
+const CLI_HCP_SETS={"03695":{"hc":{"50":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"51":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"52":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"53":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"54":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"55":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"56":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"57":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"58":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"59":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"60":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"61":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"62":[42.0,37.0,70.5,62.0,94.5,83.2,114.0,100.3],"63":[46.2,40.7,77.4,68.1,104.1,91.65,125.7,110.6],"64":[50.4,44.35,84.3,74.15,113.7,100.1,137.4,120.9],"65":[54.6,48.05,91.2,80.25,123.3,108.5,149.1,131.2],"66":[58.8,51.7,98.1,86.3,132.9,116.95,160.8,141.5],"67":[63.0,55.4,105.0,92.4,142.5,125.4,172.5,151.8],"68":[68.1,59.9,113.1,99.5,153.6,135.15,186.0,163.7],"69":[73.2,64.4,121.2,106.65,164.7,144.9,199.5,175.55],"70":[78.3,68.9,129.3,113.75,175.8,154.7,213.0,187.45],"71":[83.4,73.4,137.4,120.9,186.9,164.45,226.5,199.3],"72":[88.5,77.9,145.5,128.0,198.0,174.2,240.0,211.2],"73":[93.6,82.4,153.9,135.4,209.4,184.25,253.5,223.1],"74":[98.7,86.85,162.3,142.8,220.8,194.3,267.0,234.95],"75":[103.8,91.35,170.7,150.2,232.2,204.3,280.5,246.85],"76":[108.9,95.8,179.1,157.6,243.6,214.35,294.0,258.7],"77":[114.0,100.3,187.5,165.0,255.0,224.4,307.5,270.6],"78":[119.1,104.8,196.5,172.9,265.5,233.65,321.0,282.5],"79":[124.2,109.3,205.5,180.85,276.0,242.9,334.5,294.35],"80":[129.3,113.8,214.5,188.75,286.5,252.1,348.0,306.25],"81":[134.4,118.3,223.5,196.7,297.0,261.35,361.5,318.1],"82":[139.5,122.8,232.5,204.6,307.5,270.6,375.0,330.0],"83":[146.1,128.6,243.0,213.85,322.5,283.8,393.0,345.85],"84":[152.7,134.4,253.5,223.1,337.5,297.0,411.0,361.7],"85":[159.3,140.2,264.0,232.3,352.5,310.2,429.0,377.5],"86":[165.9,146.0,274.5,241.55,367.5,323.4,447.0,393.35],"87":[172.5,151.8,285.0,250.8,382.5,336.6,465.0,409.2],"88":[179.1,157.6,295.5,260.05,397.5,349.8,483.0,425.05],"89":[185.7,163.4,306.0,269.3,412.5,363.0,501.0,440.9]},"hosp":[16.0,19.0,23.0,28.0,36.0,44.0,51.5,57.0],"amb":[90.7,90.7,94.8,110.9,129.0,146.2,161.3,166.3],"cancer":[50.0,62.5,75.0,85.0,97.5,100.0,107.5,112.5]},"03697":{"hc":{"50":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"51":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"52":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"53":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"54":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"55":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"56":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"57":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"58":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"59":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"60":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"61":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"62":[38.2,33.6,64.1,56.4,85.9,75.6,103.6,91.2],"63":[42.0,36.95,70.4,61.9,94.6,83.3,114.25,100.55],"64":[45.85,40.3,76.65,67.45,103.35,90.95,124.9,109.9],"65":[49.65,43.7,82.95,72.95,112.05,98.65,135.5,119.3],"66":[53.5,47.05,89.2,78.5,120.8,106.3,146.15,128.65],"67":[57.3,50.4,95.5,84.0,129.5,114.0,156.8,138.0],"68":[61.95,54.5,102.85,90.5,139.6,122.9,169.1,148.8],"69":[66.6,58.55,110.2,96.95,149.7,131.75,181.35,159.6],"70":[71.2,62.65,117.6,103.45,159.8,140.65,193.65,170.4],"71":[75.85,66.7,124.95,109.9,169.9,149.5,205.9,181.2],"72":[80.5,70.8,132.3,116.4,180.0,158.4,218.2,192.0],"73":[85.1,74.9,139.95,123.1,190.35,167.5,230.45,202.8],"74":[89.75,78.95,147.6,129.85,200.7,176.65,242.7,213.6],"75":[94.35,83.05,155.2,136.55,211.1,185.75,255.0,224.4],"76":[99.0,87.1,162.85,143.3,221.45,194.9,267.25,235.2],"77":[103.6,91.2,170.5,150.0,231.8,204.0,279.5,246.0],"78":[108.25,95.3,178.7,157.2,241.35,212.4,291.8,256.8],"79":[112.9,99.35,186.85,164.4,250.9,220.8,304.05,267.6],"80":[117.5,103.45,195.05,171.6,260.4,229.2,316.35,278.4],"81":[122.15,107.5,203.2,178.8,269.95,237.6,328.6,289.2],"82":[126.8,111.6,211.4,186.0,279.5,246.0,340.9,300.0],"83":[132.8,116.9,220.95,194.4,293.15,258.0,357.25,314.4],"84":[138.8,122.15,230.5,202.8,306.8,270.0,373.6,328.8],"85":[144.8,127.45,240.0,211.2,320.4,282.0,390.0,343.2],"86":[150.8,132.7,249.55,219.6,334.05,294.0,406.35,357.6],"87":[156.8,138.0,259.1,228.0,347.7,306.0,422.7,372.0],"88":[162.8,143.3,268.65,236.4,361.35,318.0,439.05,386.4],"89":[168.8,148.55,278.2,244.8,375.0,330.0,455.4,400.8]},"hosp":[14.5,17.3,20.9,25.5,32.7,40.0,46.8,51.8],"amb":[82.5,82.5,86.1,100.8,117.3,132.9,146.6,151.2],"cancer":[45.45,56.8,68.2,77.25,88.65,90.9,97.75,102.25]},"AL":{"hc":{"50":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"51":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"52":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"53":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"54":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"55":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"56":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"57":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"58":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"59":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"60":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"61":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"62":[45.0,39.6,75.5,66.5,101.3,89.1,122.2,107.5],"63":[49.5,43.55,82.9,73.0,111.6,98.15,134.7,118.55],"64":[54.0,47.5,90.3,79.5,121.85,107.2,147.25,129.6],"65":[58.5,51.5,97.7,86.0,132.15,116.3,159.75,140.6],"66":[63.0,55.45,105.1,92.5,142.4,125.35,172.3,151.65],"67":[67.5,59.4,112.5,99.0,152.7,134.4,184.8,162.7],"68":[72.95,64.2,121.2,106.65,164.6,144.85,199.3,175.4],"69":[78.4,69.0,129.85,114.3,176.5,155.3,213.75,188.15],"70":[83.9,73.8,138.55,121.9,188.4,165.8,228.25,200.85],"71":[89.35,78.6,147.2,129.55,200.3,176.25,242.7,213.6],"72":[94.8,83.4,155.9,137.2,212.2,186.7,257.2,226.3],"73":[100.3,88.2,164.9,145.1,224.4,197.45,271.65,239.05],"74":[105.75,93.05,173.9,153.05,236.6,208.2,286.1,251.8],"75":[111.25,97.85,182.9,160.95,248.8,218.9,300.6,264.5],"76":[116.7,102.7,191.9,168.9,261.0,229.65,315.05,277.25],"77":[122.2,107.5,200.9,176.8,273.2,240.4,329.5,290.0],"78":[127.65,112.3,210.55,185.3,284.45,250.3,343.95,302.7],"79":[133.1,117.1,220.2,193.75,295.7,260.25,358.4,315.45],"80":[138.6,121.9,229.8,202.25,307.0,270.15,372.9,328.15],"81":[144.05,126.7,239.45,210.7,318.25,280.1,387.35,340.9],"82":[149.5,131.5,249.1,219.2,329.5,290.0,401.8,353.6],"83":[156.55,137.75,260.35,229.1,345.6,304.15,421.1,370.6],"84":[163.6,144.0,271.6,239.0,361.65,318.3,440.4,387.55],"85":[170.7,150.2,282.9,248.9,377.75,332.4,459.7,404.55],"86":[177.75,156.45,294.15,258.8,393.8,346.55,479.0,421.5],"87":[184.8,162.7,305.4,268.7,409.9,360.7,498.3,438.5],"88":[191.85,168.95,316.65,278.6,426.0,374.85,517.6,455.5],"89":[198.9,175.2,327.9,288.5,442.05,389.0,536.9,472.45]},"hosp":[16.0,19.0,23.0,28.0,36.0,44.0,51.5,57.0],"amb":[90.7,90.7,94.8,110.9,129.0,146.2,161.3,166.3],"cancer":[50.0,62.5,75.0,85.0,97.5,100.0,107.5,112.5]},"KY":{"hc":{"50":[22.8,20.15,38.35,33.8,51.5,45.2,62.1,54.6],"51":[24.55,21.7,41.3,36.35,55.4,48.65,66.8,58.75],"52":[26.3,23.2,44.2,38.9,59.3,52.1,71.5,62.9],"53":[28.05,24.7,47.1,41.45,63.2,55.55,76.2,67.05],"54":[29.8,26.25,50.05,44.0,67.1,59.0,80.9,71.2],"55":[31.5,27.75,52.95,46.6,71.0,62.4,85.6,75.3],"56":[33.25,29.3,55.9,49.15,74.9,65.85,90.3,79.45],"57":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"58":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"59":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"60":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"61":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"62":[35.0,30.8,58.8,51.7,78.8,69.3,95.0,83.6],"63":[38.5,33.9,64.55,56.75,86.8,76.35,104.75,92.2],"64":[42.0,36.95,70.3,61.8,94.8,83.4,114.5,100.75],"65":[45.5,40.05,76.0,66.9,102.8,90.4,124.3,109.35],"66":[49.0,43.1,81.75,71.95,110.8,97.45,134.05,117.9],"67":[52.5,46.2,87.5,77.0,118.8,104.5,143.8,126.5],"68":[56.75,49.95,94.25,82.95,128.05,112.65,155.05,136.4],"69":[61.0,53.7,101.0,88.9,137.3,120.8,166.3,146.3],"70":[65.3,57.4,107.8,94.8,146.5,128.9,177.5,156.2],"71":[69.55,61.15,114.55,100.75,155.75,137.05,188.75,166.1],"72":[73.8,64.9,121.3,106.7,165.0,145.2,200.0,176.0],"73":[78.05,68.65,128.3,112.85,174.5,153.55,211.25,185.9],"74":[82.3,72.4,135.3,119.0,184.0,161.9,222.5,195.8],"75":[86.5,76.1,142.3,125.2,193.5,170.3,233.8,205.7],"76":[90.75,79.85,149.3,131.35,203.0,178.65,245.05,215.6],"77":[95.0,83.6,156.3,137.5,212.5,187.0,256.3,225.5],"78":[99.25,87.35,163.8,144.1,221.25,194.7,267.55,235.4],"79":[103.5,91.1,171.3,150.7,230.0,202.4,278.8,245.3],"80":[107.8,94.8,178.8,157.3,238.8,210.1,290.0,255.2],"81":[112.05,98.55,186.3,163.9,247.55,217.8,301.25,265.1],"82":[116.3,102.3,193.8,170.5,256.3,225.5,312.5,275.0],"83":[121.8,107.15,202.55,178.2,268.8,236.5,327.5,288.2],"84":[127.3,112.0,211.3,185.9,281.3,247.5,342.5,301.4],"85":[132.8,116.8,220.0,193.6,293.8,258.5,357.5,314.6],"86":[138.3,121.65,228.75,201.3,306.3,269.5,372.5,327.8],"87":[143.8,126.5,237.5,209.0,318.8,280.5,387.5,341.0],"88":[149.3,131.35,246.25,216.7,331.3,291.5,402.5,354.2],"89":[154.8,136.2,255.0,224.4,343.8,302.5,417.5,367.4]},"hosp":[13.3,15.8,19.2,23.3,30.0,36.7,42.9,47.5],"amb":[75.6,75.6,79.0,92.4,107.5,121.8,134.4,138.6],"cancer":[41.3,51.6,61.95,70.2,80.5,82.6,88.75,92.9]}};
+const CLI_HCP_FORMS={'03695':'CLIHM03695','03697':'CLIHM03697','AL':'CLIHM03698AL','KY':'CLIHM03699KY'};
+const CLI_HCP_STATES={AR:'03695',GA:'03695',IL:'03695',IA:'03695',LA:'03695',MS:'03695',MO:'03695',NE:'03695',NV:'03695',NM:'03695',OK:'03695',OR:'03695',PA:'03695',TX:'03695',WV:'03695',WI:'03695',WY:'03695',
+  AZ:'03697',DE:'03697',IN:'03697',MI:'03697',ND:'03697',OH:'03697',SC:'03697',TN:'03697', AL:'AL', KY:'KY'};
+window.HCP=(function(){
+  const WEEKS=[13,26,39,52], EPS=[0,20], BANDS=[50,55,60,65,70,75,80,85];
+  const MODAL={annual:1,semiannual:0.52,quarterly:0.265,monthly:0.08333};
+  const r2=x=>Math.round((x+1e-9)*100)/100;
+  function band(age){ let i=0; for(let k=0;k<BANDS.length;k++) if(age>=BANDS[k]) i=k; return i; }
+  function quote(o){
+    const age=+o.age, st=String(o.state||'TX').toUpperCase(), key=CLI_HCP_STATES[st];
+    if(!key) throw new Error('Home Care Plus rates are loaded for '+Object.keys(CLI_HCP_STATES).sort().join(', ')+' only.');
+    if(!(age>=50&&age<=89)) throw new Error('Home Care Plus issues ages 50–89.');
+    const R=CLI_HCP_SETS[key], wk=+o.hcWeekly||0, wi=WEEKS.indexOf(+o.hcWeeks||52), ei=EPS.indexOf(+o.hcEP||0);
+    if(!(wk>=150) || wk%150) throw new Error('Home care is sold in $150/week units.');
+    if(wi<0) throw new Error('Benefit period must be 13, 26, 39 or 52 weeks.');
+    if(ei<0) throw new Error('Waiting period must be 0 or 20 days.');
+    const hd=+o.hospitalDaily||0; if(hd<0 || hd%10) throw new Error('Daily hospital benefit is sold in $10/day units.');
+    const amb=Math.max(0,Math.round(+o.ambulanceUnits||0)), can=Math.max(0,Math.round(+o.cancerUnits||0)), b=band(age), steps=[];
+    steps.push(['Home care $'+wk+'/week · '+WEEKS[wi]+' weeks · '+EPS[ei]+'-day wait', R.hc[String(age)][wi*2+ei]*(wk/150)]);
+    if(hd>0) steps.push(['Daily hospital $'+hd+'/day', R.hosp[b]*(hd/10)]);
+    if(amb>0) steps.push(['Ambulance / ER $'+(200*amb), R.amb[b]*amb]);
+    if(can>0) steps.push(['Lump-sum cancer $'+(2500*can).toLocaleString(), R.cancer[b]*can]);
+    const mode=MODAL[o.mode]?o.mode:'monthly', annual=r2(steps.reduce((a,x)=>a+x[1],0));
+    return {carrier:'clihcp', age, annualPremium:annual, modalPayment:r2(annual*MODAL[mode]), mode, pay:'Level', steps, form:CLI_HCP_FORMS[key]}; }
+  function formFor(st){ return CLI_HCP_FORMS[CLI_HCP_STATES[String(st||'').toUpperCase()]]||null; }
+  return {quote, WEEKS, EPS, formFor};
+})();
 function isCS(o){ return !!o && o.carrier==='carescout'; }
 function isNwm(o){ return !!o && o.carrier==='nwm'; }
 function isAet(o){ return !!o && o.carrier==='aetna'; }
+function isHcp(o){ return !!o && o.carrier==='clihcp'; }
 function isOmni(o){ return !!o && o.carrier==='omniflex'; }
 function isMoo(o){ return !!o && o.carrier==='moo'; }
 function isMooc(o){ return !!o && o.carrier==='mooc'; }
 // CareScout's rate file runs to 70, but the tool sells CareScout at issue ages 40-65 (form, carrier tools) — hold comparisons to the same rule.
-function oneQuote(o){ if(isCS(o) && +o.age>65) throw new Error('CareScout issues ages 40–65.'); return isNwm(o) ? NWM.quote(o) : isAet(o) ? AET.quote(o) : isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : isMoo(o) ? MOO.quote(o) : isMooc(o) ? MOOC.quote(o) : E.quote(o); }
+function oneQuote(o){ if(isCS(o) && +o.age>65) throw new Error('CareScout issues ages 40–65.'); return isNwm(o) ? NWM.quote(o) : isAet(o) ? AET.quote(o) : isHcp(o) ? HCP.quote(o) : isOmni(o) ? OMNI.quote(o) : isCS(o) ? CS.quote(o) : isMoo(o) ? MOO.quote(o) : isMooc(o) ? MOOC.quote(o) : E.quote(o); }
 // A couple/household item (__couple) quotes each spouse and returns the summed premium.
 function anyQuote(o){ if(o && o.__couple){ let mp=0, ap=0; const mode=(o.parts[0]||{}).mode||'monthly';
     for(const part of o.parts){ const q=oneQuote(part); mp+=(q.modalPayment!=null?q.modalPayment:(q.singlePremium||0)); ap+=(q.annualPremium!=null?q.annualPremium:(q.singlePremium||0)); }
     return {modalPayment:Math.round(mp*100)/100, annualPremium:Math.round(ap*100)/100, mode, pay:'Level', __couple:true}; }
   return oneQuote(o); }
 function premText(o,q){ return premText0(o,q)+tenPayLine(o); }
-function premText0(o,q){ if(isCS(o)||isOmni(o)||isMoo(o)||isMooc(o)||isNwm(o)||isAet(o)||(o&&o.__couple)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
+function premText0(o,q){ if(isCS(o)||isOmni(o)||isMoo(o)||isMooc(o)||isNwm(o)||isAet(o)||isHcp(o)||(o&&o.__couple)){ const per={monthly:'/mo',quarterly:'/qtr',semiannual:'/6mo',annual:'/yr'}[q.mode]||'/mo'; return fmt(q.modalPayment)+per; } return q.pay==='Single-Pay'?fmt(q.singlePremium)+' once':fmt(q.modalPayment)+'/mo'; }
 // ---- NGL 10-Pay, shown NEXT TO the regular (level, lifetime) premium when "Show 10-pay too" is ticked ----
 // Same plan, premiums paid for 10 years and then it's paid up. Display only — the plan itself stays level-pay.
 let SHOW_TENPAY=false; try{ SHOW_TENPAY = localStorage.getItem('ltc_show10')==='1'; }catch(e){}
@@ -3683,7 +3748,7 @@ function csInflRate(v){ return (!v||v==='none')?0:(+v/100); }
 function csInflLabel(v){ return (!v||v==='none')?'level (no inflation)':(v+'% compound'); }
 function csMaritalLabel(m){ return m==='Married'?'married (both applying)':(m==='Married1buy'?'married (one applying)':'single'); }
 function csRatioYrs(o){ return o.coverageMax/o.dailyBenefit/365.25; }
-function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delete base.__couple; const who=o._ages.map((a,i)=>a+(String(o._genders[i]).toLowerCase().startsWith('f')?'F':'M')).join(' + '); return 'Couple '+who+' · '+cfgTextAny(base)+' (each)'; } return isNwm(o)?nwmConfigShort(o):isAet(o)?aetConfigShort(o):isOmni(o)?omniConfigText(o):isCS(o)?csConfigShort(o):isMoo(o)?mooConfigShort(o):isMooc(o)?moocConfigShort(o):cfgText(o); }
+function cfgTextAny(o){ if(o&&o.__couple){ const base=Object.assign({},o); delete base.__couple; const who=o._ages.map((a,i)=>a+(String(o._genders[i]).toLowerCase().startsWith('f')?'F':'M')).join(' + '); return 'Couple '+who+' · '+cfgTextAny(base)+' (each)'; } return isNwm(o)?nwmConfigShort(o):isAet(o)?aetConfigShort(o):isHcp(o)?hcpConfigShort(o):isOmni(o)?omniConfigText(o):isCS(o)?csConfigShort(o):isMoo(o)?mooConfigShort(o):isMooc(o)?moocConfigShort(o):cfgText(o); }
 // MutualCare Custom — condensed one-liner for the comparison tray
 function moocInflLabel(o){ return (o.inflTerm && o.inflTerm!=='none') ? MOOC.codeLabel(o.inflTerm,o.inflPct) : 'level'; }
 function moocConfigShort(o){ const g=String(o.gender||'').toLowerCase().startsWith('f')?'F':'M';
@@ -3727,7 +3792,7 @@ function csConfigText(o){ const g=String(o.gender||'').toLowerCase().startsWith(
 function pickInto(sel, targetId){ const t=$(targetId); if(!t) return; if(sel.value!==''){ t.value=sel.value; try{ t.dispatchEvent(new Event('input',{bubbles:true})); t.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } sel.selectedIndex=0; }
 // Top-level view switcher: "New Quote" (carrier forms) vs "Quick Commands".
 let VIEW='quote';
-const QUOTE_CARDS=['manual','cscard','omnicard','moocard','mooccard','nwmcard','aetcard','budgetCard','sweetCard','sameCard'];
+const QUOTE_CARDS=['manual','cscard','omnicard','moocard','mooccard','nwmcard','aetcard','hcpcard','budgetCard','sweetCard','sameCard'];
 function setView(v){
   const prevView=VIEW;
   VIEW = v==='qc' ? 'qc' : 'quote';
@@ -3753,6 +3818,7 @@ function setView(v){
     if($('mooccard')) $('mooccard').hidden = !mooc;
     if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
     if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
+    if($('hcpcard')) $('hcpcard').hidden = CARRIER!=='clihcp';
     if(ngl) setMode(MODE); else if($('manual')) $('manual').hidden=true;
   }
 }
@@ -3805,13 +3871,14 @@ const CLIENT_FIELDS={
   moo:      {age:['moo_age'], gender:['moo_gender'], age2:['moo_age2'], gender2:['moo_g2']},
   mooc:     {age:['mooc_age'], gender:['mooc_gender'], age2:['mooc_age2'], gender2:['mooc_g2']},
   nwm:      {age:['nwm_age'], gender:['nwm_gender'], age2:['nwm_age2'], gender2:['nwm_g2']},
-  aetna:    {age:['aet_age']}   // CLI Recovery Care Choice is unisex
+  aetna:    {age:['aet_age']},   // CLI Recovery Care Choice is unisex
+  clihcp:   {age:['hcp_age']}    // CLI Home Care Plus is unisex
 };
 const CLIENT_COUPLE={ moo:'moo_couple', mooc:'mooc_couple', omniflex:'om_couple', nwm:'nwm_couple' };
 // Primary state select per carrier (clamped on apply to whatever states that carrier offers).
-const CLIENT_STATE={ ngl:'s_state', carescout:'cs_state', omniflex:'om_state', moo:'moo_state', mooc:'mooc_state', nwm:'nwm_state', aetna:'aet_state' };
+const CLIENT_STATE={ ngl:'s_state', carescout:'cs_state', omniflex:'om_state', moo:'moo_state', mooc:'mooc_state', nwm:'nwm_state', aetna:'aet_state', clihcp:'hcp_state' };
 // Age fields per carrier [primary, spouse] — used to reach the 🎂 birthday picker beside each.
-const CLIENT_AGEIDS={ ngl:['s_age','c_age2'], carescout:['cs_age'], omniflex:['om_age','om_age2'], moo:['moo_age','moo_age2'], mooc:['mooc_age','mooc_age2'], nwm:['nwm_age','nwm_age2'], aetna:['aet_age'] };
+const CLIENT_AGEIDS={ ngl:['s_age','c_age2'], carescout:['cs_age'], omniflex:['om_age','om_age2'], moo:['moo_age','moo_age2'], mooc:['mooc_age','mooc_age2'], nwm:['nwm_age','nwm_age2'], aetna:['aet_age'], clihcp:['hcp_age'] };
 function coupleToggleFor(c){ return c==='nwm'?nwmCoupleToggle:c==='moo'?mooCoupleToggle:c==='mooc'?moocCoupleToggle:c==='omniflex'?omniCoupleToggle:null; }
 function clampField(id,v){ var el=$(id); if(!el)return v; var n=+v; if(isNaN(n))return v;
   if(el.min!==''&&n<+el.min)n=+el.min; if(el.max!==''&&n>+el.max)n=+el.max; return n; }
@@ -3871,7 +3938,7 @@ function planFieldVals(carrier){
 // Short-term care plans (OmniFlex, and any STC carrier added later) open at their max daily benefits
 // (OmniFlex: $400 facility / $300 home care) and stay out of the long-term-care plan carry-over in both
 // directions, so an NGL or Mutual of Omaha $/mo never shrinks them.
-const STC_CARRIERS=new Set(['omniflex','aetna']);
+const STC_CARRIERS=new Set(['omniflex','aetna','clihcp']);
 function capturePlan(carrier){ if(STC_CARRIERS.has(carrier)) return; try{
   var ap=(CLIENT._ap||{})[carrier], cur=planFieldVals(carrier);
   var chMb=!ap||cur.mb!==ap.mb, chPer=!ap||cur.per!==ap.per, chInf=!ap||cur.inf!==ap.inf;
@@ -3942,7 +4009,7 @@ function applyPlan(carrier){ if(STC_CARRIERS.has(carrier)) return; if(CLIENT.mb=
 }catch(e){} }
 function setCarrier(c){
   const prev=CARRIER; if(prev) captureClient(prev);
-  CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc'||c==='nwm'||c==='aetna') ? c : 'ngl';
+  CARRIER = (c==='carescout'||c==='omniflex'||c==='moo'||c==='mooc'||c==='nwm'||c==='aetna'||c==='clihcp') ? c : 'ngl';
   const cs=CARRIER==='carescout', om=CARRIER==='omniflex', moo=CARRIER==='moo', mooc=CARRIER==='mooc', ngl=CARRIER==='ngl';
   if($('carrier')) $('carrier').value = CARRIER;
   $('askCard').style.display = ngl ? '' : 'none';
@@ -3952,7 +4019,8 @@ function setCarrier(c){
   if($('mooccard')) $('mooccard').hidden = !mooc;
   if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
   if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
-  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, LA, MD, MI, MO, NE, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, TX, WV, WI)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  if($('hcpcard')) $('hcpcard').hidden = CARRIER!=='clihcp';
+  $('carrierBadge').textContent = CARRIER==='clihcp' ? '✓ CLI · Home Care Plus (AL, AR, AZ, DE, GA, IA, IL, IN, KY, LA, MI, MO, MS, ND, NE, NM, NV, OH, OK, OR, PA, SC, TN, TX, WI, WV, WY)' : CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, LA, MD, MI, MO, NE, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, TX, WV, WI)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -3962,10 +4030,12 @@ function setCarrier(c){
     if(mooc){ $('mooccard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
     if(CARRIER==='nwm'){ $('nwmcard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
     if(CARRIER==='aetna'){ $('aetcard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+    if(CARRIER==='clihcp'){ $('hcpcard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
   }
   applyClient(CARRIER);
   if(typeof mooEnforceAll==='function') mooEnforceAll();   // Class 1 limits after carried-over values land
   if(CARRIER==='aetna' && typeof aetSyncState==='function') aetSyncState();   // hospital-day options follow the state
+  if(CARRIER==='clihcp' && typeof hcpSyncState==='function') hcpSyncState();
 }
 
 // CareScout state availability (Care Assurance Individual). 42 states sell individual
@@ -4318,6 +4388,21 @@ function aetRun(){ try{
   const o=aetOpts(); const q=AET.quote(o);
   show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Recovery Care Choice</div></div><div class="config-line">'+aetConfigShort(o).replace(/·/g,'&middot;')+'</div>'
     +'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+AET_NOTE+' '+DISC+'</div>');
+}catch(e){ showErr(e.message); } }
+/* ---------- CLI Home Care Plus — form, results ---------- */
+function hcpRiderList(o){ const r=[]; if(+o.hospitalDaily>0) r.push('hospital $'+o.hospitalDaily+'/day');
+  if(+o.ambulanceUnits>0) r.push('ambulance/ER $'+(200*o.ambulanceUnits)); if(+o.cancerUnits>0) r.push('cancer $'+(2500*o.cancerUnits).toLocaleString()); return r; }
+function hcpConfigShort(o){ const r=hcpRiderList(o);
+  return o.age+' · CLI Home Care Plus · $'+o.hcWeekly+'/week home care · '+(+o.hcWeeks||52)+' weeks · '+(+o.hcEP||0)+'-day wait'+(r.length?' · '+r.join(', '):'')+' · '+(o.state||'TX'); }
+function hcpOpts(){ const n=id=>+($(id)||{}).value||0;
+  return {carrier:'clihcp', state:$('hcp_state').value||'TX', age:+$('hcp_age').value, mode:$('hcp_mode').value,
+    hcWeekly:n('hcp_weekly'), hcWeeks:n('hcp_weeks'), hcEP:n('hcp_ep'), hospitalDaily:n('hcp_hosp'), ambulanceUnits:n('hcp_amb')/200, cancerUnits:n('hcp_cancer')/2500}; }
+const HCP_NOTE='CLI Home Care Plus is limited-benefit home care indemnity paid as a weekly benefit — it is not long-term care insurance. No inflation option. Rates from CLI’s Home Care Plus rate guides.';
+function hcpSyncState(){ const f=HCP.formFor(($('hcp_state')||{}).value), el=$('hcp_formnote'); if(el && f) el.innerHTML='Rate guide '+f+'. Premium = (home care + hospital + ambulance/ER + cancer) × the mode factor, rounded to the penny — checked against each rate guide’s worked example. The rate guides don’t list maximum benefit amounts.'; }
+function hcpRun(){ try{
+  const o=hcpOpts(); const q=HCP.quote(o);
+  show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Home Care Plus</div></div><div class="config-line">'+hcpConfigShort(o).replace(/·/g,'&middot;')+'</div>'
+    +'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">Rate guide '+q.form+'. '+HCP_NOTE+' '+DISC+'</div>');
 }catch(e){ showErr(e.message); } }
 
 /* ---------- Mutual of Omaha — MutualCare Custom (Texas) ---------- */
@@ -5178,15 +5263,16 @@ function waitGrow(o, yr){ const g=Math.pow(1.03, yr);
     if(o.homeCare) x.hcDaily=Math.min(300, fd, Math.max(10, Math.round((+o.hcDaily||fd)*g/10)*10)); }
   else if(isMoo(o)){ x.monthlyBenefit=Math.min(12000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/100)*100)); }
   else if(isNwm(o)){ x.monthlyBenefit=Math.max(100, Math.round((+o.monthlyBenefit)*g/100)*100); }
+  else if(isHcp(o)){ x.hcWeekly=Math.max(150, Math.round((+o.hcWeekly||600)*g/150)*150); }
   else if(isAet(o)){ x.facilityDaily=Math.min(700, Math.max(10, Math.round((+o.facilityDaily||100)*g/10)*10)); if(o.homeCare&&+o.hcWeekly>0) x.hcWeekly=Math.min(2100, Math.max(150, Math.round((+o.hcWeekly)*g/150)*150)); }
   else if(isMooc(o)){ const mb=Math.min(15000, Math.max(1500, Math.round((+o.monthlyBenefit)*g/50)*50)); x.monthlyBenefit=mb; x.policyLimit=mb*12*(+o.years||3); }
   else { x.monthlyBenefit=SNAP(+(o._rawMb||o.monthlyBenefit)*g); delete x._rawMb; }
   return x; }
 function waitBenText(o){ const b=o.__couple?o.parts[0]:o, each=isCoupleItem(o)?' each':'';
-  if(isCS(b)) return '$'+b.dailyBenefit+'/day'+each; if(isOmni(b)||isAet(b)) return '$'+b.facilityDaily+'/day'+each; return fmt0(b.monthlyBenefit)+'/mo'+each; }
+  if(isCS(b)) return '$'+b.dailyBenefit+'/day'+each; if(isOmni(b)||isAet(b)) return '$'+b.facilityDaily+'/day'+each; if(isHcp(b)) return '$'+b.hcWeekly+'/week'+each; return fmt0(b.monthlyBenefit)+'/mo'+each; }
 function waitAgesText(o){ return (o._ages && o._ages.length>1) ? o._ages.join(' &amp; ') : String(o.age); }
 function waitWho(o){ if(o._ages && o._ages.length>1) return o._ages.map((a,i)=>a+' '+gL((o._genders||[])[i]||'')).join(' + ');
-  return o.age+((isOmni(o)||isAet(o))?'':' '+gL(o.gender)); }
+  return o.age+((isOmni(o)||isAet(o)||isHcp(o))?'':' '+gL(o.gender)); }
 function computeWaitingItem(o){
   const price=it=>{ const q=anyQuote(it); return {prem:(q.modalPayment!=null?q.modalPayment:q.singlePremium), mode:q.mode||it.mode||'monthly'}; };
   let now=null, mode='monthly'; try{ const p0=price(o); now=p0.prem; mode=p0.mode; }catch(e){ throw new Error('Can’t price this plan today: '+e.message); }
@@ -5443,10 +5529,11 @@ function runQuickCommand(){ try{
    closest design (monthly $ <-> daily $, years <-> pool/days, inflation % <-> codes), then apply
    the chosen health rating where the carrier rates by health. Same closest-match rules as the
    carrier carry-over. ---- */
-function qcCarrierOf(o){ return isNwm(o)?'nwm':isAet(o)?'aetna':isOmni(o)?'omniflex':isCS(o)?'carescout':isMoo(o)?'moo':isMooc(o)?'mooc':'ngl'; }
+function qcCarrierOf(o){ return isNwm(o)?'nwm':isAet(o)?'aetna':isHcp(o)?'clihcp':isOmni(o)?'omniflex':isCS(o)?'carescout':isMoo(o)?'moo':isMooc(o)?'mooc':'ngl'; }
 function qcCanon(op){
   if(isNwm(op)){ const ix=NWM.idxOf(op), pc=ix.startsWith('abi')?+ix.slice(3):(ix==='aapb'?5:0); return {mb:+op.monthlyBenefit||5000, years:+op.years||3, pct:pc, term:pc>0?'L':'none', spousal:!!op.spousal}; }
   if(isAet(op)){ const pc=({c5:5,s5:5,c3:3,s3:3})[op.inflation]||0; return {mb:(+op.facilityDaily||100)*30, years:(+op.facilityBP||360)/360, pct:pc, term:pc>0?'L':'none', spousal:false}; }
+  if(isHcp(op)) return {mb:Math.round((+op.hcWeekly||600)/7*30), years:(+op.hcWeeks||52)/52, pct:0, term:'none', spousal:false};
   if(isOmni(op)) return {mb:(+op.facilityDaily||100)*30, years:(+op.facilityBP||360)/360, pct:op.inflation?5:0, term:op.inflation?'L':'none', spousal:!!op.spousal};
   if(isCS(op)){ const d=+op.dailyBenefit||100, pc=(!op.inflation||op.inflation==='none')?0:parseFloat(op.inflation)||0;
     return {mb:d*30, years:(+op.coverageMax||d*365.25*3)/d/365.25, pct:pc, term:pc>0?'L':'none', spousal:op.marital==='Married1buy'}; }
@@ -5481,6 +5568,8 @@ function qcConvert(op, target, state){
     return {carrier:'nwm', state:st||'TX', age, gender, uwClass:'Standard', monthlyBenefit:Math.max(1000,Math.round(c.mb/100)*100), years:nearestVal(c.years,[3,6]), epWeeks:12, indexing:pc>0?'abi'+pc:'none', spousal:c.spousal, multiLife:false, nfb:false, mode}; }
   if(target==='aetna'){ const fd=Math.min(700,Math.max(10,Math.round(c.mb/30/10)*10)), bp=nearestVal(c.years*360, AET.opts(st||'TX').bps);
     return {carrier:'aetna', state:st||'TX', age, mode, facilityDaily:fd, facilityBP:bp, facilityEP:0, inflation:c.pct>0?(c.pct>=4?'c5':'c3'):'none', homeCare:AET.opts(st||'TX').homeCare, hcWeekly:Math.min(2100,Math.max(150,Math.round(fd*7/150)*150)), hcBP:bp, hcEP:0, rxUnits:3}; }
+  if(target==='clihcp'){ const wk=Math.max(150,Math.round(c.mb/30*7/150)*150), weeks=nearestVal(c.years*52, HCP.WEEKS);
+    return {carrier:'clihcp', state:st||'TX', age, mode, hcWeekly:wk, hcWeeks:weeks, hcEP:0, hospitalDaily:50, ambulanceUnits:0, cancerUnits:0}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
   if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
     return {carrier:'mooc', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:mb, years:yrs, policyLimit:mb*12*yrs, elimination:90, inflTerm:c.pct>0?canonToMoocTerm(c.term):'none', inflPct:c.pct>0?nearestVal(c.pct,MOOC_PCTS):0, mode, alfReduction:100, hhcReduction:100, proHHC:false, hhcWaiver:false, nfsbp:false, rop:'none'}; }
@@ -5499,6 +5588,7 @@ const QC_HEALTH={
   ngl:[['saved','Not rated by health class']],
   nwm:[['Standard','Standard'],['Class 1','Class 1 (+35%)'],['Class 2','Class 2 (+70%)']],
   aetna:[['saved','Not rated by health class (one class)']],
+  clihcp:[['saved','Not rated by health class (one class)']],
   omniflex:[['saved','Not rated by health class (unisex rates)']]
 };
 function qcSyncHealth(){ const c=($('qc_carrier')||{}).value||'saved', sel=$('qc_health'); if(!sel) return; const cur=sel.value, list=QC_HEALTH[c]||QC_HEALTH.saved;
@@ -5506,7 +5596,7 @@ function qcSyncHealth(){ const c=($('qc_carrier')||{}).value||'saved', sel=$('qc
   const want = (c==='carescout') ? (cur==='Preferred'?'Preferred':'Standard') : (c==='moo'||c==='mooc') ? (cur==='Standard'||cur==='saved'||!cur?'Select':cur) : cur;
   sel.value = list.some(o=>o[0]===want) ? want : list[0][0];
   if(c==='nwm' && ['Standard','Class 1','Class 2'].indexOf(sel.value)<0){ sel.value=(cur==='Class 1'||cur==='Class 2')?cur:'Standard'; }
-  sel.disabled = (c==='ngl'||c==='omniflex'||c==='aetna'); }
+  sel.disabled = (c==='ngl'||c==='omniflex'||c==='aetna'||c==='clihcp'); }
 function qcApplyHealth(op, rating){
   if(!rating||rating==='saved'||!op) return op;
   if(isMoo(op)||isMooc(op)){ const o=Object.assign({}, op, {uwClass: rating==='Standard'?'Select':rating});
@@ -5539,6 +5629,7 @@ function qcApplyInfl(op, infl, state){
   if(isOmni(op)){ const S=OMNI_RATES.rates[String(op.state||state||'').toUpperCase()]||{}; return Object.assign({}, op, {inflation: pct>0 && !!S.facility_infl}); }
   if(isCS(op))   return Object.assign({}, op, {inflation: pct>0 ? String(nearestVal(pct,[1,3,5])) : 'none'});
   if(isNwm(op))  return Object.assign({}, op, {indexing: pct>0 ? 'abi'+nearestVal(pct,[3,4,5]) : 'none'});
+  if(isHcp(op))  return op;   // Home Care Plus has no inflation option
   if(isAet(op))  return Object.assign({}, op, {inflation: pct>0 ? (term==='L'||!term ? (pct>=4?'c5':'c3') : (pct>=4?'s5':'s3')) : 'none'});
   if(isMoo(op))  return Object.assign({}, op, {inflation: canonToMooCode(pct,term)});
   if(isMooc(op)) return Object.assign({}, op, {inflTerm: pct>0 ? canonToMoocTerm(term) : 'none', inflPct: pct>0 ? nearestVal(pct,MOOC_PCTS) : 0});
@@ -5551,7 +5642,7 @@ function qcIsShared(op){ return !!(op && (op.riderSharedAdditional || op.sharedC
 function qcApplyShared(op, on){
   if(!op) return op;
   if(isMoo(op)||isMooc(op)) return Object.assign({}, op, {sharedCare:!!on});
-  if(isCS(op)||isOmni(op)||isNwm(op)||isAet(op)) return op;   // no shared-care benefit (Northwestern has Survivorship instead)
+  if(isCS(op)||isOmni(op)||isNwm(op)||isAet(op)||isHcp(op)) return op;   // no shared-care benefit (Northwestern has Survivorship instead)
   return Object.assign({}, op, {riderSharedAdditional:!!on, totalBenefitPeriod: op.totalBenefitPeriod||op.benefitPeriod});
 }
 // A saved option as a one-person design: a couple household becomes its first policy, a joint (two-life)
@@ -5564,7 +5655,7 @@ function qcSingle(op, married){ const o=Object.assign({}, qcTemplate(op)); delet
   else if(isCS(o)){ o.marital = married ? 'Married1buy' : 'Single'; }
   else if(isOmni(o)){ if(!married) o.spousal=false; }
   else if(isNwm(o)){ o.partner=false; o.survivorship=false; o.spousal=!!married; }
-  else if(isAet(o)){ }
+  else if(isAet(o)||isHcp(o)){ }
   else { o.riderSharedAdditional=false; o.maritalDiscount=!!married; }
   return o; }
 // Was this option saved with a spouse-not-applying discount? (typed commands keep it)
@@ -5590,7 +5681,7 @@ function fillQuickPicker(){
 }
 // --- save the current comparison as a reusable quick command (no typing amounts) ---
 let PENDING_PATTERN_OPTS=null;
-function optDesignText(o){ if(isCS(o)||isOmni(o)||isNwm(o)||isAet(o)) return cfgTextAny(o); return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
+function optDesignText(o){ if(isCS(o)||isOmni(o)||isNwm(o)||isAet(o)||isHcp(o)) return cfgTextAny(o); return fmt0(o.monthlyBenefit)+'/mo · '+poolYearsLabel(o)+' · '+o.elimination+'-day · '+pctL(o.inflation)+(o.riderSharedAdditional?' · shared':'')+(o.maritalDiscount?' · spousal':'')+(o.joint?' · joint':''); }
 function saveTrayAsPattern(){ let a=LS.tray(); if(!a.length){ alert('Add at least one quote to the comparison first.'); return; }
   PENDING_PATTERN_OPTS=a.map(o=>Object.assign({},o));
   $('sp_trigger').value=''; $('sp_name').value='';
@@ -5685,7 +5776,7 @@ function parseDob(s){ s=String(s||'').trim(); if(!s) return null; let y,m,d, mm;
 function ageFromDob(dob){ const d=parseDob(dob); if(!d) return null; const now=new Date(); let a=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--; return (a>=0&&a<130)?a:null; }
 function fmtDob(dt){ const p=n=>String(n).padStart(2,'0'); return p(dt.getMonth()+1)+'/'+p(dt.getDate())+'/'+dt.getFullYear(); }
 // Birthday → age: enter either an age OR type a birthday, and the birthday fills in the age.
-const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','w_age2','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2','nwm_age','nwm_age2','aet_age'];
+const AGE_FIELDS=['s_age','c_age1','c_age2','b_age','ba_age','t_age','t_age2','w_age','w_age2','g_age','coc_age','cs_age','om_age','om_age2','moo_age','moo_age2','mooc_age','mooc_age2','sw_age','sw_age2','nwm_age','nwm_age2','aet_age','hcp_age'];
 // Save age: NGL, Mutual of Omaha (and Thrivent, once added) let a client who turned a year older
 // within the last 30 days apply at the younger age (policy dated before the birthday).
 // CareScout and Manhattan Life OmniFlex quote the actual age.
@@ -5694,7 +5785,7 @@ const SAVE_AGE_LABEL='NGL & Mutual of Omaha';
 // Which carrier each age field quotes ('mixed' = all-carrier tools: shows the save age, keeps the actual age for the others)
 const AGE_FIELD_CARRIER={s_age:'ngl',c_age1:'ngl',c_age2:'ngl',b_age:'ngl',w_age:'ngl',g_age:'ngl',coc_age:'ngl',
   cs_age:'carescout',om_age:'omniflex',om_age2:'omniflex',moo_age:'moo',moo_age2:'moo',mooc_age:'mooc',mooc_age2:'mooc',
-  w_age2:'ngl',nwm_age:'nwm',nwm_age2:'nwm',aet_age:'aetna',ba_age:'mixed',sw_age:'mixed',sw_age2:'mixed',t_age:'mixed',t_age2:'mixed'};
+  w_age2:'ngl',nwm_age:'nwm',nwm_age2:'nwm',aet_age:'aetna',hcp_age:'clihcp',ba_age:'mixed',sw_age:'mixed',sw_age2:'mixed',t_age:'mixed',t_age2:'mixed'};
 function dobInfo(dob){ const d=parseDob(dob); if(!d) return null; const age=ageFromDob(dob); if(age==null) return null;
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   let last=new Date(now.getFullYear(), d.getMonth(), d.getDate()); if(last>today) last=new Date(now.getFullYear()-1, d.getMonth(), d.getDate());
@@ -5802,10 +5893,10 @@ function openClient(i){ const c=LS.clients()[i]; LS.setTray(c.items.slice()); re
 // Loading a client puts their applicant details back into the entry form (ages, gender, plan)
 function hydrateFormsFrom(items){
   if(!items||!items.length) return;
-  const ngl1=items.find(o=>isNglItem(o)&&!o.joint), nglJ=items.find(o=>isNglItem(o)&&o.joint), cs1=items.find(o=>isCS(o)), om1=items.find(o=>isOmni(o)), moo1=items.find(o=>isMoo(o)), mooc1=items.find(o=>isMooc(o)), nwm1=items.find(o=>isNwm(o)), aet1=items.find(o=>isAet(o));
+  const ngl1=items.find(o=>isNglItem(o)&&!o.joint), nglJ=items.find(o=>isNglItem(o)&&o.joint), cs1=items.find(o=>isCS(o)), om1=items.find(o=>isOmni(o)), moo1=items.find(o=>isMoo(o)), mooc1=items.find(o=>isMooc(o)), nwm1=items.find(o=>isNwm(o)), aet1=items.find(o=>isAet(o)), hcp1=items.find(o=>isHcp(o));
   const primary = ngl1||nglJ||cs1||om1||moo1||mooc1||items[0];
   setApplicant(primary.age, primary.gender, primary.state);   // carry age/gender/state to every tab
-  if(ngl1) fillSingleForm(ngl1); else if(nglJ) fillCoupleForm(nglJ); else if(cs1) fillCsForm(cs1); else if(om1) fillOmniForm(om1); else if(moo1) fillMooForm(moo1); else if(mooc1) fillMoocForm(mooc1); else if(nwm1) fillNwmForm(nwm1); else if(aet1) fillAetForm(aet1);
+  if(ngl1) fillSingleForm(ngl1); else if(nglJ) fillCoupleForm(nglJ); else if(cs1) fillCsForm(cs1); else if(om1) fillOmniForm(om1); else if(moo1) fillMooForm(moo1); else if(mooc1) fillMoocForm(mooc1); else if(nwm1) fillNwmForm(nwm1); else if(aet1) fillAetForm(aet1); else if(hcp1) fillHcpForm(hcp1);
 }
 // Write the applicant (age / gender / state) into every tab's inputs, so switching tabs keeps them
 function setApplicant(age, gender, state){
@@ -5882,6 +5973,10 @@ function fillAetForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('aetna');
   $('aet_hc').checked=!!p.homeCare; $('aet_hcbox').hidden=!p.homeCare; set('aet_hcweekly',p.hcWeekly||2100); set('aet_hcbp',String(p.hcBP||p.facilityBP||360)); set('aet_hcep',String(p.hcEP||0));
   set('aet_hosp',p.hospitalDaily||0); set('aet_rx',100*Math.max(3,p.rxUnits||3)); set('aet_amb',200*(p.ambulanceUnits||0)); set('aet_pt',50*(p.ptUnits||0)); set('aet_ptv',String(p.ptVisits||15));
   set('aet_mh',25*(p.mentalUnits||0)); set('aet_adc',10*(p.adcUnits||0)); set('aet_adcd',String(p.adcDays||15)); set('aet_pet',25*(p.petUnits||0)); set('aet_hm',500*(p.homeModUnits||0)); $('aet_mp').checked=!!p.multiPolicy; }
+function fillHcpForm(o){ const p=o.__couple?o.parts[0]:o; setCarrier('clihcp');
+  const set=(id,v)=>{ if($(id)!=null && v!=null) $(id).value=v; };
+  set('hcp_state',p.state||'TX'); hcpSyncState(); set('hcp_age',p.age); set('hcp_mode',p.mode||'monthly'); set('hcp_weekly',p.hcWeekly||600); set('hcp_weeks',String(p.hcWeeks||52)); set('hcp_ep',String(p.hcEP||0));
+  set('hcp_hosp',p.hospitalDaily||0); set('hcp_amb',200*(p.ambulanceUnits||0)); set('hcp_cancer',2500*(p.cancerUnits||0)); }
 function fillMoocForm(o){
   setCarrier('mooc'); moocFillPct();
   if($('mooc_couple')){ $('mooc_couple').checked=false; moocCoupleToggle(); }
@@ -5924,8 +6019,8 @@ function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$(
 let EDIT_PAT = -1;
 function patternSummary(p){
   if(p.options && p.options.length){
-    const carriers=[...new Set(p.options.map(o=>isNwm(o)?'Northwestern':isAet(o)?'CLI Recovery Care Choice':isOmni(o)?'OmniFlex™':isCS(o)?'CareScout':(isMoo(o)||isMooc(o))?'Mutual of Omaha':'NGL'))].join('/');
-    const optStr=o=> isAet(o)?('$'+o.facilityDaily+'/day STC') : isNwm(o)?(fmt0(o.monthlyBenefit)+'/'+o.years+'yr') : isOmni(o)?('$'+o.facilityDaily+'/day STC') : isCS(o)?('$'+o.dailyBenefit+'/day') : (fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr'+(o.inflation?'/'+(o.inflation*100)+'%':''));
+    const carriers=[...new Set(p.options.map(o=>isNwm(o)?'Northwestern':isAet(o)?'CLI Recovery Care Choice':isHcp(o)?'CLI Home Care Plus':isOmni(o)?'OmniFlex™':isCS(o)?'CareScout':(isMoo(o)||isMooc(o))?'Mutual of Omaha':'NGL'))].join('/');
+    const optStr=o=> isHcp(o)?('$'+o.hcWeekly+'/wk home care') : isAet(o)?('$'+o.facilityDaily+'/day STC') : isNwm(o)?(fmt0(o.monthlyBenefit)+'/'+o.years+'yr') : isOmni(o)?('$'+o.facilityDaily+'/day STC') : isCS(o)?('$'+o.dailyBenefit+'/day') : (fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr'+(o.inflation?'/'+(o.inflation*100)+'%':''));
     return carriers+' · '+p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(optStr).join(', ');
   }
   const bits=[bpL(p.benefitPeriod), (p.elimination||'90')+'-day', pctL(p.inflation??null)];
@@ -6014,8 +6109,14 @@ const QCATS = {
     elim:o=>(+o.facilityEP||0)+'-day wait', inflation:o=>(o.inflation&&o.inflation!=='none')?aetInflLabel(o)+' (facility only)':'None', inflationYN:o=>(o.inflation&&o.inflation!=='none')?ck:'',
     shared:o=>(o.homeCare&&+o.hcWeekly>0)?'$'+o.hcWeekly+'/week · '+((+o.hcBP||+o.facilityBP||360)/90*13)+' weeks':'—', rxbenefit:o=>ck+' $'+(100*Math.max(3,+o.rxUnits||0))+'/yr',
     marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'CLI (Continental Life)' };
+  const wks=o=>(+o.hcWeeks||52), hcpExtras=o=>{ const r=[]; if(+o.hospitalDaily>0) r.push('Hospital $'+o.hospitalDaily+'/day'); if(+o.ambulanceUnits>0) r.push('Ambulance/ER $'+(200*o.ambulanceUnits)); if(+o.cancerUnits>0) r.push('Cancer $'+(2500*o.cancerUnits).toLocaleString()); return r.join('<br>')||'—'; };
+  const H={ applicant:o=>o.__couple?null:(o.age+' · '+(o.state||'TX')), benefit:o=>'$'+o.hcWeekly+'/week home care',
+    period:o=>wks(o)+'-week benefit period', pool:o=>fmt0((+o.hcWeekly)*wks(o)),
+    projMonthly:o=>'$'+o.hcWeekly+'/week', projPool:o=>fmt0((+o.hcWeekly)*wks(o)),
+    elim:o=>(+o.hcEP||0)+'-day wait', inflation:o=>'None (no inflation option)', inflationYN:o=>'',
+    optbenefits:o=>hcpExtras(o), marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'CLI (Continental Life)' };
   Object.keys(QCATS).forEach(k=>{ const orig=QCATS[k].v;
-    QCATS[k].v=(o,q)=>{ const T=isNwm(o)?N:isAet(o)?A:null; if(T&&T[k]){ const r=T[k](o,q); if(r!=null) return r; } return orig(o,q); }; });
+    QCATS[k].v=(o,q)=>{ const T=isNwm(o)?N:isAet(o)?A:isHcp(o)?H:null; if(T&&T[k]){ const r=T[k](o,q); if(r!=null) return r; } return orig(o,q); }; });
 })();
 const QLAYOUTS = {
   essentials:  ['benefit','period','inflationYN','premium'],
@@ -6059,6 +6160,7 @@ const GROWTH_YEARS=[1,2,3,4,5,6,7,8,9,10,15,20,25,26,30];
 // each option's benefit at `e` years after issue (e=0 at year 1), per its carrier's growth model
 function growthCell(o,e){
   if(isNwm(o)) return fmt0(Math.round(NWM.projBenefit(o,(+o.age)+e)))+'/mo';
+  if(isHcp(o)) return '$'+o.hcWeekly+'/week';
   if(isAet(o)) return '$'+Math.round(AET.projDaily(o,(+o.age)+e))+'/day'+((o.homeCare&&+o.hcWeekly>0)?'<div class="gc-sub">+$'+o.hcWeekly+'/wk home</div>':'');
   if(isOmni(o)){ const f=omFactorAtElapsed(o,e); let s='$'+Math.round(o.facilityDaily*f)+'/day'; if(o.homeCare) s+='<div class="gc-sub">+$'+Math.round(o.hcDaily*f)+' home</div>'; return s; }
   if(isCS(o)){ const r=csInflRate(o.inflation); return '$'+Math.round(o.dailyBenefit*Math.pow(1+r,e))+'/day'; }
@@ -6071,7 +6173,7 @@ function benefitGrowthSection(items, order){
   if(!items.length) return '';
   const uniform = items.every(o=>(+o.age)===(+items[0].age));
   const issueAge = uniform ? +items[0].age : null;
-  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div></th>').join('');
+  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isHcp(items[idx])?'CLI Home Care Plus':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div></th>').join('');
   const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
     return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
   return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
@@ -6081,7 +6183,7 @@ function benefitGrowthSection(items, order){
     + '</div>';
 }
 /* ---------- NGL shared-care explainer page ("Mickey ears": two policyholders + a shared pool) ---------- */
-function isNglItem(o){ return !!o && !isCS(o) && !isOmni(o) && !isMoo(o) && !isMooc(o) && !isNwm(o) && !isAet(o); }
+function isNglItem(o){ return !!o && !isCS(o) && !isOmni(o) && !isMoo(o) && !isMooc(o) && !isNwm(o) && !isAet(o) && !isHcp(o); }
 function toggleSharedPage(on){ QSHEET.sharedPage=!!on; renderSheet(); }
 // Two policyholder names for the shared-care circles: prefer the structured names from the
 // top form; otherwise split a "A & B" client name into two.
@@ -6343,7 +6445,7 @@ function renderSheet(){
     if(anyTen && !rows.includes('tenpay')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi+1, 0, 'tenpay'); }
     else if(!anyTen) rows = rows.filter(k=>k!=='tenpay');
     // Mutual of Omaha optional benefits (ROP, Pro HHC, HHC Waiver, NF-SBP, ALF/HHC reduction) → list row when any are selected
-    const anyMooOpt = items.some(o=>mooSheetOpts(o));
+    const anyMooOpt = items.some(o=>mooSheetOpts(o) || (isHcp(o) && (+o.hospitalDaily>0||+o.ambulanceUnits>0||+o.cancerUnits>0)));
     if(QSHEET.layout!=='essentials' && anyMooOpt && !rows.includes('optbenefits')){ const pi=rows.indexOf('premium'); rows.splice(pi<0?rows.length:pi, 0, 'optbenefits'); }
     else if(!anyMooOpt) rows = rows.filter(k=>k!=='optbenefits');
     // OmniFlex-only sheet → show its built-in benefit lines (Rx, Fast-50, Restoration of
@@ -6357,7 +6459,7 @@ function renderSheet(){
   // option column order (view-only; reset each time the sheet is opened)
   if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
   const order = QSHEET.colOrder;
-  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isHcp(items[idx])?'CLI Home Care Plus':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
