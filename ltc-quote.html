@@ -292,7 +292,7 @@
           <option value="moo">Mutual of Omaha — MutualCare Secure</option>
           <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
           <option value="nwm">Northwestern Mutual — QuietCare</option>
-          <option value="aetna">Aetna — Short Term Care</option>
+          <option value="aetna">CLI — Recovery Care Choice (STC)</option>
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
@@ -335,7 +335,7 @@
         <option value="moo">Mutual of Omaha — MutualCare Secure</option>
         <option value="mooc">Mutual of Omaha — MutualCare Custom</option>
         <option value="nwm">Northwestern Mutual — QuietCare (TX)</option>
-        <option value="aetna">Aetna — Short Term Care (TX)</option>
+        <option value="aetna">CLI — Recovery Care Choice (TX)</option>
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
       <div class="field"><label>Inflation</label><select id="qc_infl"></select></div>
@@ -706,8 +706,8 @@
 
   <div class="card" id="aetcard" hidden>
     <div class="cs-head">
-      <h2 style="margin:0 0 2px">Aetna <span style="color:var(--muted);font-weight:600;font-size:.9rem">Short Term Care (Recovery Care)</span></h2>
-      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (an Aetna company) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>Texas filing (2025)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
+      <h2 style="margin:0 0 2px">CLI <span style="color:var(--muted);font-weight:600;font-size:.9rem">Recovery Care Choice</span></h2>
+      <p class="hint" style="margin:0">Continental Life Insurance Company of Brentwood, TN (CLI) · limited-benefit short-term care indemnity, policy series CLI-025. Rates from the <b>Texas filing (2025)</b>. Issue ages 40–89, unisex, one health class. Not long-term care insurance.</p>
     </div>
     <div class="grid">
       <div class="field"><label>State</label><select id="aet_state"><option value="TX" selected>Texas</option></select></div>
@@ -729,7 +729,7 @@
       <div class="field"><label>Home care benefit period</label><select id="aet_hcbp"><option value="90">13 weeks</option><option value="180">26 weeks</option><option value="270">39 weeks</option><option value="360" selected>52 weeks</option></select></div>
       <div class="field"><label>Home care waiting period</label><select id="aet_hcep"><option value="0" selected>0 days</option><option value="20">20 days</option></select></div>
     </div>
-    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— benefit amounts as on Aetna’s quoter; 0 = not included</span></div>
+    <div style="font-weight:800;font-size:.82rem;color:var(--primary-d);margin:10px 0 4px">Optional riders <span style="color:var(--muted);font-weight:600">— benefit amounts as on CLI’s quoter; 0 = not included</span></div>
     <div class="grid">
       <div class="field"><label>Hospital daily benefit ($/day · 31 days, 0 = none)</label><input id="aet_hosp" type="number" value="0" step="10" min="0"></div>
       <div class="field"><label>Prescription drug benefit ($/yr · $300 minimum, required)</label><input id="aet_rx" type="number" value="300" step="100" min="300"></div>
@@ -748,9 +748,9 @@
     <div class="grid">
       <div class="field"><label>Home modification ($ lifetime · $500 steps, 0 = none)</label><input id="aet_hm" type="number" value="0" step="500" min="0"></div>
     </div>
-    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Owns another Aetna individual policy (5% discount)</label></div>
-    <div class="warn" style="margin-top:6px">Texas rates only (CLI-025 filing, 2025). Starts at Aetna's maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
-    <div class="actions"><button class="run" onclick="aetRun()">Run Aetna quote</button></div>
+    <div class="riders" style="margin-top:6px"><label><input type="checkbox" id="aet_mp"> Multiple Policy Discount (5% — owns another CLI individual policy)</label></div>
+    <div class="warn" style="margin-top:6px">Texas rates only (CLI-025 filing, 2025). Starts at the maximums: $700/day facility and $2,100/week home care (click lower as needed). The inflation rider increases the facility benefit only; home care stays level. Rounding of the filed rates is assumed to the cent on the final premium.</div>
+    <div class="actions"><button class="run" onclick="aetRun()">Run Recovery Care Choice quote</button></div>
   </div>
 
   <div class="card" id="budgetCard" hidden>
@@ -3534,13 +3534,14 @@ window.NWM=(function(){
     return (+o.monthlyBenefit||0)*Math.pow(1+pct, yrs); }
   return {quote, projBenefit, INDEX_LABEL, EP_DAYS, idxOf, clsOf, epOf};
 })();
-/* ---------- Aetna — Continental Life Insurance Company of Brentwood, TN: Limited Benefit Short Term Care (CLI-025, TX filing 2025) ----------
+/* ---------- CLI Recovery Care Choice — Continental Life Insurance Company of Brentwood, TN: Limited Benefit Short Term Care (CLI-025, TX filing 2025) ----------
+   Internal carrier id stays 'aetna' (saved quotes use it). Other CLI products (Home Care Plus, Recovery Care) get their own ids/engines.
    Annual rates per $10/day facility (base + inflation riders), per $150/week home care, per unit for other riders.
    Rows by issue age: "40" = ages 40–49, then 50…89. Columns: benefit period 90/180/270/360 × waiting 0/20/100 (home care 0/20). */
 const AET_RATES={"base":{"40":[2.52,2.16,0.98,4.24,3.94,1.9,5.67,5.38,2.66,6.91,6.67,3.46],"50":[4.39,3.8,2.12,7.45,6.88,4.08,9.99,9.49,5.83,12.2,11.8,7.48],"51":[5.02,4.34,2.5,8.51,7.86,4.81,11.42,10.86,6.88,13.96,13.51,8.82],"52":[5.64,4.89,2.88,9.58,8.84,5.53,12.86,12.23,7.94,15.73,15.22,10.16],"53":[6.27,5.44,3.26,10.65,9.82,6.26,14.3,13.61,8.99,17.49,16.93,11.5],"54":[6.89,5.98,3.64,11.72,10.81,6.99,15.74,14.98,10.05,19.26,18.65,12.84],"55":[7.52,6.53,4.02,12.78,11.79,7.71,17.17,16.35,11.1,21.02,20.36,14.18],"56":[8.14,7.07,4.4,13.85,12.77,8.44,18.61,17.72,12.15,22.79,22.07,15.52],"57":[8.77,7.62,4.78,14.92,13.75,9.17,20.05,19.09,13.21,24.55,23.78,16.86],"58":[9.87,8.57,5.45,16.8,15.48,10.45,22.58,21.5,15.05,27.65,26.79,19.23],"59":[10.97,9.53,6.12,18.67,17.21,11.73,25.12,23.91,16.9,30.75,29.8,21.6],"60":[12.07,10.48,6.8,20.55,18.94,13.02,27.65,26.31,18.75,33.85,32.82,23.97],"61":[13.17,11.43,7.47,22.43,20.68,14.3,30.18,28.72,20.59,36.95,35.83,26.33],"62":[14.27,12.38,8.14,24.3,22.41,15.59,32.72,31.12,22.44,40.05,38.84,28.7],"63":[15.94,13.83,9.15,27.16,25.04,17.53,36.57,34.79,25.23,44.77,43.41,32.28],"64":[17.61,15.28,10.15,30.01,27.67,19.47,40.42,38.46,28.03,49.5,47.98,35.85],"65":[19.28,16.73,11.16,32.87,30.3,21.4,44.27,42.12,30.82,54.22,52.55,39.42],"66":[20.95,18.18,12.16,35.72,32.92,23.34,48.11,45.79,33.62,58.94,57.13,43.0],"67":[22.62,19.63,13.17,38.57,35.55,25.28,51.96,49.45,36.41,63.66,61.7,46.57],"68":[25.07,21.75,14.62,42.76,39.41,28.08,57.61,54.82,40.43,70.58,68.39,51.71],"69":[27.52,23.88,16.07,46.95,43.27,30.87,63.25,60.19,44.45,77.49,75.08,56.85],"70":[29.97,26.01,17.52,51.14,47.13,33.66,68.9,65.56,48.47,84.4,81.78,61.99],"71":[32.43,28.14,18.97,55.32,50.99,36.45,74.54,70.93,52.5,91.32,88.47,67.13],"72":[34.88,30.26,20.42,59.51,54.84,39.24,80.19,76.3,56.52,98.23,95.16,72.27],"73":[38.08,33.04,22.16,64.98,59.89,42.6,87.55,83.32,61.36,107.24,103.9,78.46],"74":[41.28,35.83,23.91,70.45,64.94,45.97,94.92,90.33,66.2,116.25,112.63,84.64],"75":[44.48,38.61,25.65,75.91,69.99,49.33,102.29,97.34,71.05,125.27,121.37,90.83],"76":[47.68,41.39,27.4,81.38,75.04,52.7,109.65,104.36,75.89,134.28,130.1,97.01],"77":[50.88,44.17,29.14,86.85,80.08,56.06,117.02,111.37,80.74,143.29,138.83,103.2],"78":[54.24,47.08,30.44,92.59,85.36,58.56,124.72,118.7,84.32,152.67,147.93,107.76],"79":[57.59,49.99,31.73,98.32,90.64,61.05,132.43,126.03,87.9,162.05,157.02,112.33],"80":[60.95,52.9,33.03,104.06,95.92,63.54,140.14,133.37,91.49,171.42,166.11,116.89],"81":[64.3,55.82,34.32,109.79,101.2,66.04,147.84,140.7,95.07,180.8,175.2,121.46],"82":[67.66,58.73,35.62,115.53,106.48,68.53,155.55,148.03,98.65,190.18,184.3,126.02],"83":[70.74,61.4,35.86,120.71,111.26,68.97,162.42,154.58,99.23,198.44,192.3,126.68],"84":[73.83,64.08,36.11,125.89,116.04,69.41,169.29,161.12,99.8,206.71,200.31,127.33],"85":[76.92,66.76,36.36,131.07,120.82,69.84,176.16,167.67,100.38,214.97,208.32,127.99],"86":[80.01,69.44,36.6,136.25,125.59,70.28,183.04,174.21,100.95,223.24,216.33,128.64],"87":[83.1,72.11,36.85,141.43,130.37,70.71,189.91,180.76,101.53,231.5,224.34,129.3],"88":[86.19,74.79,37.09,146.62,135.15,71.15,196.78,187.3,102.1,239.77,232.35,129.96],"89":[89.27,77.47,37.34,151.8,139.93,71.58,203.65,193.84,102.68,248.03,240.36,130.61]},"c5":{"40":[11.83,10.29,6.48,20.15,18.55,12.43,27.11,25.83,17.94,33.19,32.19,22.88],"50":[13.41,11.66,7.37,22.86,21.05,14.15,30.76,29.29,20.4,37.65,36.5,26.04],"51":[13.94,12.11,7.67,23.76,21.89,14.72,31.98,30.45,21.22,39.13,37.94,27.09],"52":[14.47,12.57,7.97,24.66,22.72,15.3,33.19,31.6,22.04,40.62,39.38,28.14],"53":[15.0,13.02,8.27,25.56,23.56,15.87,34.41,32.75,22.85,42.1,40.81,29.2],"54":[15.53,13.48,8.57,26.46,24.39,16.45,35.62,33.91,23.67,43.59,42.25,30.25],"55":[16.06,13.93,8.87,27.37,25.22,17.02,36.84,35.06,24.49,45.07,43.69,31.3],"56":[16.58,14.39,9.16,28.27,26.06,17.6,38.05,36.21,25.31,46.56,45.13,32.36],"57":[17.11,14.85,9.46,29.17,26.89,18.17,39.27,37.37,26.13,48.04,46.57,33.41],"58":[17.66,15.32,9.76,30.11,27.76,18.76,40.53,38.57,26.98,49.59,48.06,34.49],"59":[18.21,15.8,10.06,31.04,28.62,19.35,41.79,39.78,27.83,51.14,49.55,35.57],"60":[18.76,16.28,10.37,31.98,29.48,19.94,43.05,40.99,28.68,52.69,51.05,36.66],"61":[19.31,16.76,10.67,32.92,30.34,20.53,44.31,42.19,29.53,54.24,52.54,37.74],"62":[19.86,17.23,10.97,33.86,31.2,21.12,45.57,43.4,30.39,55.79,54.03,38.82],"63":[20.42,17.73,11.26,34.83,32.1,21.68,46.88,44.64,31.19,57.38,55.58,39.85],"64":[20.99,18.22,11.56,35.8,32.99,22.24,48.18,45.88,31.99,58.98,57.13,40.87],"65":[21.56,18.71,11.85,36.76,33.89,22.8,49.49,47.12,32.8,60.57,58.67,41.9],"66":[22.12,19.21,12.15,37.73,34.79,23.36,50.8,48.36,33.6,62.16,60.22,42.93],"67":[22.69,19.7,12.44,38.7,35.68,23.92,52.1,49.6,34.4,63.75,61.77,43.95],"68":[23.37,20.3,12.75,39.87,36.76,24.51,53.67,51.09,35.26,65.66,63.63,45.04],"69":[24.06,20.89,13.06,41.04,37.84,25.1,55.23,52.59,36.11,67.57,65.48,46.12],"70":[24.74,21.49,13.37,42.2,38.91,25.69,56.8,54.08,36.96,69.48,67.34,47.21],"71":[25.42,22.08,13.68,43.37,39.99,26.29,58.37,55.57,37.81,71.39,69.2,48.29],"72":[26.11,22.67,13.99,44.54,41.07,26.88,59.93,57.07,38.66,73.3,71.06,49.38],"73":[26.72,23.2,14.15,45.58,42.02,27.19,61.33,58.4,39.11,74.99,72.69,49.95],"74":[27.34,23.73,14.32,46.63,42.98,27.51,62.73,59.72,39.57,76.68,74.33,50.53],"75":[27.95,24.26,14.49,47.67,43.93,27.83,64.13,61.05,40.02,78.37,75.96,51.1],"76":[28.56,24.79,14.65,48.72,44.89,28.14,65.52,62.38,40.47,80.07,77.6,51.68],"77":[29.18,25.32,14.82,49.76,45.84,28.46,66.92,63.71,40.92,81.76,79.24,52.25],"78":[29.13,25.28,14.5,49.66,45.76,27.85,66.77,63.56,40.04,81.55,79.03,51.1],"79":[29.08,25.24,14.18,49.55,45.67,27.23,66.61,63.42,39.15,81.34,78.82,49.94],"80":[29.03,25.19,13.86,49.45,45.58,26.62,66.46,63.27,38.27,81.13,78.61,48.79],"81":[28.98,25.15,13.54,49.35,45.5,26.01,66.3,63.12,37.38,80.92,78.4,47.64],"82":[28.93,25.11,13.22,49.24,45.41,25.4,66.15,62.98,36.5,80.71,78.19,46.48],"83":[28.37,24.62,12.64,48.27,44.5,24.25,64.8,61.69,34.84,79.02,76.56,44.35],"84":[27.81,24.14,12.05,47.29,43.6,23.11,63.46,60.41,33.18,77.34,74.93,42.22],"85":[27.24,23.66,11.46,46.31,42.69,21.97,62.11,59.13,31.53,75.65,73.29,40.09],"86":[26.68,23.17,10.88,45.33,41.78,20.83,60.77,57.85,29.87,73.96,71.66,37.96],"87":[26.12,22.69,10.29,44.35,40.88,19.68,59.42,56.56,28.22,72.28,70.03,35.82],"88":[25.56,22.2,9.7,43.37,39.97,18.54,58.08,55.28,26.56,70.59,68.39,33.69],"89":[25.0,21.72,9.11,42.39,39.07,17.4,56.73,54.0,24.9,68.91,66.76,31.56]},"s5":{"40":[4.47,3.9,2.41,7.61,6.98,4.6,10.22,9.76,6.69,12.52,12.16,8.49],"50":[5.79,5.04,3.18,9.86,9.07,6.1,13.27,12.64,8.82,16.24,15.76,11.23],"51":[6.23,5.42,3.44,10.62,9.77,6.6,14.28,13.61,9.52,17.48,16.96,12.15],"52":[6.67,5.8,3.7,11.37,10.47,7.1,15.3,14.57,10.23,18.72,18.16,13.06],"53":[7.11,6.18,3.96,12.12,11.16,7.6,16.31,15.53,10.94,19.96,19.36,13.98],"54":[7.56,6.56,4.22,12.87,11.86,8.1,17.33,16.49,11.65,21.2,20.56,14.89],"55":[8.0,6.94,4.48,13.62,12.56,8.6,18.34,17.46,12.36,22.44,21.76,15.81],"56":[8.44,7.32,4.74,14.38,13.25,9.09,19.36,18.42,13.07,23.68,22.96,16.72],"57":[8.88,7.7,5.0,15.13,13.95,9.59,20.37,19.38,13.78,24.92,24.16,17.64],"58":[9.42,8.17,5.3,16.05,14.8,10.19,21.61,20.56,14.65,26.45,25.63,18.74],"59":[9.95,8.63,5.61,16.97,15.64,10.8,22.85,21.75,15.52,27.97,27.1,19.85],"60":[10.49,9.1,5.92,17.89,16.49,11.4,24.08,22.93,16.39,29.49,28.56,20.95],"61":[11.03,9.57,6.23,18.81,17.33,12.0,25.32,24.11,17.26,31.01,30.03,22.05],"62":[11.57,10.04,6.53,19.73,18.18,12.6,26.56,25.29,18.12,32.53,31.49,23.16],"63":[12.16,10.56,6.87,20.74,19.12,13.23,27.93,26.6,19.04,34.21,33.13,24.32],"64":[12.76,11.08,7.2,21.76,20.06,13.87,29.3,27.9,19.95,35.89,34.76,25.49],"65":[13.36,11.6,7.54,22.78,21.0,14.5,30.68,29.21,20.86,37.57,36.39,26.66],"66":[13.95,12.12,7.87,23.8,21.94,15.14,32.05,30.51,21.78,39.24,38.02,27.83],"67":[14.55,12.64,8.2,24.82,22.88,15.77,33.42,31.82,22.69,40.92,39.65,29.0],"68":[15.28,13.27,8.57,26.07,24.04,16.48,35.1,33.42,23.71,42.97,41.64,30.3],"69":[16.01,13.9,8.94,27.32,25.19,17.19,36.78,35.02,24.73,45.02,43.63,31.6],"70":[16.74,14.54,9.31,28.56,26.34,17.9,38.46,36.62,25.75,47.07,45.62,32.9],"71":[17.47,15.17,9.68,29.81,27.49,18.61,40.13,38.22,26.76,49.12,47.62,34.2],"72":[18.2,15.81,10.05,31.06,28.64,19.31,41.81,39.82,27.78,51.17,49.61,35.5],"73":[18.94,16.45,10.31,32.32,29.8,19.82,43.51,41.43,28.51,53.23,51.6,36.43],"74":[19.68,17.09,10.58,33.59,30.96,20.33,45.2,43.04,29.24,55.29,53.59,37.36],"75":[20.42,17.73,10.85,34.85,32.12,20.84,46.9,44.65,29.97,57.35,55.59,38.29],"76":[21.16,18.37,11.11,36.11,33.27,21.34,48.59,46.26,30.7,59.4,57.58,39.21],"77":[21.9,19.01,11.38,37.38,34.43,21.85,50.28,47.87,31.42,61.46,59.57,40.14],"78":[22.13,19.2,11.25,37.74,34.77,21.61,50.76,48.33,31.08,62.03,60.12,39.68],"79":[22.35,19.39,11.13,38.1,35.11,21.37,51.24,48.78,30.74,62.59,60.66,39.23],"80":[22.57,19.59,11.0,38.47,35.46,21.14,51.71,49.24,30.4,63.16,61.2,38.77],"81":[22.79,19.78,10.88,38.83,35.8,20.9,52.19,49.69,30.05,63.72,61.74,38.31],"82":[23.01,19.98,10.75,39.19,36.14,20.66,52.66,50.15,29.71,64.29,62.29,37.85],"83":[22.8,19.79,10.35,38.81,35.78,19.87,52.12,49.62,28.55,63.58,61.6,36.36],"84":[22.58,19.61,9.94,38.42,35.42,19.07,51.57,49.1,27.39,62.87,60.91,34.86],"85":[22.37,19.43,9.53,38.03,35.06,18.27,51.02,48.57,26.23,62.16,60.22,33.36],"86":[22.16,19.24,9.12,37.64,34.7,17.48,50.48,48.05,25.07,61.45,59.53,31.87],"87":[21.94,19.06,8.72,37.26,34.34,16.68,49.93,47.53,23.92,60.74,58.85,30.37],"88":[21.73,18.88,8.31,36.87,33.98,15.88,49.38,47.0,22.76,60.03,58.16,28.87],"89":[21.51,18.69,7.9,36.48,33.62,15.08,48.84,46.48,21.6,59.32,57.47,27.38]},"c3":{"40":[4.7,4.08,2.58,7.98,7.36,4.92,10.73,10.24,7.12,13.18,12.79,9.06],"50":[5.61,4.87,3.1,9.54,8.8,5.93,12.84,12.24,8.56,15.74,15.27,10.92],"51":[5.91,5.13,3.28,10.06,9.28,6.27,13.55,12.9,9.03,16.59,16.1,11.54],"52":[6.22,5.39,3.45,10.58,9.76,6.61,14.25,13.57,9.51,17.45,16.93,12.15],"53":[6.52,5.66,3.63,11.1,10.24,6.94,14.96,14.24,9.99,18.3,17.75,12.77],"54":[6.83,5.92,3.8,11.62,10.72,7.28,15.66,14.9,10.47,19.16,18.58,13.39],"55":[7.13,6.18,3.97,12.14,11.2,7.61,16.36,15.57,10.94,20.01,19.41,14.01],"56":[7.43,6.44,4.15,12.66,11.68,7.95,17.07,16.23,11.42,20.86,20.24,14.63],"57":[7.74,6.71,4.32,13.19,12.16,8.29,17.77,16.9,11.9,21.72,21.06,15.24],"58":[8.09,7.01,4.52,13.78,12.71,8.67,18.56,17.66,12.45,22.7,22.0,15.94],"59":[8.43,7.31,4.71,14.37,13.25,9.05,19.36,18.43,13.0,23.68,22.94,16.63],"60":[8.78,7.62,4.9,14.97,13.8,9.43,20.15,19.19,13.55,24.66,23.89,17.32],"61":[9.13,7.92,5.09,15.56,14.34,9.81,20.95,19.96,14.1,25.64,24.83,18.01],"62":[9.47,8.22,5.28,16.15,14.89,10.19,21.75,20.72,14.65,26.62,25.77,18.7],"63":[9.83,8.54,5.47,16.76,15.45,10.56,22.57,21.5,15.17,27.63,26.75,19.38],"64":[10.19,8.85,5.66,17.38,16.02,10.92,23.39,22.28,15.7,28.64,27.73,20.06],"65":[10.55,9.16,5.86,17.99,16.58,11.29,24.22,23.06,16.23,29.64,28.71,20.74],"66":[10.91,9.47,6.05,18.6,17.14,11.65,25.04,23.85,16.76,30.65,29.69,21.42],"67":[11.27,9.79,6.24,19.21,17.71,12.02,25.87,24.63,17.29,31.66,30.67,22.09],"68":[11.7,10.16,6.45,19.95,18.39,12.41,26.86,25.58,17.86,32.87,31.85,22.82],"69":[12.13,10.54,6.66,20.69,19.08,12.81,27.85,26.53,18.44,34.09,33.02,23.55],"70":[12.57,10.91,6.87,21.42,19.77,13.21,28.85,27.48,19.01,35.3,34.2,24.28],"71":[13.0,11.29,7.08,22.16,20.46,13.6,29.84,28.43,19.58,36.51,35.38,25.01],"72":[13.43,11.67,7.29,22.9,21.14,14.0,30.83,29.38,20.16,37.72,36.55,25.74],"73":[13.85,12.03,7.43,23.61,21.79,14.26,31.79,30.28,20.52,38.87,37.67,26.21],"74":[14.27,12.39,7.57,24.33,22.43,14.52,32.74,31.18,20.89,40.02,38.79,26.68],"75":[14.68,12.75,7.7,25.04,23.08,14.78,33.69,32.08,21.26,41.18,39.9,27.15],"76":[15.1,13.11,7.84,25.75,23.73,15.04,34.64,32.99,21.63,42.33,41.02,27.62],"77":[15.52,13.47,7.98,26.47,24.37,15.3,35.59,33.89,22.0,43.48,42.14,28.1],"78":[15.57,13.51,7.83,26.54,24.44,15.03,35.68,33.97,21.61,43.58,42.23,27.59],"79":[15.62,13.55,7.69,26.61,24.52,14.76,35.76,34.05,21.22,43.68,42.32,27.08],"80":[15.67,13.59,7.54,26.68,24.59,14.49,35.85,34.13,20.84,43.78,42.41,26.58],"81":[15.71,13.63,7.4,26.75,24.66,14.22,35.93,34.21,20.45,43.88,42.5,26.07],"82":[15.76,13.67,7.25,26.82,24.73,13.95,36.02,34.29,20.06,43.98,42.59,25.56],"83":[15.53,13.47,6.96,26.4,24.34,13.37,35.44,33.74,19.21,43.25,41.88,24.46],"84":[15.29,13.26,6.66,25.99,23.96,12.78,34.87,33.2,18.36,42.51,41.17,23.37],"85":[15.05,13.06,6.36,25.58,23.57,12.2,34.3,32.66,17.51,41.78,40.46,22.27],"86":[14.81,12.86,6.07,25.17,23.18,11.61,33.72,32.11,16.66,41.05,39.75,21.17],"87":[14.57,12.65,5.77,24.75,22.79,11.02,33.15,31.57,15.81,40.32,39.04,20.07],"88":[14.33,12.45,5.47,24.34,22.41,10.44,32.58,31.02,14.96,39.58,38.33,18.97],"89":[14.09,12.25,5.17,23.93,22.02,9.85,32.0,30.48,14.11,38.85,37.62,17.87]},"s3":{"40":[2.68,2.35,1.46,4.54,4.18,2.74,6.11,5.84,4.01,7.5,7.3,5.07],"50":[3.47,3.03,1.92,5.9,5.44,3.65,7.94,7.58,5.28,9.73,9.46,6.72],"51":[3.74,3.25,2.07,6.35,5.86,3.95,8.55,8.15,5.7,10.47,10.17,7.27],"52":[4.0,3.48,2.23,6.8,6.27,4.25,9.16,8.73,6.13,11.22,10.89,7.82],"53":[4.27,3.71,2.38,7.26,6.69,4.55,9.77,9.31,6.55,11.96,11.61,8.37],"54":[4.53,3.93,2.53,7.71,7.11,4.85,10.38,9.89,6.97,12.7,12.33,8.92],"55":[4.8,4.16,2.69,8.16,7.53,5.15,11.0,10.47,7.4,13.45,13.05,9.47],"56":[5.06,4.38,2.84,8.62,7.95,5.45,11.61,11.04,7.82,14.19,13.76,10.02],"57":[5.33,4.61,2.99,9.07,8.36,5.75,12.22,11.62,8.24,14.93,14.48,10.57],"58":[5.65,4.9,3.18,9.63,8.88,6.11,12.96,12.34,8.77,15.86,15.36,11.24],"59":[5.98,5.18,3.36,10.19,9.39,6.48,13.71,13.05,9.3,16.78,16.25,11.9],"60":[6.31,5.47,3.55,10.74,9.9,6.84,14.46,13.77,9.83,17.7,17.13,12.56],"61":[6.63,5.75,3.73,11.3,10.41,7.2,15.21,14.48,10.36,18.63,18.01,13.23],"62":[6.96,6.04,3.91,11.86,10.93,7.57,15.95,15.2,10.89,19.55,18.89,13.89],"63":[7.31,6.35,4.12,12.46,11.48,7.95,16.77,15.98,11.43,20.54,19.87,14.59],"64":[7.66,6.66,4.32,13.07,12.04,8.32,17.59,16.75,11.97,21.54,20.84,15.28],"65":[8.01,6.96,4.52,13.68,12.6,8.7,18.41,17.53,12.51,22.54,21.82,15.98],"66":[8.37,7.27,4.73,14.29,13.15,9.08,19.23,18.31,13.05,23.53,22.79,16.68],"67":[8.72,7.58,4.93,14.89,13.71,9.46,20.04,19.08,13.59,24.53,23.77,17.37],"68":[9.16,7.96,5.15,15.64,14.4,9.88,21.04,20.03,14.2,25.75,24.96,18.15],"69":[9.59,8.34,5.36,16.38,15.09,10.3,22.04,20.99,14.81,26.97,26.15,18.93],"70":[10.03,8.72,5.58,17.12,15.78,10.73,23.04,21.94,15.42,28.19,27.34,19.71],"71":[10.47,9.09,5.8,17.86,16.47,11.15,24.04,22.89,16.03,29.41,28.53,20.49],"72":[10.91,9.47,6.01,18.61,17.16,11.58,25.04,23.84,16.64,30.63,29.72,21.27],"73":[11.34,9.85,6.18,19.36,17.84,11.89,26.05,24.8,17.09,31.85,30.9,21.85],"74":[11.78,10.23,6.35,20.1,18.52,12.21,27.05,25.76,17.54,33.07,32.08,22.42],"75":[12.22,10.6,6.52,20.85,19.2,12.53,28.06,26.72,17.99,34.29,33.27,23.0],"76":[12.65,10.98,6.69,21.6,19.88,12.84,29.06,27.68,18.45,35.52,34.45,23.57],"77":[13.09,11.36,6.86,22.35,20.56,13.16,30.07,28.64,18.9,36.74,35.63,24.15],"78":[13.23,11.48,6.78,22.58,20.78,13.01,30.37,28.92,18.68,37.1,35.98,23.86],"79":[13.37,11.61,6.69,22.81,21.0,12.86,30.67,29.21,18.46,37.46,36.32,23.57],"80":[13.51,11.73,6.61,23.04,21.22,12.71,30.97,29.49,18.24,37.82,36.67,23.28],"81":[13.65,11.86,6.53,23.27,21.44,12.56,31.27,29.77,18.02,38.18,37.01,22.99],"82":[13.79,11.98,6.44,23.5,21.66,12.41,31.57,30.06,17.8,38.54,37.36,22.7],"83":[13.66,11.87,6.2,23.26,21.44,11.92,31.24,29.73,17.1,38.1,36.93,21.8],"84":[13.53,11.76,5.95,23.02,21.22,11.44,30.9,29.41,16.41,37.66,36.5,20.9],"85":[13.4,11.65,5.71,22.78,21.0,10.95,30.56,29.08,15.71,37.22,36.06,20.0],"86":[13.27,11.54,5.46,22.54,20.78,10.47,30.22,28.76,15.02,36.78,35.63,19.09],"87":[13.14,11.43,5.22,22.31,20.56,9.99,29.88,28.43,14.32,36.35,35.2,18.19],"88":[13.0,11.32,4.97,22.07,20.34,9.5,29.54,28.11,13.62,35.91,34.77,17.29],"89":[12.87,11.21,4.73,21.83,20.12,9.02,29.2,27.78,12.93,35.47,34.34,16.39]},"hc":{"50":[10.26,9.03,18.01,15.85,23.97,21.09,28.37,24.97],"51":[11.6,10.21,20.34,17.9,27.04,23.79,31.97,28.13],"52":[12.95,11.39,22.67,19.95,30.11,26.49,35.56,31.29],"53":[14.29,12.58,25.0,22.0,33.18,29.2,39.15,34.46],"54":[15.63,13.76,27.33,24.05,36.25,31.9,42.75,37.62],"55":[16.98,14.94,29.67,26.11,39.32,34.6,46.34,40.78],"56":[18.32,16.12,32.0,28.16,42.39,37.3,49.94,43.95],"57":[19.66,17.3,34.33,30.21,45.46,40.0,53.53,47.11],"58":[21.68,19.08,37.82,33.28,50.02,44.02,58.86,51.8],"59":[23.7,20.85,41.3,36.35,54.59,48.04,64.2,56.49],"60":[25.71,22.63,44.79,39.42,59.16,52.07,69.53,61.19],"61":[27.73,24.4,48.28,42.49,63.73,56.09,74.86,65.88],"62":[29.75,26.18,51.76,45.56,68.3,60.11,80.19,70.57],"63":[32.67,28.75,56.8,49.99,74.85,65.88,87.79,77.25],"64":[35.6,31.33,61.83,54.41,81.4,71.64,95.38,83.93],"65":[38.53,33.9,66.86,58.84,87.96,77.41,102.97,90.61],"66":[41.45,36.47,71.9,63.26,94.51,83.18,110.56,97.29],"67":[44.38,39.05,76.93,67.69,101.06,88.94,118.16,103.97],"68":[48.33,42.52,83.65,73.6,109.71,96.55,128.06,112.69],"69":[52.27,46.0,90.36,79.51,118.35,104.16,137.97,121.41],"70":[56.22,49.47,97.08,85.42,127.0,111.76,147.88,130.13],"71":[60.17,52.94,103.79,91.33,135.65,119.37,157.79,138.85],"72":[64.11,56.42,110.51,97.25,144.29,126.98,167.69,147.57],"73":[68.85,60.59,118.52,104.29,154.48,135.94,179.2,157.69],"74":[73.59,64.76,126.52,111.34,164.67,144.91,190.7,167.82],"75":[78.33,68.93,134.53,118.39,174.86,153.87,202.2,177.94],"76":[83.06,73.1,142.54,125.44,185.05,162.84,213.71,188.06],"77":[87.8,77.27,150.55,132.49,195.24,171.81,225.21,198.18],"78":[93.03,81.87,159.46,140.32,206.53,181.75,237.92,209.37],"79":[98.26,86.47,168.36,148.16,217.82,191.68,250.63,220.56],"80":[103.49,91.07,177.27,155.99,229.12,201.62,263.34,231.74],"81":[108.72,95.67,186.17,163.83,240.41,211.56,276.05,242.93],"82":[113.95,100.27,195.07,171.67,251.71,221.5,288.76,254.11],"83":[117.52,103.42,201.33,177.17,259.7,228.53,297.76,262.03],"84":[121.09,106.56,207.59,182.68,267.68,235.56,306.77,269.96],"85":[124.67,109.71,213.85,188.19,275.67,242.59,315.77,277.88],"86":[128.24,112.85,220.11,193.69,283.66,249.62,324.77,285.8],"87":[131.82,116.0,226.36,199.2,291.65,256.65,333.78,293.72],"88":[135.39,119.15,232.62,204.71,299.63,263.68,342.78,301.65],"89":[138.97,122.29,238.88,210.21,307.62,270.71,351.78,309.57],"40":[6.23,5.48,11.01,9.69,14.76,12.99,17.59,15.48]},"riders":{"bands":[40,50,55,60,65,70,75,80,85],"pet":[7.82,9.32,14.54,23.57,38.22,56.8,80.66,111.89,146.64],"homeMod":[2.89,3.44,5.36,8.63,14.0,20.88,29.67,41.1,54.34],"rx":[11.67,13.91,15.59,17.13,19.11,20.48,20.0,20.0,20.0],"mental":[218.63,260.59,287.44,322.18,352.61,369.83,368.85,359.49,346.88],"ambulance":[68.94,82.17,86.51,98.42,114.76,131.67,148.05,160.19,167.06],"pt15":[52.83,62.97,64.67,64.78,65.18,64.8,63.83,62.66,60.86],"pt30":[60.63,72.27,74.0,74.39,74.17,72.96,71.33,69.21,66.84],"adc15":[0.91,1.09,1.69,2.72,4.41,6.58,9.31,13.02,17.31],"adc30":[1.74,2.08,3.26,5.23,8.52,12.65,17.96,25.01,33.21],"adc45":[2.52,3.0,4.7,7.54,12.3,18.27,25.97,36.0,47.92],"hosp":[11.61,12.58,15.02,18.03,22.19,28.06,34.09,39.39,42.44]}};
 window.AET=(function(){
   const BPS=[90,180,270,360], EPS=[0,20,100], HCEPS=[0,20];
-  const MODAL={annual:1,semiannual:0.52,quarterly:0.265,monthly:0.08333};   // monthly is 0.08333 in Aetna's quoter (the filing prints 0.0833)
+  const MODAL={annual:1,semiannual:0.52,quarterly:0.265,monthly:0.08333};   // monthly is 0.08333 in CLI's quoter (the filing prints 0.0833)
   const INFL_LABEL={none:'None',c5:'5% compound',s5:'5% simple',c3:'3% compound',s3:'3% simple'};
   const RIDER_UNIT={pet:25,homeMod:500,rx:100,mental:25,ambulance:200,pt:50,adc:10,hosp:10};
   const r2=x=>Math.round((x+1e-9)*100)/100;
@@ -3548,19 +3549,19 @@ window.AET=(function(){
   function band(age){ const b=AET_RATES.riders.bands; let i=0; for(let k=0;k<b.length;k++) if(age>=b[k]) i=k; return i; }
   function quote(o){
     const age=+o.age, st=String(o.state||'TX').toUpperCase();
-    if(st!=='TX') throw new Error('Aetna Short Term Care rates are loaded from the Texas filing only.');
-    if(!(age>=40&&age<=89)) throw new Error('Aetna Short Term Care issues ages 40–89.');
+    if(st!=='TX') throw new Error('Recovery Care Choice rates are loaded from the Texas filing only.');
+    if(!(age>=40&&age<=89)) throw new Error('Recovery Care Choice issues ages 40–89.');
     const bp=+o.facilityBP||360, ep=+o.facilityEP||0, bi=BPS.indexOf(bp), ei=EPS.indexOf(ep);
     if(bi<0) throw new Error('Benefit period must be 90, 180, 270 or 360 days.');
     if(ei<0) throw new Error('Waiting period must be 0, 20 or 100 days.');
     const fd=+o.facilityDaily||0; if(!(fd>=10) || fd%10) throw new Error('Facility daily benefit must be in $10 steps.');
-    if(fd>700) throw new Error('Aetna’s facility daily benefit goes up to $700/day.');
+    if(fd>700) throw new Error('Recovery Care Choice facility benefit goes up to $700/day.');
     const k=rowKey(age), col=bi*3+ei, units=fd/10, R=AET_RATES, b=band(age), steps=[];
     let ann=R.base[k][col]*units; steps.push(['Facility $'+fd+'/day · '+bp+'-day period · '+ep+'-day wait', ann]);
     const inf=INFL_LABEL[o.inflation]&&o.inflation!=='none'?o.inflation:null;
     if(inf){ const v=R[inf][k][col]*units; ann+=v; steps.push([INFL_LABEL[inf]+' inflation rider', v]); }
     if(o.homeCare && +o.hcWeekly>0){ const hw=+o.hcWeekly; if(hw%150) throw new Error('Home care is sold in $150/week units.');
-      if(hw>2100) throw new Error('Aetna’s home care benefit goes up to $2,100/week.');
+      if(hw>2100) throw new Error('Recovery Care Choice home care goes up to $2,100/week.');
       const he=HCEPS.indexOf(+o.hcEP||0); if(he<0) throw new Error('Home care waiting period must be 0 or 20 days.');
       const hb=BPS.indexOf(+o.hcBP||bp); if(hb<0) throw new Error('Home care benefit period must be 13, 26, 39 or 52 weeks.');   // its own period, separate from the facility's
       const v=R.hc[k][hb*2+he]*(hw/150); ann+=v; steps.push(['Home care $'+hw+'/week · '+(BPS[hb]/90*13)+' weeks · '+(+o.hcEP||0)+'-day wait', v]); }
@@ -3574,7 +3575,7 @@ window.AET=(function(){
     add('ambulance', +o.ambulanceUnits||0, 'Ambulance $'+(200*(+o.ambulanceUnits||0)));
     if(+o.ptUnits>0) add(+o.ptVisits===30?'pt30':'pt15', +o.ptUnits, 'Outpatient rehab $'+(50*o.ptUnits)+'/day · '+(+o.ptVisits===30?30:15)+' visits/yr');
     if(+o.adcUnits>0) add('adc'+([15,30,45].indexOf(+o.adcDays)>=0?+o.adcDays:15), +o.adcUnits, 'Adult day care $'+(10*o.adcUnits)+'/day · '+(+o.adcDays||15)+' days/yr');
-    // Aetna prices each benefit line separately: line × discount × mode factor, rounded to the cent, then summed.
+    // CLI prices each benefit line separately: line × discount × mode factor, rounded to the cent, then summed.
     const mode=MODAL[o.mode]?o.mode:'monthly', disc=o.multiPolicy?0.95:1;
     let modal=0, annual=0; for(const st of steps){ modal+=r2(st[1]*disc*MODAL[mode]); annual+=r2(st[1]*disc); }
     if(o.multiPolicy) steps.push(['5% multiple-policy discount (each line)', -(steps.reduce((a,x)=>a+x[1],0)*0.05)]);
@@ -3751,7 +3752,7 @@ const CLIENT_FIELDS={
   moo:      {age:['moo_age'], gender:['moo_gender'], age2:['moo_age2'], gender2:['moo_g2']},
   mooc:     {age:['mooc_age'], gender:['mooc_gender'], age2:['mooc_age2'], gender2:['mooc_g2']},
   nwm:      {age:['nwm_age'], gender:['nwm_gender'], age2:['nwm_age2'], gender2:['nwm_g2']},
-  aetna:    {age:['aet_age']}   // Aetna STC is unisex
+  aetna:    {age:['aet_age']}   // CLI Recovery Care Choice is unisex
 };
 const CLIENT_COUPLE={ moo:'moo_couple', mooc:'mooc_couple', omniflex:'om_couple', nwm:'nwm_couple' };
 // Primary state select per carrier (clamped on apply to whatever states that carrier offers).
@@ -3898,7 +3899,7 @@ function setCarrier(c){
   if($('mooccard')) $('mooccard').hidden = !mooc;
   if($('nwmcard')) $('nwmcard').hidden = CARRIER!=='nwm';
   if($('aetcard')) $('aetcard').hidden = CARRIER!=='aetna';
-  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ Aetna · Short Term Care (TX filing)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (TX)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   if(ngl){ setMode(MODE); }
   else {
     $('manual').hidden = true;
@@ -4230,7 +4231,7 @@ function nwmRunCouple(){ try{
     +'<div class="disc">Two Northwestern policies (one per spouse), each with the 20% two-insured discount, combined into one household premium.'+(surv?' Survivorship Benefit added: at the first death, the survivor’s policy becomes fully paid up.':'')+' '+NWM_NOTE+' '+DISC+'</div>');
 }catch(e){ showErr(e.message); } }
 const NWM_NOTE='Northwestern Mutual QuietCare (UU 2016) rates from the Texas filing; verified against Northwestern quotes.';
-/* ---------- Aetna Short Term Care — form, results ---------- */
+/* ---------- CLI Recovery Care Choice — form, results ---------- */
 function aetInflLabel(o){ return AET.INFL_LABEL[o.inflation]||'None'; }
 function aetRiderList(o){ const r=[];
   if(o.homeCare&&+o.hcWeekly>0) r.push('home care $'+o.hcWeekly+'/wk · '+((+o.hcBP||+o.facilityBP||360)/90*13)+' wks');
@@ -4239,7 +4240,7 @@ function aetRiderList(o){ const r=[];
   if(+o.adcUnits>0) r.push('adult day care'); if(+o.petUnits>0) r.push('pet boarding'); if(+o.homeModUnits>0) r.push('home modification');
   return r; }
 function aetConfigShort(o){ const r=aetRiderList(o);
-  return o.age+' · Aetna Short Term Care · $'+o.facilityDaily+'/day facility · '+o.facilityBP+'-day · '+(+o.facilityEP||0)+'-day wait'+(o.inflation&&o.inflation!=='none'?' · '+aetInflLabel(o)+' facility inflation':'')+(r.length?' · '+r.join(', '):'')+(o.multiPolicy?' · multi-policy −5%':'')+' · '+(o.state||'TX'); }
+  return o.age+' · CLI Recovery Care Choice · $'+o.facilityDaily+'/day facility · '+o.facilityBP+'-day · '+(+o.facilityEP||0)+'-day wait'+(o.inflation&&o.inflation!=='none'?' · '+aetInflLabel(o)+' facility inflation':'')+(r.length?' · '+r.join(', '):'')+(o.multiPolicy?' · multi-policy −5%':'')+' · '+(o.state||'TX'); }
 function aetOpts(){ const n=id=>+($(id)||{}).value||0;
   return {carrier:'aetna', state:$('aet_state').value||'TX', age:+$('aet_age').value, mode:$('aet_mode').value,
     facilityDaily:n('aet_daily'), facilityBP:n('aet_bp'), facilityEP:n('aet_ep'), inflation:$('aet_infl').value,
@@ -4247,10 +4248,10 @@ function aetOpts(){ const n=id=>+($(id)||{}).value||0;
     hospitalDaily:n('aet_hosp'), rxUnits:Math.max(3,n('aet_rx')/100), ambulanceUnits:n('aet_amb')/200, ptUnits:n('aet_pt')/50, ptVisits:n('aet_ptv'),
     mentalUnits:n('aet_mh')/25, adcUnits:n('aet_adc')/10, adcDays:n('aet_adcd'), petUnits:n('aet_pet')/25, homeModUnits:n('aet_hm')/500,
     multiPolicy:!!$('aet_mp').checked}; }
-const AET_NOTE='Aetna Short Term Care is limited-benefit short-term recovery coverage paid as a daily/weekly indemnity — it is not long-term care insurance. The inflation rider increases the facility benefit only; the home care benefit stays level. Rates are from the Texas CLI-025 filing (2025).';
+const AET_NOTE='CLI Recovery Care Choice is limited-benefit short-term recovery coverage paid as a daily/weekly indemnity — it is not long-term care insurance. The inflation rider increases the facility benefit only; the home care benefit stays level. Rates are from the Texas CLI-025 filing (2025).';
 function aetRun(){ try{
   const o=aetOpts(); const q=AET.quote(o);
-  show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">Aetna · Short Term Care</div></div><div class="config-line">'+aetConfigShort(o).replace(/·/g,'&middot;')+'</div>'
+  show('<div class="res-head">'+mooPriceHead(q)+'<div style="color:var(--muted);font-weight:600">CLI · Recovery Care Choice</div></div><div class="config-line">'+aetConfigShort(o).replace(/·/g,'&middot;')+'</div>'
     +'<div class="resbtns">'+addBtn(o)+'</div>'+stepsBlock(q.steps)+'<div class="disc">'+AET_NOTE+' '+DISC+'</div>');
 }catch(e){ showErr(e.message); } }
 
@@ -5445,7 +5446,7 @@ function qcApplyHealth(op, rating){
     return o; }
   if(isCS(op)) return Object.assign({}, op, {uwClass: rating==='Preferred'?'Preferred':'Standard'});
   if(isNwm(op)) return Object.assign({}, op, {uwClass: (rating==='Class 1'||rating==='Class 2')?rating:'Standard'});
-  return op;   // NGL, OmniFlex and Aetna don't rate by health class
+  return op;   // NGL, OmniFlex and CLI Recovery Care Choice don't rate by health class
 }
 // Inflation: starts on what the command was saved with; pick another to re-run every option at that
 // inflation (matched to each carrier's closest filed option, same rules as the carrier carry-over).
@@ -5853,7 +5854,7 @@ function renderClients(){ if($('clientsList')) renderClientsList(); const btn=$(
 let EDIT_PAT = -1;
 function patternSummary(p){
   if(p.options && p.options.length){
-    const carriers=[...new Set(p.options.map(o=>isNwm(o)?'Northwestern':isAet(o)?'Aetna STC':isOmni(o)?'OmniFlex™':isCS(o)?'CareScout':(isMoo(o)||isMooc(o))?'Mutual of Omaha':'NGL'))].join('/');
+    const carriers=[...new Set(p.options.map(o=>isNwm(o)?'Northwestern':isAet(o)?'CLI Recovery Care Choice':isOmni(o)?'OmniFlex™':isCS(o)?'CareScout':(isMoo(o)||isMooc(o))?'Mutual of Omaha':'NGL'))].join('/');
     const optStr=o=> isAet(o)?('$'+o.facilityDaily+'/day STC') : isNwm(o)?(fmt0(o.monthlyBenefit)+'/'+o.years+'yr') : isOmni(o)?('$'+o.facilityDaily+'/day STC') : isCS(o)?('$'+o.dailyBenefit+'/day') : (fmt0(o.monthlyBenefit)+'/'+(parseInt(o.benefitPeriod)/12)+'yr'+(o.inflation?'/'+(o.inflation*100)+'%':''));
     return carriers+' · '+p.options.length+' option'+(p.options.length>1?'s':'')+': '+p.options.map(optStr).join(', ');
   }
@@ -5930,7 +5931,7 @@ const QCATS = {
   tenpayAnnual:{label:'10-Pay annual premium', v:(o)=>{ const q=tenPayQuote(o); if(!q) return '—'; return fmt(q.annualPremium)+'<div class="pu">per year · 10 years, then paid up</div>'; }},
   carrier:  {label:'Carrier',              v:(o)=> isOmni(o) ? 'Manhattan Life' : isCS(o) ? 'CareScout' : (isMoo(o)||isMooc(o)) ? 'Mutual of Omaha' : 'NGL'},
 };
-// Northwestern & Aetna on the client sheet: their own wording for each line, everything else as before.
+// Northwestern & CLI Recovery Care Choice on the client sheet: their own wording for each line, everything else as before.
 (function(){
   const ck='<span style="color:var(--success);font-weight:800;font-size:1.1rem">✓</span>';
   const N={ period:o=>(+o.years||3)+'-year benefit', pool:o=>fmt0((+o.monthlyBenefit)*12*(+o.years||3)),
@@ -5942,7 +5943,7 @@ const QCATS = {
     projMonthly:o=>'$'+Math.round(AET.projDaily(o,QSHEET.projAge))+'/day', projPool:o=>fmt0(AET.projDaily(o,QSHEET.projAge)*(+o.facilityBP)),
     elim:o=>(+o.facilityEP||0)+'-day wait', inflation:o=>(o.inflation&&o.inflation!=='none')?aetInflLabel(o)+' (facility only)':'None', inflationYN:o=>(o.inflation&&o.inflation!=='none')?ck:'',
     shared:o=>(o.homeCare&&+o.hcWeekly>0)?'$'+o.hcWeekly+'/week · '+((+o.hcBP||+o.facilityBP||360)/90*13)+' weeks':'—', rxbenefit:o=>ck+' $'+(100*Math.max(3,+o.rxUnits||0))+'/yr',
-    marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'Aetna' };
+    marital:o=>o.__couple?'Couple — two individual policies':'—', carrier:o=>'CLI (Continental Life)' };
   Object.keys(QCATS).forEach(k=>{ const orig=QCATS[k].v;
     QCATS[k].v=(o,q)=>{ const T=isNwm(o)?N:isAet(o)?A:null; if(T&&T[k]){ const r=T[k](o,q); if(r!=null) return r; } return orig(o,q); }; });
 })();
@@ -6000,7 +6001,7 @@ function benefitGrowthSection(items, order){
   if(!items.length) return '';
   const uniform = items.every(o=>(+o.age)===(+items[0].age));
   const issueAge = uniform ? +items[0].age : null;
-  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'Aetna STC':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div></th>').join('');
+  const head = '<th>Year</th>'+(uniform?'<th>Age</th>':'')+order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div></th>').join('');
   const rows = GROWTH_YEARS.map(y=>{ const e=y-1; const ageCell = issueAge!=null ? '<td>'+(issueAge+e)+'</td>' : '';
     return '<tr><td><b>'+y+'</b></td>'+ageCell+order.map(idx=>'<td>'+growthCell(items[idx],e)+'</td>').join('')+'</tr>'; }).join('');
   return '<div class="growth-page"><h3 class="growth-h">Benefit growth over time</h3>'
@@ -6286,7 +6287,7 @@ function renderSheet(){
   // option column order (view-only; reset each time the sheet is opened)
   if(!QSHEET.colOrder || QSHEET.colOrder.length!==items.length) QSHEET.colOrder = items.map((_,i)=>i);
   const order = QSHEET.colOrder;
-  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'Aetna STC':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
+  const colHead = order.map((idx,pos)=>'<th>Option '+(pos+1)+'<div class="col-carrier">'+(isNwm(items[idx])?'Northwestern':isAet(items[idx])?'CLI Recovery Care Choice':isOmni(items[idx])?'OmniFlex™':isCS(items[idx])?'CareScout':isMoo(items[idx])?'MutualCare Secure':isMooc(items[idx])?'MutualCare Custom':'NGL — HonestLTC')+'</div>'+(custom&&order.length>1?'<div class="colmove"><button onclick="moveCol('+pos+',-1)" '+(pos===0?'disabled':'')+'>◀</button><button onclick="moveCol('+pos+',1)" '+(pos===order.length-1?'disabled':'')+'>▶</button></div>':'')+'</th>').join('');
   const body = rows.map(key=>{ const cat=QCATS[key]; const label=(typeof cat.label==='function')?cat.label():cat.label;
     const cls=key==='premium'?' class="prem"':(key.indexOf('proj')===0?' class="proj"':'');
     return '<tr'+cls+'><th>'+label+'</th>'+order.map(idx=>'<td>'+cat.v(items[idx],quotes[idx])+'</td>').join('')+'</tr>'; }).join('');
