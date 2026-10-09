@@ -151,38 +151,38 @@ export function evolve(profile, id) {
    answers fill an energy bar; a move spends it. Using one is a free action,
    so the turn still goes to a problem: the maths stays the main event and
    the move is the reward for it. */
-export const ENERGY_MAX = 6;
+export const ENERGY_MAX = 10;
 
 export const MOVES = {
   fire: [
-    { id: 'ember', name: 'Ember Boost', cost: 4, text: 'Your next hit does +30%.', fx: { boost: 1.3 } },
-    { id: 'flame', name: 'Flame Burst', cost: 5, text: 'Blast the foe for an eighth of its health.', fx: { burst: 0.12 } },
-    { id: 'inferno', name: 'Inferno', cost: 6, text: 'Your next hit does +60%.', fx: { boost: 1.6 } },
+    { id: 'ember', name: 'Ember Boost', cost: 6, text: 'Your next hit does +30%.', fx: { boost: 1.3 } },
+    { id: 'flame', name: 'Flame Burst', cost: 8, text: 'Blast the foe for an eighth of its health.', fx: { burst: 0.12 } },
+    { id: 'inferno', name: 'Inferno', cost: 10, text: 'Your next hit does +60%.', fx: { boost: 1.6 } },
   ],
   water: [
-    { id: 'rain', name: 'Healing Rain', cost: 4, text: 'Heal a little health.', fx: { heal: 0.12 } },
-    { id: 'tidal', name: 'Tidal Shield', cost: 5, text: 'Block the next attack completely.', fx: { guard: true } },
-    { id: 'tsunami', name: 'Tsunami', cost: 6, text: 'Crash into the foe for a seventh of its health.', fx: { burst: 0.15 } },
+    { id: 'rain', name: 'Healing Rain', cost: 6, text: 'Heal a little health.', fx: { heal: 0.12 } },
+    { id: 'tidal', name: 'Tidal Shield', cost: 8, text: 'Block the next attack completely.', fx: { guard: true } },
+    { id: 'tsunami', name: 'Tsunami', cost: 10, text: 'Crash into the foe for a seventh of its health.', fx: { burst: 0.15 } },
   ],
   grass: [
-    { id: 'vine', name: 'Vine Wrap', cost: 4, text: 'The foe is tangled and skips its next attack.', fx: { skip: true } },
-    { id: 'leech', name: 'Leech Seed', cost: 5, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.08, drain: true } },
-    { id: 'regrow', name: 'Regrowth', cost: 6, text: 'Heal a good chunk of health.', fx: { heal: 0.22 } },
+    { id: 'vine', name: 'Vine Wrap', cost: 6, text: 'The foe is tangled and skips its next attack.', fx: { skip: true } },
+    { id: 'leech', name: 'Leech Seed', cost: 8, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.08, drain: true } },
+    { id: 'regrow', name: 'Regrowth', cost: 10, text: 'Heal a good chunk of health.', fx: { heal: 0.22 } },
   ],
   storm: [
-    { id: 'static', name: 'Static Shock', cost: 4, text: 'Your next hit ignores armor and resists.', fx: { boost: 1, pierce: true } },
-    { id: 'thunder', name: 'Thunderbolt', cost: 5, text: 'Zap the foe for an eighth of its health.', fx: { burst: 0.12 } },
-    { id: 'tempest', name: 'Tempest', cost: 6, text: 'Your next two hits do +25%.', fx: { boost: 1.25, hits: 2 } },
+    { id: 'static', name: 'Static Shock', cost: 6, text: 'Your next hit ignores armor and resists.', fx: { boost: 1, pierce: true } },
+    { id: 'thunder', name: 'Thunderbolt', cost: 8, text: 'Zap the foe for an eighth of its health.', fx: { burst: 0.12 } },
+    { id: 'tempest', name: 'Tempest', cost: 10, text: 'Your next two hits do +25%.', fx: { boost: 1.25, hits: 2 } },
   ],
   light: [
-    { id: 'shine', name: 'Shine', cost: 4, text: 'Breaks any shield and heals a little.', fx: { unshield: true, heal: 0.06 } },
-    { id: 'barrier', name: 'Barrier', cost: 5, text: 'Block the next attack completely.', fx: { guard: true } },
-    { id: 'beam', name: 'Radiant Beam', cost: 6, text: 'Strike the foe for a seventh of its health.', fx: { burst: 0.15 } },
+    { id: 'shine', name: 'Shine', cost: 6, text: 'Breaks any shield and heals a little.', fx: { unshield: true, heal: 0.06 } },
+    { id: 'barrier', name: 'Barrier', cost: 8, text: 'Block the next attack completely.', fx: { guard: true } },
+    { id: 'beam', name: 'Radiant Beam', cost: 10, text: 'Strike the foe for a seventh of its health.', fx: { burst: 0.15 } },
   ],
   shadow: [
-    { id: 'sneak', name: 'Shadow Sneak', cost: 4, text: 'Your next hit ignores armor and resists, +15%.', fx: { boost: 1.15, pierce: true } },
-    { id: 'drain', name: 'Dark Drain', cost: 5, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.1, drain: true } },
-    { id: 'curse', name: 'Curse', cost: 6, text: 'The foe hits softer for its next three attacks.', fx: { curse: 0.6, curseHits: 3 } },
+    { id: 'sneak', name: 'Shadow Sneak', cost: 6, text: 'Your next hit ignores armor and resists, +15%.', fx: { boost: 1.15, pierce: true } },
+    { id: 'drain', name: 'Dark Drain', cost: 8, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.1, drain: true } },
+    { id: 'curse', name: 'Curse', cost: 10, text: 'The foe hits softer for its next three attacks.', fx: { curse: 0.6, curseHits: 3 } },
   ],
 };
 export const MOVE_BY_ID = Object.fromEntries(Object.values(MOVES).flat().map(m => [m.id, m]));

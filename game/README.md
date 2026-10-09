@@ -414,13 +414,13 @@ answers toward the next stage.
 
 Every type has three moves; a character knows the first from the start,
 learns the second when it evolves and the third at full evolution. Right
-answers give 1 energy each (up to 6) and a move costs 4, 5 or 6. Using one
+answers give 1 energy each (up to 10) and a move costs 6, 8 or 10, about one move a fight. Using one
 is a free action, so the turn still goes to a problem: the maths is the fuel
 and the move is the reward. The energy button sits beside the battle log,
 glows when a move is affordable, and opens a list with locked moves shown
 and when they are learned.
 
-| Type | Stage 1 (4 energy) | Stage 2 (5) | Stage 3 (6) |
+| Type | Stage 1 (6 energy) | Stage 2 (8) | Stage 3 (10) |
 | --- | --- | --- | --- |
 | Fire | Ember Boost: next hit +30% | Flame Burst: 12% of the foe's health | Inferno: next hit +60% |
 | Water | Healing Rain: heal 12% | Tidal Shield: block the next attack | Tsunami: 15% of the foe's health |
@@ -431,7 +431,10 @@ and when they are learned.
 
 The first version (costs 3 to 5, bursts of a fifth to a quarter, heals of a
 fifth to a third) had the soak bot clearing 97% of runs, against about 80%
-without moves, so every move was cut back and costs one more energy.
+without moves. Cutting every move back alone still left it at 91 to 100%:
+the problem was how often, not how strong. Two moves a fight meant two
+blocked attacks, which halved the damage taken. Costs of 6, 8 and 10 make it
+about one a fight, a moment rather than a habit.
 
 Damage moves use the type chart too. The evolution screen announces the new
 move.

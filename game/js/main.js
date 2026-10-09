@@ -915,7 +915,7 @@ function openMoves({ name, type, known, energy, onUse }) {
       const can = learned && energy >= m.cost;
       return `<button class="ms-move ${can ? '' : 'off'}" ${can ? `data-mv="${i}"` : 'disabled'}>
         <span class="ms-name">${learned ? '' : '\u{1F512} '}${m.name}</span>
-        <span class="ms-cost">${'\u26A1'.repeat(m.cost)}</span>
+        <span class="ms-cost">\u26A1 ${m.cost}</span>
         <small>${learned ? m.text : `Learned at evolution stage ${i + 1}.`}</small>
       </button>`;
     }).join('')}`;

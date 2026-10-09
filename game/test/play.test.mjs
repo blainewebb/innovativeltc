@@ -763,7 +763,7 @@ try {
   for (let i = 0; i < 40 && !(await mp.$('.hand, .drill-problem')); i++) await worldTurn(mp, { want: 'grass' });
   ok('a fight has a moves button with energy', /0/.test(await mp.$eval('#movesBtn', e => e.textContent).catch(() => '')));
   let energy = 0;
-  for (let step = 0; step < 40 && energy < 4; step++) {
+  for (let step = 0; step < 60 && energy < 6; step++) {
     if (await mp.$('.drill-problem')) await clearDrill(mp);
     else if (await mp.$('.hand')) {
       if (!(await buildLegalExpression(mp))) { if (await tryReshuffle(mp)) continue; break; }
@@ -772,15 +772,15 @@ try {
     } else break;
     energy = Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 0));
   }
-  ok('right answers fill the energy bar', energy >= 4, `energy ${energy}`);
-  if (energy >= 4) {
+  ok('right answers fill the energy bar', energy >= 6, `energy ${energy}`);
+  if (energy >= 6) {
     await mp.click('#movesBtn');
     await mp.waitForSelector('.moves-sheet');
     ok('the moves sheet shows three moves, two still locked', (await mp.$$('.ms-move')).length === 3 && (await mp.$$('.ms-move[disabled]')).length >= 2);
     await mp.click('.ms-move[data-mv="0"]');
     await mp.waitForSelector('.moves-sheet', { state: 'detached' });
     ok('using a move spends energy and says so', /used/.test(await mp.$eval('.log', e => e.textContent).catch(() => ''))
-       && Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 9)) === energy - 4);
+       && Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 9)) === energy - 6);
   }
   await mp.close();
 
