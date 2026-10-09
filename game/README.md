@@ -414,20 +414,24 @@ answers toward the next stage.
 
 Every type has three moves; a character knows the first from the start,
 learns the second when it evolves and the third at full evolution. Right
-answers give 1 energy each (up to 6) and a move costs 3, 4 or 5. Using one
+answers give 1 energy each (up to 6) and a move costs 4, 5 or 6. Using one
 is a free action, so the turn still goes to a problem: the maths is the fuel
 and the move is the reward. The energy button sits beside the battle log,
 glows when a move is affordable, and opens a list with locked moves shown
 and when they are learned.
 
-| Type | Stage 1 (3 energy) | Stage 2 (4) | Stage 3 (5) |
+| Type | Stage 1 (4 energy) | Stage 2 (5) | Stage 3 (6) |
 | --- | --- | --- | --- |
-| Fire | Ember Boost: next hit +50% | Flame Burst: a fifth of the foe's health | Inferno: next hit doubled |
-| Water | Healing Rain: heal a fifth | Tidal Shield: block the next attack | Tsunami: a quarter of the foe's health |
-| Grass | Vine Wrap: foe skips its next move | Leech Seed: drain 12% | Regrowth: heal a third |
-| Storm | Static Shock: next hit ignores armor and resists | Thunderbolt: a fifth of the foe's health | Tempest: next two hits +40% |
-| Light | Shine: break shields, heal a little | Barrier: block the next attack | Radiant Beam: a quarter of the foe's health |
-| Shadow | Shadow Sneak: next hit pierces, +25% | Dark Drain: drain 15% | Curse: foe hits half as hard for 3 attacks |
+| Fire | Ember Boost: next hit +30% | Flame Burst: 12% of the foe's health | Inferno: next hit +60% |
+| Water | Healing Rain: heal 12% | Tidal Shield: block the next attack | Tsunami: 15% of the foe's health |
+| Grass | Vine Wrap: foe skips its next move | Leech Seed: drain 8% | Regrowth: heal 22% |
+| Storm | Static Shock: next hit ignores armor and resists | Thunderbolt: 12% of the foe's health | Tempest: next two hits +25% |
+| Light | Shine: break shields, heal 6% | Barrier: block the next attack | Radiant Beam: 15% of the foe's health |
+| Shadow | Shadow Sneak: next hit pierces, +15% | Dark Drain: drain 10% | Curse: foe hits 40% softer for 3 attacks |
+
+The first version (costs 3 to 5, bursts of a fifth to a quarter, heals of a
+fifth to a third) had the soak bot clearing 97% of runs, against about 80%
+without moves, so every move was cut back and costs one more energy.
 
 Damage moves use the type chart too. The evolution screen announces the new
 move.
