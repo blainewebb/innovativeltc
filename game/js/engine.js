@@ -717,7 +717,7 @@ export function expectedDrillDamage(rng, mastery, runes, level, samples = 48) {
   return Math.max(1, sum / n);
 }
 
-export const WORLD_PRESSURE = 1.2;
+export const WORLD_PRESSURE = 1.35;
 
 export function spawnEnemy(rng, depth, opts = {}) {
   const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
