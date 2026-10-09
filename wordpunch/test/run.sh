@@ -25,4 +25,8 @@ echo
 echo "== browser playthrough =="
 PORT="$PORT" node test/play.test.mjs || fail=1
 
+echo
+echo "== offline voice =="
+PORT="$PORT" node test/offline.test.mjs || fail=1
+
 exit $fail

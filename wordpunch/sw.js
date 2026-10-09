@@ -2,8 +2,13 @@
    other apps in this repo. Everything is network-first: a fresh deploy shows
    up on the next load, and the cache only answers when there is no network.
    (Cache-first for scripts once left another app in this repo running
-   months-old code behind a fresh page.) Bump CACHE with VERSION in data.js. */
-const CACHE = 'wordpunch-v6';
+   months-old code behind a fresh page.) Bump CACHE with VERSION in data.js.
+   The recorded voice clips are the exception: they're saved for offline in
+   their own cache by voice-sw.js and served from it first. */
+const CACHE = 'wordpunch-v7';
+self.VOICE_DIR = new URL('./voice/', self.location).href;
+importScripts('./js/voice-sw.js');
+
 const SHELL = [
   './',
   './index.html',
@@ -21,6 +26,7 @@ const SHELL = [
   './js/rewards.js',
   './js/prizes.js',
   './js/voice.js',
+  './js/voice-sw.js',
   './voice/manifest.json',
 ];
 
@@ -41,6 +47,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (isClip(url)) { e.respondWith(clipResponse(req)); return; }
   const isPage = req.mode === 'navigate';
   e.respondWith(
     fetch(req).then(res => {
