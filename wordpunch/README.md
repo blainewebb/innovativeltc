@@ -125,8 +125,12 @@ record the new lines, and `--prune` to delete clips no longer used. The voice
 is "Emma - Bright Kids Educator" (`VOICE_ID` to change it). The full set is
 about 1,240 clips and 17,800 characters.
 
-Played clips are saved for offline use as they're heard. A clip that has
-never been played on a device falls back to the device voice when offline.
+Every time the game opens online, the service worker quietly downloads any
+clips the device doesn't have yet (about 7.4 MB for the full set, shared with
+Word Kick) into its own cache, `wordvoice-clips`, which version bumps don't
+clear (`js/voice-sw.js`). After one full download the recorded voice works
+offline. Until then, a question with a clip that isn't saved yet falls back
+to the device voice.
 
 ## Learning from misses
 
@@ -172,6 +176,9 @@ or device is a different set of boxers.
   purpose, wins the Minor Circuit belt, reloads, checks another grade and a
   second boxer, runs the clock out, and checks the hit animation lands on the
   fighter.
+- `test/offline.test.mjs`: installs the service worker, waits for every
+  clip to be saved, then cuts the network and checks the game loads and the
+  clips still play (including the byte-range requests iPhones make).
 
 ## Files
 
@@ -183,5 +190,6 @@ or device is a different set of boxers.
 | `js/art.js` | fighters, player and belts as inline SVG |
 | `js/storage.js` | boxers in localStorage |
 | `js/sfx.js` | WebAudio sounds and read-aloud |
+| `js/voice-sw.js` | saves the voice clips for offline (loaded by both games' service workers) |
 
 Bump `VERSION` in `js/data.js` and `CACHE` in `sw.js` together when shipping.

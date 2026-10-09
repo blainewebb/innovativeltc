@@ -47,7 +47,9 @@ Punch. The prize list is `js/prizes.js`. Every player is made up.
 
 Word Kick reads questions with Word Punch's recorded ElevenLabs clips
 (`../wordpunch/voice/`), falling back to the best voice on the device. See
-Word Punch's README for how the clips are recorded.
+Word Punch's README for how the clips are recorded. The service worker saves
+every clip for offline play the same way Word Punch's does, into the same
+shared cache, so a device that has played either game has them for both.
 
 ## One grade easier than Word Punch
 
@@ -118,6 +120,9 @@ needs). Progress lives in that browser's `localStorage`.
 - `test/play.test.mjs`: plays in Chromium. Makes a player, wins, loses on
   purpose, wins the Local Cup, reloads, uses a star, changes kit, runs the
   clock out, adds a second player, and checks a goal puts the ball in the net.
+- `../wordpunch/test/offline.test.mjs` (with `APP=wordkick/`): installs Word
+  Kick's service worker, waits for every clip to be saved, then checks the
+  game and the clips work with the network cut.
 
 ## Files
 

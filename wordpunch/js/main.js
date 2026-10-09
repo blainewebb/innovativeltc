@@ -740,6 +740,8 @@ if (TEST) window.__wp = { state: () => state, q: null, n: 0, fight: null };
 
 if ('serviceWorker' in navigator && !TEST && location.protocol === 'https:') {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
+  // Save every voice clip for offline play (only fetches what's still missing).
+  navigator.serviceWorker.ready.then(reg => reg.active && reg.active.postMessage('cache-voice')).catch(() => {});
   // Reload once when a NEW worker takes over, so a deploy lands without a
   // second refresh. Skipped on the very first visit, when there was no old one.
   let reloaded = !navigator.serviceWorker.controller;
