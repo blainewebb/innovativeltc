@@ -809,6 +809,12 @@ export function enemyAct(enemy, player, rng) {
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
   enemy.intentIndex += 1;
   const events = [];
+  // A move like Vine Wrap costs it this turn entirely.
+  if (enemy.skipNext) {
+    enemy.skipNext = false;
+    events.push({ type: 'skip', text: `${enemy.name} is tangled up and can't move!` });
+    return { intent, events };
+  }
 
   switch (intent.type) {
     case 'attack':
@@ -816,7 +822,12 @@ export function enemyAct(enemy, player, rng) {
       const block = player.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
       // typeEdge is the enemy's matchup against whoever the player is fighting with.
-      const raw = Math.round((enemy.enraged ? intent.dmg * 2 : intent.dmg) * (enemy.typeEdge || 1));
+      const raw = Math.round((enemy.enraged ? intent.dmg * 2 : intent.dmg) * (enemy.typeEdge || 1) * weakness(enemy));
+      if (player.guard) {
+        player.guard = false;
+        events.push({ type: 'blocked', text: `Your shield blocks ${enemy.name}'s attack!` });
+        break;
+      }
       const dmg = Math.max(1, raw - block);
       player.hp -= dmg;
       events.push({ type: 'damage', amount: dmg, text: `${enemy.name} hits you for ${dmg}.` });
@@ -845,11 +856,20 @@ export function enemyAct(enemy, player, rng) {
   return { intent, events };
 }
 
+/** A cursed enemy hits softer for a few attacks; each call uses one up. */
+function weakness(enemy, spend = true) {
+  const w = enemy.weak;
+  if (!w) return 1;
+  if (spend) { w.hits -= 1; if (w.hits <= 0) enemy.weak = null; }
+  return w.mult;
+}
+
 /** The one-turn warning the player plans against. */
 export function describeIntent(enemy) {
+  if (enemy.skipNext) return { icon: '\u{1F33F}', text: 'Tangled: skips its next move' };
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
   // Matches enemyAct exactly, so the warning is the number that lands.
-  const hit = n => Math.round((enemy.enraged ? n * 2 : n) * (enemy.typeEdge || 1));
+  const hit = n => Math.round((enemy.enraged ? n * 2 : n) * (enemy.typeEdge || 1) * weakness(enemy, false));
   switch (intent.type) {
     case 'attack': return { icon: '\u{1F5E1}\uFE0F', text: `Attack for ${hit(intent.dmg)}` };
     case 'bigAttack': return { icon: '\u{1F4A5}', text: `BIG attack for ${hit(intent.dmg)}` };

@@ -751,6 +751,82 @@ try {
   ok('through the gate is floor 2', /Floor 2\b/.test(await wp.$eval('.wtitle', e => e.textContent).catch(() => '')));
   await wp.close();
 
+  /* ---- special moves ---- */
+  const mp = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  mp.on('pageerror', e => errors.push(e.message));
+  await mp.goto(URL, { waitUntil: 'networkidle' });
+  await mp.fill('#newName', 'Mover2');
+  await mp.click('.grade[data-grade="3"]');
+  await mp.click('#createProfile');
+  await mp.click('#startRun');
+  await mp.waitForSelector('#world');
+  for (let i = 0; i < 40 && !(await mp.$('.hand, .drill-problem')); i++) await worldTurn(mp, { want: 'grass' });
+  ok('a fight has a moves button with energy', /0/.test(await mp.$eval('#movesBtn', e => e.textContent).catch(() => '')));
+  let energy = 0;
+  for (let step = 0; step < 30 && energy < 3; step++) {
+    if (await mp.$('.drill-problem')) await clearDrill(mp);
+    else if (await mp.$('.hand')) {
+      if (!(await buildLegalExpression(mp))) { if (await tryReshuffle(mp)) continue; break; }
+      const ex = await readExpression(mp);
+      await typeNumber(mp, ex.answer, '#strike');
+    } else break;
+    energy = Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 0));
+  }
+  ok('right answers fill the energy bar', energy >= 3, `energy ${energy}`);
+  if (energy >= 3) {
+    await mp.click('#movesBtn');
+    await mp.waitForSelector('.moves-sheet');
+    ok('the moves sheet shows three moves, two still locked', (await mp.$$('.ms-move')).length === 3 && (await mp.$$('.ms-move[disabled]')).length >= 2);
+    await mp.click('.ms-move[data-mv="0"]');
+    await mp.waitForSelector('.moves-sheet', { state: 'detached' });
+    ok('using a move spends energy and says so', /used/.test(await mp.$eval('.log', e => e.textContent).catch(() => ''))
+       && Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 9)) === energy - 3);
+  }
+  await mp.close();
+
+  /* ---- versus ---- */
+  const vp = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  vp.on('pageerror', e => errors.push(e.message));
+  await vp.goto(URL, { waitUntil: 'networkidle' });
+  for (const [n, g] of [['Ann', 4], ['Ben', 2]]) {
+    if (await vp.$('#switchBtn')) await vp.click('#switchBtn');
+    await vp.fill('#newName', n); await vp.click(`.grade[data-grade="${g}"]`); await vp.click('#createProfile');
+    await vp.waitForSelector('#startRun');
+    if (n === 'Ann') ok('no versus button with only one hero', !(await vp.$('#versusBtn')));
+  }
+  ok('two heroes on a device can battle each other', !!(await vp.$('#versusBtn')));
+  await vp.click('#versusBtn');
+  await vp.click('[data-vs]');
+  await vp.waitForSelector('#vsReady');
+  ok('the cover screen hides the problem until the player is ready', !(await vp.$('.drill-problem')) && /Pass the device/.test(await vp.$eval('.panel', e => e.textContent)));
+  const seenProblems = { Ann: [], Ben: [] };
+  let vsTurns = 0;
+  for (let i = 0; i < 120 && !(await vp.$('#rematch')); i++) {
+    if (await vp.$('#vsReady')) { await vp.click('#vsReady'); continue; }
+    if (await vp.$('#vsGo')) {
+      vsTurns++;
+      const bar = await vp.$eval('.topbar', e => e.textContent).catch(() => null);
+      if (bar === null) continue; // caught mid-switch between turns
+      const who = bar.includes('Ann') ? 'Ann' : 'Ben';
+      const parts = await vp.$$eval('.drill-problem .dp', els => els.map(e => e.textContent.trim()));
+      if (parts.length === 3) seenProblems[who].push(OPS[parts[1]](Number(parts[0]), Number(parts[2])));
+      const ans = parts.length === 3 ? OPS[parts[1]](Number(parts[0]), Number(parts[2])) : 7;
+      await typeNumber(vp, ans, '#vsGo');
+      await vp.waitForSelector('#app:not([data-busy])');
+      continue;
+    }
+    if (await vp.$('#evoOk')) { await vp.click('#evoOk'); continue; }
+    break;
+  }
+  ok('a versus battle ends with a winner', !!(await vp.$('#rematch')) && /WINS!/.test(await vp.$eval('.vbanner', e => e.textContent)));
+  ok('both players got turns', seenProblems.Ann.length > 1 && seenProblems.Ben.length > 1, JSON.stringify(seenProblems));
+  ok('the winner gets a trophy and gold for the next run', /\+15 gold/.test(await vp.$eval('.vpanel', e => e.textContent)) && /Champion/.test(await vp.$eval('.vpanel', e => e.textContent)));
+  const banked = await vp.evaluate(() => JSON.parse(localStorage.getItem('runebreaker.v1')).profiles.map(p => ({ n: p.name, gold: p.meta.bankGold || 0, answered: p.days.reduce((s, d) => s + d.correct + d.wrong, 0) })));
+  ok('both kids\' answers went on their own report cards', banked.filter(x => ['Ann', 'Ben'].includes(x.n)).every(x => x.answered > 0), JSON.stringify(banked));
+  await vp.click('#home');
+  await vp.waitForSelector('#startRun');
+  await vp.close();
+
   /* ---- evolving ---- */
   const evoPage = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   evoPage.on('pageerror', e => errors.push(e.message));

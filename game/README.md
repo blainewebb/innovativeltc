@@ -410,6 +410,47 @@ by type (Ember Newt to Blaze Newt to Inferno Newt; Fox to Blaze Fox), a
 glow in its type's colour, and stars. The team screen shows a bar of right
 answers toward the next stage.
 
+## Special moves
+
+Every type has three moves; a character knows the first from the start,
+learns the second when it evolves and the third at full evolution. Right
+answers give 1 energy each (up to 6) and a move costs 3, 4 or 5. Using one
+is a free action, so the turn still goes to a problem: the maths is the fuel
+and the move is the reward. The energy button sits beside the battle log,
+glows when a move is affordable, and opens a list with locked moves shown
+and when they are learned.
+
+| Type | Stage 1 (3 energy) | Stage 2 (4) | Stage 3 (5) |
+| --- | --- | --- | --- |
+| Fire | Ember Boost: next hit +50% | Flame Burst: a fifth of the foe's health | Inferno: next hit doubled |
+| Water | Healing Rain: heal a fifth | Tidal Shield: block the next attack | Tsunami: a quarter of the foe's health |
+| Grass | Vine Wrap: foe skips its next move | Leech Seed: drain 12% | Regrowth: heal a third |
+| Storm | Static Shock: next hit ignores armor and resists | Thunderbolt: a fifth of the foe's health | Tempest: next two hits +40% |
+| Light | Shine: break shields, heal a little | Barrier: block the next attack | Radiant Beam: a quarter of the foe's health |
+| Shadow | Shadow Sneak: next hit pierces, +25% | Dark Drain: drain 15% | Curse: foe hits half as hard for 3 attacks |
+
+Damage moves use the type chart too. The evolution screen announces the new
+move.
+
+## Battle a friend
+
+With two or more heroes on a device, camp shows **Battle a friend**. The two
+teams take turns on the one device; a cover screen ("Pass the device to
+Max") hides everything between turns. Each turn is one problem at **that
+kid's own level**, on a clock set from **their own** speed, so brothers years
+apart are an even match. A right answer attacks for 10, times the type
+matchup, evolution power, any move boost, and up to +50% for answering
+quickly; a wrong one misses and shows the answer. Both start on 80 health.
+Moves, team switching and energy all work as in a run.
+
+Every answer goes on that kid's report card and right answers help their
+characters evolve. The winner gets the Champion trophy and 15 gold added to
+their next run. Nothing is taken from the loser.
+
+It is one device only. Two devices would need an online service to connect
+them (sign-ins, a server, possibly a monthly cost), which the game does not
+have and does not need for anything else.
+
 ## Seasons
 
 By the device's date: October is **Halloween**, November **Thanksgiving**,

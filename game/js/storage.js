@@ -67,7 +67,7 @@ export function newProfile(name, avatar, grade = 0) {
     prefs: { drills: true },
     records: { deepest: 0, runs: 0, bossesFelled: 0, wins: 0, bestEndless: 0, floorsBeaten: 0,
                fightsWon: 0, bestStreak: 0, flawlessFights: 0, flawlessBosses: 0, fastAnswers: 0,
-               levelSeen: 0 },
+               levelSeen: 0, versusWins: 0 },
     /* One entry per day the kid played: { date:'YYYY-MM-DD', ms, correct, wrong } */
     days: [],
   };
