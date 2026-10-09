@@ -253,7 +253,7 @@ try {
       }
     }
     // Spend energy on a move whenever one is ready, the way a kid would.
-    if (await page.$('#movesBtn.ready') && !(await page.$('#app[data-busy]'))) {
+    if (!process.env.NOMOVES && await page.$('#movesBtn.ready') && !(await page.$('#app[data-busy]'))) {
       await page.click('#movesBtn');
       const mv = await page.$$('.ms-move[data-mv]');
       if (mv.length) { await mv[mv.length - 1].click(); seen.add('move'); }
@@ -363,7 +363,7 @@ try {
   // Twelve heroes across sixty floors, so several runs must produce some.
   ok('heroes are earned along the way', seen.has('avatar-earned'), [...seen].join(','));
   ok('walked the world', seen.has('map'));
-  ok('used a special move', seen.has('move'));
+  if (!process.env.NOMOVES) ok('used a special move', seen.has('move'));
   ok('fought a trainer', seen.has('trainer'), [...seen].join(','));
   ok('a trainer sent out a second monster', seen.has('trainer-next'), [...seen].join(','));
   ok('saw a victory screen', seen.has('victory'));
