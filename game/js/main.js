@@ -823,7 +823,9 @@ function startBattle(enemy, reward) {
     battle.log = [`${enemy.name} challenges you to a duel. Answer, or be hit.`];
   }
   applyFighter();
-  battle.energy = 0;
+  // Energy is the run's, not the fight's: a short early fight would otherwise
+  // end before a single move could be afforded.
+  run.player.energy = run.player.energy || 0;
   run.player.guard = false;
   run.player.boost = null;
   const o = TYPES[enemy.type];
@@ -879,9 +881,9 @@ function logRow() {
 
 function movesBtnHtml() {
   const known = movesOf(profile, battle.fighter);
-  const ready = known.some(m => m.cost <= battle.energy);
+  const ready = known.some(m => m.cost <= run.player.energy);
   return `<button class="moves-btn ${ready ? 'ready' : ''}" id="movesBtn" title="Special moves">
-    <span>\u2728</span><b>${battle.energy || 0}</b><small>\u26A1 energy</small></button>`;
+    <span>\u2728</span><b>${run.player.energy || 0}</b><small>\u26A1 energy</small></button>`;
 }
 
 function refreshMovesBtn() {
@@ -895,7 +897,7 @@ function wireMoves() {
     ev.stopPropagation();
     if (app.dataset.busy) return;
     const f = battle.fighter;
-    openMoves({ name: form(f).name, type: f.type, known: movesOf(profile, f).length, energy: battle.energy || 0, onUse: useMove });
+    openMoves({ name: form(f).name, type: f.type, known: movesOf(profile, f).length, energy: run.player.energy || 0, onUse: useMove });
   };
 }
 
@@ -928,9 +930,9 @@ function closeMoves() { app.querySelectorAll('.moves-sheet').forEach(x => x.remo
 
 function useMove(mv) {
   const p = run.player, e = battle.enemy, f = battle.fighter;
-  if ((battle.energy || 0) < mv.cost || app.dataset.busy) return;
+  if ((run.player.energy || 0) < mv.cost || app.dataset.busy) return;
   closeMoves();
-  battle.energy -= mv.cost;
+  run.player.energy -= mv.cost;
   const out = applyMove(mv, p, e, f.type, e.type);
   const bits = [];
   if (out.dmg) bits.push(`${out.dmg} damage${effNote(f.type, e.type)}`);
@@ -1498,7 +1500,7 @@ function tally(correct, ms) {
   // Every right answer helps whoever is fighting evolve, and charges a move.
   if (correct) {
     addXp(profile, battle.fighter.id);
-    battle.energy = Math.min(ENERGY_MAX, (battle.energy || 0) + 1);
+    run.player.energy = Math.min(ENERGY_MAX, (run.player.energy || 0) + 1);
   }
 }
 

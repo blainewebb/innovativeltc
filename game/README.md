@@ -418,7 +418,7 @@ answers toward the next stage.
 
 Every type has three moves; a character knows the first from the start,
 learns the second when it evolves and the third at full evolution. Right
-answers give 1 energy each (up to 10) and a move costs 6, 8 or 10, about one move a fight. Using one
+answers give 1 energy each (up to 10) and a move costs 6, 8 or 10. Energy carries from fight to fight for the whole run: an early wild monster often falls in four or five answers, so energy that reset each fight meant almost no moves on the first floors. Using one
 is a free action, so the turn still goes to a problem: the maths is the fuel
 and the move is the reward. The energy button sits beside the battle log,
 glows when a move is affordable, and opens a list with locked moves shown

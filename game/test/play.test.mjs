@@ -762,15 +762,21 @@ try {
   await mp.waitForSelector('#world');
   for (let i = 0; i < 40 && !(await mp.$('.hand, .drill-problem')); i++) await worldTurn(mp, { want: 'grass' });
   ok('a fight has a moves button with energy', /0/.test(await mp.$eval('#movesBtn', e => e.textContent).catch(() => '')));
+  // Energy carries from fight to fight, so keep playing (through wins and
+  // back into the grass) until a move is affordable.
   let energy = 0;
-  for (let step = 0; step < 60 && energy < 6; step++) {
+  for (let step = 0; step < 160 && energy < 6; step++) {
     if (await mp.$('.drill-problem')) await clearDrill(mp);
     else if (await mp.$('.hand')) {
-      if (!(await buildLegalExpression(mp))) { if (await tryReshuffle(mp)) continue; break; }
+      if (!(await buildLegalExpression(mp))) { if (!(await tryReshuffle(mp))) await toHand(mp); continue; }
       const ex = await readExpression(mp);
       await typeNumber(mp, ex.answer, '#strike');
-    } else break;
-    energy = Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => 0));
+    } else if (await mp.$('#world')) { await worldTurn(mp, { want: 'grass' }); continue; }
+    else if (await mp.$('.win-scene')) { await mp.click('#cont', { force: true }); if (await mp.$('#cont')) await mp.click('#cont'); continue; }
+    else if (await mp.$('#evoOk')) { await mp.click('#evoOk'); continue; }
+    else if (await mp.$('.choice')) { await mp.click('.choice'); continue; }
+    else break;
+    energy = Number(await mp.$eval('#movesBtn b', e => e.textContent).catch(() => energy));
   }
   ok('right answers fill the energy bar', energy >= 6, `energy ${energy}`);
   if (energy >= 6) {
