@@ -352,8 +352,12 @@ decorations.
 
 **Balance.** On the old menu a kid picked one thing per floor; in the world
 they can do all of it, which means more healing and more prizes. The healer
-was cut from 50% to 25% of max health to compensate (see the numbers in the
-balance note below).
+was cut from 50% to 25% of max health, but a later soak run with the bot
+using no special moves still cleared 35 of 35 runs (an earlier ~80% had been
+flattered by the bot wandering into extra grass fights). Enemies now hit 35%
+harder (`WORLD_PRESSURE` in engine.js). With moves in use, the soak bot
+clears 82% with no grade set (31/38) and 81% at 8th grade (29/36), about
+where the game sat before the world.
 
 ## Types, catching and the team
 
