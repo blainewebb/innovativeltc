@@ -717,6 +717,8 @@ export function expectedDrillDamage(rng, mastery, runes, level, samples = 48) {
   return Math.max(1, sum / n);
 }
 
+export const WORLD_PRESSURE = 1.2;
+
 export function spawnEnemy(rng, depth, opts = {}) {
   const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
           ceiling = null, armorBase = null, duel = false, season = null } = opts;
@@ -746,7 +748,11 @@ export function spawnEnemy(rng, depth, opts = {}) {
      blows are heavy. Parrying one is clearly worth the answer; missing one
      hurts. Without this a duel is the safest floor in the run, because a
      fluent player blunts every hit and the fight carries no threat at all. */
-  const share = Math.min(0.07, 0.03 + depth * 0.002)
+  /* The walkable world lets a kid do everything on a floor (trainers' relics,
+     the healer, quests), where the old menu was one thing per floor; the
+     soak bot then cleared every run. Enemies hit 20% harder to keep a careful
+     player under some pressure. */
+  const share = WORLD_PRESSURE * Math.min(0.07, 0.03 + depth * 0.002)
     * (boss ? 1.3 : elite ? 1.15 : 1)
     /* Nearly every duel turn is an attack now that jam and shield are gone,
        where an ordinary boss attacks on about half its turns. The multiplier
