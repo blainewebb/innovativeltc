@@ -155,6 +155,7 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
 .ans.right { background: var(--ok); color: #fff; box-shadow: 0 6px 0 #2c7428; }
 .ans.right .lc { color: #e6f5e4; }
 .answers.wait .ans { pointer-events: none; }
+.stage.locked { pointer-events: none; }
 
 @keyframes wobble { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-8px) } 75% { transform: translateX(8px) } }
 @keyframes hop { 0% { transform: scale(1) } 40% { transform: scale(1.25) translateY(-8px) } 100% { transform: scale(1) } }
@@ -274,18 +275,26 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
     if (current) { try { current.stop(); } catch (e) {} current = null; }
     if (window.speechSynthesis) speechSynthesis.cancel();
   }
+  // Phones can pause audio without warning (a call, the lock screen, iOS "interrupted"),
+  // and then a clip never reports that it ended. Every clip gets a deadline so the game
+  // never waits forever on sound.
   function playOne(name, my) {
-    return load(name).then(buf => new Promise(res => {
+    return Promise.race([load(name), wait(4000).then(() => null)]).then(buf => new Promise(res => {
       if (my !== token) return res();
+      if (ctx && ctx.state !== 'running' && ctx.resume) ctx.resume().catch(() => {});
+      let done = false;
+      const finish = () => { if (!done) { done = true; res(); } };
       if (buf) {
         const src = ctx.createBufferSource();
         src.buffer = buf; src.connect(ctx.destination);
-        src.onended = () => { if (current === src) current = null; res(); };
+        src.onended = () => { if (current === src) current = null; finish(); };
         current = src; src.start();
+        setTimeout(finish, buf.duration * 1000 + 800);
       } else if (window.speechSynthesis && TEXT[name]) {
         const u = new SpeechSynthesisUtterance(TEXT[name]);
-        u.rate = 0.9; u.onend = res; u.onerror = res; speechSynthesis.speak(u);
-      } else res();
+        u.rate = 0.9; u.onend = finish; u.onerror = finish; speechSynthesis.speak(u);
+        setTimeout(finish, 6000);
+      } else finish();
     }));
   }
   async function say(...names) {
@@ -346,6 +355,7 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
 
   // ---------- round state ----------
   let game = null, qIndex = 0, starsWon = 0, replay = () => {};
+  let session = 0; // bumps when a game starts or the player goes home, so stale timers never move the game on
 
   function drawStars() {
     $('stars').innerHTML = Array.from({ length: ROUND }, (_, i) => STAR.replace('class="star"', `class="star${i < starsWon ? ' on' : ''}"`)).join('');
@@ -353,11 +363,14 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
 
   function startGame(g) {
     game = g; qIndex = 0; starsWon = 0;
+    const my = ++session;
+    replay = () => {};
     show('playScreen'); drawStars();
-    say({ letters: 'm_letters', count: 'm_count', add: 'm_add' }[g]).then(ok => ok && next());
+    say({ letters: 'm_letters', count: 'm_count', add: 'm_add' }[g]).then(() => { if (my === session) next(); });
   }
 
   function next() {
+    $('stage').classList.remove('locked');
     if (qIndex >= ROUND) return finish();
     qIndex++;
     ({ letters: letterQ, count: countQ, add: addQ })[game]();
@@ -388,9 +401,14 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
         if (opt === correct) {
           finished = true;
           b.classList.add('right'); box.classList.add('wait');
+          $('stage').classList.add('locked');
+          replay = () => {};
           starsWon++; drawStars(); burst();
-          const ok = await say(...onRight());
-          if (ok) { await wait(350); next(); }
+          // Move on once the praise is done, even if a tap or a phone hiccup cut the sound short.
+          const my = session;
+          await say(...onRight());
+          await wait(350);
+          if (my === session) next();
         } else {
           misses++;
           b.classList.add('wrong');
@@ -468,21 +486,26 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
     async function countTogether() {
       autoCounting = true;
       $('answers').classList.add('wait');
-      if (!(await say('together'))) return;
-      const crits = [...herd.children];
-      crits.forEach(c => { c.classList.remove('counted', 'hop'); const t = c.querySelector('.tag'); if (t) t.remove(); });
-      $('counter').textContent = '';
-      const my = token;
-      for (let i = 0; i < crits.length; i++) {
-        if (my !== token) return;
-        crits[i].classList.add('counted', 'hop');
-        crits[i].insertAdjacentHTML('beforeend', `<span class="tag">${i + 1}</span>`);
-        $('counter').textContent = i + 1;
-        await playOne('n' + (i + 1), my);
-        await wait(150);
+      try {
+        if (!(await say('together'))) return;
+        const crits = [...herd.children];
+        crits.forEach(c => { c.classList.remove('counted', 'hop'); const t = c.querySelector('.tag'); if (t) t.remove(); });
+        $('counter').textContent = '';
+        const my = token;
+        for (let i = 0; i < crits.length; i++) {
+          if (my !== token) return;
+          crits[i].classList.add('counted', 'hop');
+          crits[i].insertAdjacentHTML('beforeend', `<span class="tag">${i + 1}</span>`);
+          $('counter').textContent = i + 1;
+          await playOne('n' + (i + 1), my);
+          await wait(150);
+        }
+        counted = n;
+      } finally {
+        // Always hand control back, even if the counting was interrupted.
+        autoCounting = false;
+        $('answers').classList.remove('wait');
       }
-      counted = n; autoCounting = false;
-      $('answers').classList.remove('wait');
     }
     answers(numberOptions(n, 1, Math.max(hi, 6)), n, numRender, () => ['n' + n, praise()], countTogether);
     replay = () => say('count_q');
@@ -525,7 +548,9 @@ button:focus-visible { outline: 4px solid var(--plum); outline-offset: 3px; }
     Object.keys(TEXT).forEach((n, i) => setTimeout(() => load(n), 30 * i));
   };
   document.querySelectorAll('.game-card').forEach(b => b.onclick = () => startGame(b.dataset.game));
-  $('homeBtn').onclick = () => { stopAll(); show('menuScreen'); };
+  $('homeBtn').onclick = () => { session++; stopAll(); show('menuScreen'); };
+  // iOS can leave audio paused after an interruption; any tap wakes it back up.
+  document.addEventListener('pointerdown', () => { if (ctx && ctx.state !== 'running' && ctx.resume) ctx.resume().catch(() => {}); });
   $('againBtn').onclick = () => replay();
   document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); else if (ctx && ctx.resume) ctx.resume(); });
 })();
