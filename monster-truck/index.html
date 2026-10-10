@@ -330,9 +330,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
       <legend>Voice and sound</legend>
       <label for="quietMode"><input type="checkbox" id="quietMode"> Quiet mode (no talking, no sound — questions he can do by looking)</label>
       <label for="sfxOn"><input type="checkbox" id="sfxOn"> Sound effects (crunches, honks)</label>
+      <label for="recVoice"><input type="checkbox" id="recVoice"> Recorded voice (Emma). Turn off to use this device's voice instead.</label>
       <div class="vrow"><label for="voiceSel" style="flex:1">Voice <select id="voiceSel"></select></label></div>
       <div class="vrow"><label for="voiceRate" style="flex:1">Speed <input type="range" id="voiceRate" min="0.6" max="1.15" step="0.05"></label><button class="btn small" id="testVoice" type="button">Test voice</button></div>
-      <p class="tip" id="voiceTip">The voices come from this device. Voices marked "Natural", "Premium" or "Enhanced" sound the most human. On an iPad or iPhone, go to Settings › Accessibility › Spoken Content › Voices › English, download "Ava (Premium)" or "Samantha (Enhanced)", then reload this page. On a Windows PC, the Microsoft Edge browser has the most natural voices.</p>
+      <p class="tip" id="voiceTip">The voice and speed above are for this device's voice, used when the recorded voice is off or a line has no recording (like a name that wasn't recorded). The device voices come from this device. Voices marked "Natural", "Premium" or "Enhanced" sound the most human. On an iPad or iPhone, go to Settings › Accessibility › Spoken Content › Voices › English, download "Ava (Premium)" or "Samantha (Enhanced)", then reload this page. On a Windows PC, the Microsoft Edge browser has the most natural voices.</p>
     </fieldset>
     <fieldset>
       <legend>What to practice</legend>
@@ -367,6 +368,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
   </form>
 </div>
 
+<script src="content.js"></script>
 <script>
 (() => {
 'use strict';
@@ -384,7 +386,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem('mts:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('mts:' + k, JSON.stringify(v)); } catch (e) {} }
 };
-const DEFAULTS = { skills: { count: true, add: true, big: true, words: true }, countMax: 10, addMax: 4, bigMax: 20, wordLevel: 1, name: '', sfx: true, quiet: false, voiceName: '', rate: 0.9, autoRead: true, raceEvery: 3 };
+const DEFAULTS = { skills: { count: true, add: true, big: true, words: true }, countMax: 10, addMax: 4, bigMax: 20, wordLevel: 1, name: '', sfx: true, quiet: false, voiceName: '', rate: 0.9, recVoice: true, autoRead: true, raceEvery: 3 };
 const settings = Object.assign({}, DEFAULTS, store.get('settings', {}));
 settings.skills = Object.assign({}, DEFAULTS.skills, settings.skills || {});
 const blankStats = () => ({ count: [0, 0], add: [0, 0], big: [0, 0], letters: [0, 0], words: [0, 0] });
@@ -393,44 +395,20 @@ progress.stats = Object.assign(blankStats(), progress.stats || {});
 const saveSettings = () => store.set('settings', settings);
 const saveProgress = () => store.set('progress', progress);
 
-/* ---------- content ---------- */
-const WORDS = [
-  ['the', 'in', 'on', 'a', 'I', 'is', 'it', 'up', 'go'],
-  ['me', 'my', 'we', 'to', 'and', 'see', 'can', 'no', 'at'],
-  ['big', 'run', 'you', 'look', 'stop', 'car', 'mud', 'red', 'jump', 'like', 'here', 'said']
-];
+/* ---------- content (content.js) ---------- */
+const { WORDS, PIC_WORDS, ANIMALS, LETTER, TRUCKS, PRAISE, NAMES, ORD, LINE } = MTS;
 const wordPool = () => WORDS.slice(0, settings.wordLevel).flat();
-// Picture words for quiet mode: see the picture, find the word.
-const PIC_WORDS = [
-  ['car', '🚗'], ['bus', '🚌'], ['sun', '☀️'], ['dog', '🐶'], ['cat', '🐱'], ['pig', '🐷'], ['hat', '🎩'], ['bed', '🛏️'],
-  ['cup', '🥤'], ['bug', '🐛'], ['fox', '🦊'], ['cow', '🐮'], ['egg', '🥚'], ['box', '📦'], ['bat', '🦇'], ['map', '🗺️']
-];
-// Animals for "what letter does it start with?". Third entry: letters never offered as wrong
-// choices because they fit another name for the picture (puppy, kitty, bunny, pony, bird).
-const ANIMALS = [
-  ['dog', '🐶', 'p'], ['cat', '🐱', 'k'], ['pig', '🐷'], ['cow', '🐮'], ['fox', '🦊'], ['bee', '🐝'], ['owl', '🦉', 'b'],
-  ['duck', '🦆', 'b'], ['frog', '🐸'], ['bear', '🐻'], ['lion', '🦁'], ['fish', '🐟'], ['snake', '🐍'], ['zebra', '🦓', 'h'],
-  ['monkey', '🐵'], ['tiger', '🐯', 'c'], ['horse', '🐴', 'p'], ['mouse', '🐭', 'r'], ['whale', '🐳', 'f'], ['ant', '🐜', 'b'],
-  ['turtle', '🐢'], ['rabbit', '🐰', 'b'], ['penguin', '🐧', 'b'], ['elephant', '🐘']
-];
 // Speech engines misread tiny words said on their own ("the" as "thee", "I" as "one", "in" as "inches").
 const PRON = { the: 'thuh', a: 'uh', I: 'eye', in: 'inn', said: 'sed', to: 'too', is: 'iz', no: 'no.' };
 const sw = w => PRON[w] || w;
-const LETTER = { a: 'ay', b: 'bee', c: 'see', d: 'dee', e: 'ee', f: 'eff', g: 'jee', h: 'aitch', i: 'eye', j: 'jay', k: 'kay', l: 'el', m: 'em', n: 'en', o: 'oh', p: 'pee', q: 'cue', r: 'ar', s: 'ess', t: 'tee', u: 'you', v: 'vee', w: 'double you', x: 'ex', y: 'why', z: 'zee' };
-const TRUCKS = [
-  { name: 'Big Red', body: '#E23B2E', trim: '#FFC61A', deco: 'flames', need: 0 },
-  { name: 'Blue Thunder', body: '#2F6FE0', trim: '#FFE14D', deco: 'bolt', need: 1 },
-  { name: 'Dino Crusher', body: '#34A853', trim: '#FFFFFF', deco: 'teeth', need: 2 },
-  { name: 'Tiger Stripe', body: '#FF8A1F', trim: '#231911', deco: 'stripes', need: 3 },
-  { name: 'Purple Rumble', body: '#8A4FD8', trim: '#8EF0FF', deco: 'stars', need: 5 }
-];
 const CAR_COLORS = ['#E23B2E', '#2F6FE0', '#FFC61A', '#34A853', '#FF8A1F', '#8A4FD8', '#16B5B0', '#F26DB0'];
-const PRAISE = ['Yes!', 'You got it!', 'Awesome!', 'Great job!', 'Super smash!', 'Way to go!', 'Nailed it!'];
 
 /* ---------- audio ---------- */
 let ac = null, master = null, engine = null, noiseBuf = null, lastEngine = -1;
 function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  // Play like media, so the voice isn't muted by an iPhone or iPad's silent switch (Safari 16.4+).
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; return; }
   master = ac.createGain(); master.gain.value = soundOn() ? 1 : 0; master.connect(ac.destination);
   const len = ac.sampleRate * 0.6; noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
@@ -515,18 +493,77 @@ function pickVoice() {
   if (!$('parentOv').hidden) fillVoices();
 }
 if (synth) { pickVoice(); try { synth.addEventListener('voiceschanged', pickVoice); } catch (e) { synth.onvoiceschanged = pickVoice; } }
-function say(text, opt = {}) {
-  if (!synth || settings.quiet) return;
-  if (opt.interrupt) synth.cancel();
+// Recorded voice: clips listed in voice/manifest.json (Emma, recorded with ElevenLabs).
+// say() takes a line or a list of lines (from LINE in content.js). When every one has a clip they
+// play back to back; otherwise the device voice reads opt.device (or the lines joined).
+let CLIPS = {};
+fetch('voice/manifest.json').then(r => r.ok ? r.json() : {}).then(m => { CLIPS = m || {}; }).catch(() => {});
+const hasClips = () => settings.recVoice && Object.keys(CLIPS).length > 0;
+const clipBufs = new Map();
+function loadClip(key) {
+  let p = clipBufs.get(key);
+  if (!p) {
+    p = fetch('voice/' + CLIPS[key]).then(r => { if (!r.ok) throw new Error('clip ' + r.status); return r.arrayBuffer(); })
+      .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)));
+    clipBufs.set(key, p);
+    p.catch(() => clipBufs.delete(key));
+  }
+  return p;
+}
+let vq = [], vBusy = false, vGen = 0, vSrc = null, vOut = null;
+function pumpVoice() {
+  if (vBusy || !vq.length) return;
+  const key = vq.shift(), gen = vGen;
+  vBusy = true;
+  loadClip(key).then(buf => {
+    if (gen !== vGen) return;
+    if (!vOut) { vOut = ac.createGain(); vOut.connect(ac.destination); }
+    const src = ac.createBufferSource(); src.buffer = buf; src.connect(vOut); vSrc = src;
+    let done = false;
+    // A paused or interrupted audio context never reports the end, so a timer backs it up.
+    const end = () => {
+      if (done) return; done = true; clearTimeout(guard);
+      if (gen !== vGen) return;
+      vSrc = null;
+      setTimeout(() => { if (gen === vGen) { vBusy = false; pumpVoice(); } }, 110);
+    };
+    const guard = setTimeout(end, (buf.duration + 1.5) * 1000);
+    src.onended = end; src.start();
+  }, () => {
+    if (gen !== vGen) return;
+    const rest = [key, ...vq]; vq = []; vBusy = false;
+    deviceSay(rest.join(' '));
+  });
+}
+function stopClips() { vGen++; vq = []; vBusy = false; if (vSrc) { try { vSrc.stop(); } catch (e) {} vSrc = null; } }
+function hush() { stopClips(); if (synth) synth.cancel(); }
+function deviceSay(text, opt = {}) {
+  if (!synth) return;
   const u = new SpeechSynthesisUtterance(text);
   if (voice) u.voice = voice;
   u.lang = (voice && voice.lang) || 'en-US';
   u.rate = clamp(settings.rate * (opt.rate || 0.9) / 0.9, 0.5, 1.4); u.pitch = opt.pitch || 1.05;
   synth.speak(u);
 }
-const speaking = () => !settings.quiet && !!(synth && (synth.speaking || synth.pending));
+function say(lines, opt = {}) {
+  if (settings.quiet) return;
+  lines = [].concat(lines);
+  if (opt.interrupt) hush();
+  if (ac && hasClips() && lines.every(k => CLIPS[k])) {
+    lines.forEach(loadClip);
+    vq.push(...lines); pumpVoice();
+  } else deviceSay(opt.device || lines.join(' '), opt);
+}
+const speaking = () => !settings.quiet && (vBusy || vq.length > 0 || !!(synth && (synth.speaking || synth.pending)));
 const spell = w => w.toLowerCase().split('').map(ch => LETTER[ch] || ch).join(', ');
-const praise = () => (settings.name && Math.random() < 0.4) ? `Great job, ${settings.name}!` : pick(PRAISE);
+// The kid's name as recorded (any capitalization), if it was recorded.
+const nameKey = () => NAMES.find(n => n.toLowerCase() === settings.name.trim().toLowerCase()) || settings.name;
+// A cheer with the name only when it can be said in the voice in use.
+const nameSayable = line => !hasClips() || !!CLIPS[line];
+function praise() {
+  if (settings.name && Math.random() < 0.4) { const k = LINE.nameCheer(nameKey()); if (nameSayable(k)) return k; }
+  return LINE.praise(Math.floor(Math.random() * PRAISE.length));
+}
 
 /* ---------- timed callbacks (paused with the game) ---------- */
 let waits = [];
@@ -655,7 +692,7 @@ function letterQ() {
   const fromAnimals = shuffle([...new Set(ANIMALS.map(p => p[0][0]))].filter(l => !banned.has(l)));
   const extra = shuffle(ALPHA.filter(l => !banned.has(l)));
   const opts = shuffle([ans, ...[...new Set([...fromAnimals, ...extra])].slice(0, 2)]).map(l => l.toUpperCase());
-  return { kind: 'words', mode: 'letter', stat: 'letters', word, pic, key: 'l' + word, answer: ans.toUpperCase(), options: opts, speech: `What letter does... ${word}... start with?` };
+  return { kind: 'words', mode: 'letter', stat: 'letters', word, pic, key: 'l' + word, answer: ans.toUpperCase(), options: opts, line: LINE.letterQ(word), speech: `What letter does... ${word}... start with?` };
 }
 function picQ(hard) {
   const [w, pic] = draw('pic', PIC_WORDS, p => p[0]);
@@ -663,28 +700,28 @@ function picQ(hard) {
   if (hard) others.sort((p, q) => (q[0][0] === w[0]) - (p[0][0] === w[0]));
   else { const seen = new Set([w[0]]); others = others.filter(p => !seen.has(p[0][0]) && seen.add(p[0][0])); }
   const opts = shuffle([w, ...(hard ? shuffle(others.slice(0, 3)) : others).slice(0, 2).map(p => p[0])]);
-  return { kind: 'words', mode: 'pic', pic, key: 'p' + w, answer: w, options: opts, speech: `Which word says... ${w}?` };
+  return { kind: 'words', mode: 'pic', pic, key: 'p' + w, answer: w, options: opts, line: LINE.picQ(w), speech: `Which word says... ${w}?` };
 }
 function sightQ() {
   const pool = wordPool(), w = draw('sight', pool);
   const rest = shuffle(pool.filter(x => x !== w)).sort((p, q) => Math.abs(p.length - w.length) - Math.abs(q.length - w.length));
   const opts = shuffle([w, ...shuffle(rest.slice(0, 4)).slice(0, 2)]);
-  return { kind: 'words', mode: settings.quiet ? 'match' : 'hear', key: 'w' + w, answer: w, options: opts, speech: `Find the word... ${sw(w)}!` };
+  return { kind: 'words', mode: settings.quiet ? 'match' : 'hear', key: 'w' + w, answer: w, options: opts, line: LINE.findWord(w), speech: `Find the word... ${sw(w)}!` };
 }
 const GEN = {
   count() {
     const n = draw('count', range(2, settings.countMax));
-    return { kind: 'count', key: 'c' + n, answer: n, groups: [n], options: numOptions(n, 1, 10), speech: 'How many cars?' };
+    return { kind: 'count', key: 'c' + n, answer: n, groups: [n], options: numOptions(n, 1, 10), line: LINE.howMany(), speech: 'How many cars?' };
   },
   add() {
     const [a, b] = draw('add', addPairs(settings.addMax), p => p.join('+'));
     const s = a + b;
-    return { kind: 'add', key: `a${a}+${b}`, a, b, answer: s, groups: [a, b], options: numOptions(s, 1, Math.max(s + 2, settings.addMax)), speech: `What is ${a} plus ${b}?` };
+    return { kind: 'add', key: `a${a}+${b}`, a, b, answer: s, groups: [a, b], options: numOptions(s, 1, Math.max(s + 2, settings.addMax)), line: LINE.addQ(a, b), speech: `What is ${a} plus ${b}?` };
   },
   big() {
     const n = draw('big', range(11, settings.bigMax));
     // Quiet mode: the number is shown, and he finds the one that matches (14 vs 41 is the real test).
-    return { kind: 'big', mode: settings.quiet ? 'match' : 'hear', key: 'b' + n, answer: n, options: bigOptions(n, settings.bigMax), speech: `Find the number ${n}!` };
+    return { kind: 'big', mode: settings.quiet ? 'match' : 'hear', key: 'b' + n, answer: n, options: bigOptions(n, settings.bigMax), line: LINE.bigQ(n), speech: `Find the number ${n}!` };
   },
   words() {
     const st = progress.readStage;
@@ -709,7 +746,7 @@ function trackReading(q, first) {
   const h = progress.readHist; h.push(first ? 1 : 0); while (h.length > 8) h.shift();
   if (settings.autoRead && progress.readStage < 3 && h.length >= 8 && h.reduce((a, b) => a + b, 0) >= 6) {
     progress.readStage++; progress.readHist = [];
-    after(0.2, () => { banner('LEVEL UP!'); SFX.cheer(); say(progress.readStage === 2 ? 'Level up! Now find the words!' : 'Level up! Now you are reading!'); }, true, 4);
+    after(0.2, () => { banner('LEVEL UP!'); SFX.cheer(); say(LINE.levelUp(progress.readStage)); }, true, 4);
   }
   saveProgress();
 }
@@ -787,7 +824,7 @@ function startQuestion() {
   truck.targetSpeed = 0; truck.speed = 0;
   if (Q.groups) { anchorTarget = QA; placeCars(Q); }
   showQuestion(Q);
-  after(Q.groups ? 0.9 : 0.2, () => { if (state === 'question') say(Q.speech, { interrupt: true }); }, true, 4);
+  after(Q.groups ? 0.9 : 0.2, () => { if (state === 'question') say(Q.line, { interrupt: true, device: Q.speech }); }, true, 4);
 }
 function showQuestion(q) {
   setView('question');
@@ -827,15 +864,15 @@ function onAnswer(btn, v) {
   } else {
     wrongCount++; btn.disabled = true; btn.classList.add('wrong'); SFX.oops();
     if (Q.groups) {
-      say(`That's ${v}. Let's count them together!`, { interrupt: true });
+      say([LINE.thatsNum(v), LINE.countTogether()], { interrupt: true, device: `That's ${v}. Let's count them together!` });
       countAlong = { i: 0, t: 0, order: countOrder(), started: false };
       cars.forEach(c => { c.label = null; });
     } else if (Q.kind === 'big') {
-      say(`That's ${v}. Find ${Q.answer}!`, { interrupt: true });
+      say([LINE.thatsNum(v), LINE.bigQ(Q.answer)], { interrupt: true, device: `That's ${v}. Find ${Q.answer}!` });
     } else if (Q.mode === 'letter') {
-      say(`That's ${LETTER[v.toLowerCase()]}. Listen... ${Q.word}. What letter does ${Q.word} start with?`, { interrupt: true });
+      say([LINE.thatsLetter(v), LINE.letterQ(Q.word)], { interrupt: true, device: `That's ${LETTER[v.toLowerCase()]}. Listen... ${Q.word}. What letter does ${Q.word} start with?` });
     } else {
-      say(`That says... ${sw(v)}. Find the word... ${sw(Q.answer)}!`, { interrupt: true });
+      say([LINE.thatSays(v), LINE.findWord(Q.answer)], { interrupt: true, device: `That says... ${sw(v)}. Find the word... ${sw(Q.answer)}!` });
     }
     if (wrongCount >= 2 || ((Q.groups || settings.quiet) && wrongCount >= 1)) {
       [...box.children].forEach(x => { if (String(x.textContent) === String(Q.answer)) x.classList.add('hint'); });
@@ -860,10 +897,10 @@ function finishCelebrate() {
   anchorTarget = driveAnchor();
   truck.targetSpeed = 200;
   if (Q.kind === 'add') {
-    say(`${Q.a} plus ${Q.b} is ${Q.answer}!`);
+    say(LINE.addDone(Q.a, Q.b));
     textPop(truck.x + 120, truck.h + 190, `${Q.a} + ${Q.b} = ${Q.answer}`, 46);
   } else {
-    say(`${Q.answer} cars!`);
+    say(LINE.carsDone(Q.answer));
     textPop(truck.x + 120, truck.h + 190, `${Q.answer}`, 70);
   }
   after(0.4, nextStep, true, 6);
@@ -871,15 +908,12 @@ function finishCelebrate() {
 function sayParts(q) {
   if (q.mode === 'letter') {
     const n = LETTER[q.answer.toLowerCase()];
-    say(`${n}! ${n} is for ${q.word}!`, { rate: 0.85 });
+    say(LINE.letterFor(q.word), { rate: 0.85, device: `${n}! ${n} is for ${q.word}!` });
   } else if (q.kind === 'words') {
     const w = q.answer;
-    say(w.length > 1 ? `${spell(w)}... ${sw(w)}!` : `${sw(w)}!`, { rate: 0.8 });
+    say(LINE.spellWord(w), { rate: 0.8, device: w.length > 1 ? `${spell(w)}... ${sw(w)}!` : `${sw(w)}!` });
   } else {
-    const s = String(q.answer);
-    const art = d => d === '8' ? 'an' : 'a';
-    if (s.length === 2) say(`${art(s[0])} ${s[0]} and ${art(s[1])} ${s[1]} make ${q.answer}!`);
-    else say(`${q.answer}!`);
+    say(LINE.digits(q.answer));
   }
 }
 function nextStep() { if (turbo >= 5) startStunt(); else startDrive(); }
@@ -887,7 +921,7 @@ function nextStep() { if (turbo >= 5) startStunt(); else startDrive(); }
 function startStunt() {
   state = 'stuntIntro'; turbo = 0; renderTurbo(); stuntStars = 0; $('starCount').textContent = '0';
   banner('STUNT TIME!'); SFX.cheer();
-  say('Turbo is full! Stunt time! Tap to jump!', { interrupt: true });
+  say(LINE.stuntTime(), { interrupt: true });
   setView('stunt');
   $('jumpBtn').textContent = 'JUMP!'; $('stuntCap').textContent = 'Tap to jump. Tap again in the air to flip!'; $('raceMap').hidden = true;
   truck.targetSpeed = 120;
@@ -932,7 +966,7 @@ function endStunt() {
   state = 'stuntEnd'; truck.targetSpeed = 0;
   for (let i = 0; i < 40; i++) particles.push({ kind: 'bit', x: truck.x + rnd(-150, 350), h: 260 + Math.random() * 120, vx: rnd(-60, 60), vh: rnd(-50, 200), rot: Math.random() * 6, vr: rnd(-8, 8), w: 8, hh: 5, color: pick(CAR_COLORS), life: 2.4, max: 2.4 });
   SFX.cheer();
-  say('You did it!', { interrupt: true });
+  say(LINE.didIt(), { interrupt: true });
   after(1.4, () => showReward('stunt'));
 }
 
@@ -941,7 +975,6 @@ function endStunt() {
 // Rivals rubber-band to stay close; a kid who keeps tapping wins at the end.
 const RACE_LEN = 22000;
 let rivals = [], raceStart = 0, raceTaps = 0, racePlace = 1, lastPlaceSay = 0, raceFinishX = 0, raceDone = false;
-const ORD = ['', 'first', 'second', 'third', 'fourth'];
 const ORD_SHORT = ['', '1st', '2nd', '3rd', '4th'];
 function startRace() {
   state = 'raceIntro'; raceTaps = 0; raceDone = false; stuntStars = 0; $('starCount').textContent = '0';
@@ -975,14 +1008,14 @@ function startRace() {
   }
   objects.push({ type: 'flag', x: raceFinishX });
   banner('BIG RACE!'); SFX.cheer();
-  say('Big race time! Tap tap tap to go fast! Ready?', { interrupt: true });
+  say(LINE.raceIntro(), { interrupt: true });
   racePlace = 1; lastPlaceSay = time;
   const count = ['3', '2', '1', 'GO!'];
   const step = i => {
     if (state !== 'raceIntro') return;
     const c = count[i];
     banner(c); tone(c === 'GO!' ? 880 : 440, c === 'GO!' ? 0.5 : 0.2, 'square', 0.08);
-    say(c === 'GO!' ? 'Go!' : c, { interrupt: true, rate: 1 });
+    say(c === 'GO!' ? LINE.go() : LINE.num(c), { interrupt: true, rate: 1 });
     if (c === 'GO!') state = 'race'; else after(0.95, () => step(i + 1));
   };
   after(0.4, () => step(0), true, 4);
@@ -1015,7 +1048,7 @@ function updateRace(dt) {
     const place = 1 + rivals.filter(r => r.x > truck.x).length;
     if (place !== racePlace && time - lastPlaceSay > 3) {
       lastPlaceSay = time;
-      say(place === 1 ? "You're in first place!" : `${ORD[place]} place! Tap tap tap!`);
+      say(LINE.racePlace(place));
     }
     racePlace = place;
     if (truck.x >= raceFinishX) endRace();
@@ -1030,7 +1063,7 @@ function endRace() {
   racePlace = 1 + rivals.filter(r => r.done).length;
   for (let i = 0; i < 50; i++) particles.push({ kind: 'bit', x: truck.x + rnd(-150, 350), h: 260 + Math.random() * 120, vx: rnd(-60, 60), vh: rnd(-50, 200), rot: Math.random() * 6, vr: rnd(-8, 8), w: 8, hh: 5, color: pick(CAR_COLORS), life: 2.4, max: 2.4 });
   SFX.cheer();
-  say(racePlace === 1 ? 'You won the race! First place!' : `You finished in ${ORD[racePlace]} place! Great race!`, { interrupt: true });
+  say(LINE.raceEnd(racePlace), { interrupt: true });
   after(1.8, () => showReward('race'));
 }
 
@@ -1057,35 +1090,35 @@ function showReward(kind) {
   clearInterval(rewardTimer);
   const finish = () => {
     clearInterval(rewardTimer);
-    say(n === 0 ? 'You won a trophy!' : `${n} ${n === 1 ? 'star' : 'stars'}! You won a trophy!`);
-    if (raceNext) say('Next up... the big race!');
+    say(LINE.trophy(), { device: n === 0 ? 'You won a trophy!' : `${n} ${n === 1 ? 'star' : 'stars'}! You won a trophy!` });
+    if (raceNext) say(LINE.raceNext());
     if (unlocked >= 0) {
       const t = TRUCKS[unlocked];
       $('rwUnlock').hidden = false; $('rwName').textContent = t.name;
       const c = $('rwTruck'), g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
       drawTruck(g, t, 200, 240, 1.45, 0, 0, 0, false);
-      say(`You unlocked ${t.name}!`);
+      say(LINE.unlocked(t.name));
     }
   };
   if (n === 0) { finish(); return; }
-  say("Let's count your stars!", { interrupt: true });
+  say(LINE.countStars(), { interrupt: true });
   let wait = 1.3;
   rewardTimer = setInterval(() => {
     if (wait > 0) { wait -= 0.45; return; }
     i++;
     $('rwCount').textContent = i;
     if (i <= 30) $('rwStars').insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24"><use href="#i-star"/></svg>');
-    SFX.star(); say(String(i), { rate: 1.05 });
+    SFX.star(); say(LINE.num(i), { rate: 1.05 });
     if (i >= n) finish();
   }, 450);
 }
 function clearRace() { rivals = []; truck.dot = null; truck.boost = 0; $('raceMap').hidden = true; }
 $('keepBtn').addEventListener('click', () => {
-  clearInterval(rewardTimer); $('rewardOv').hidden = true; if (synth) synth.cancel();
+  clearInterval(rewardTimer); $('rewardOv').hidden = true; hush();
   clearRace();
   if (raceNext) { raceNext = false; startRace(); } else startDrive();
 });
-$('changeBtn').addEventListener('click', () => { clearInterval(rewardTimer); $('rewardOv').hidden = true; if (synth) synth.cancel(); clearRace(); goTitle(); });
+$('changeBtn').addEventListener('click', () => { clearInterval(rewardTimer); $('rewardOv').hidden = true; hush(); clearRace(); goTitle(); });
 
 /* ---------- title ---------- */
 function goTitle() {
@@ -1111,7 +1144,7 @@ function buildPicker() {
     lab.innerHTML = open ? t.name : `<svg><use href="#i-trophy"/></svg>${t.need}`;
     b.append(c, lab);
     b.addEventListener('click', () => {
-      progress.truck = i; saveProgress(); initAudio(); SFX.honk(); say(t.name, { interrupt: true });
+      progress.truck = i; saveProgress(); initAudio(); SFX.honk(); say(LINE.truckName(t.name), { interrupt: true });
       [...box.children].forEach((x, k) => x.setAttribute('aria-pressed', String(k === i)));
     });
     box.appendChild(b);
@@ -1125,15 +1158,15 @@ function drawLock(g, x, y) {
 $('goBtn').addEventListener('click', () => {
   initAudio();
   $('titleOv').hidden = true;
-  const nm = settings.name ? `, ${settings.name}` : '';
-  say(`Let's go${nm}! Answer questions to fill your turbo!`, { interrupt: true });
+  const go = settings.name && nameSayable(LINE.letsGo(nameKey())) ? LINE.letsGo(nameKey()) : LINE.letsGo('');
+  say(go, { interrupt: true });
   SFX.honk();
   $('homeBtn').hidden = false;
   startDrive();
 });
 // Home: drop whatever round is in progress and go back to the start screen.
 $('homeBtn').addEventListener('click', () => {
-  if (synth) synth.cancel();
+  hush();
   clearInterval(rewardTimer); $('rewardOv').hidden = true;
   waits = []; countAlong = null; celebrateDone = true;
   objects = []; cols = []; cars = []; clearRace(); raceNext = false;
@@ -1157,7 +1190,7 @@ function crushCar(car) {
   truck.susV += 40;
   if (state === 'celebrate' && Q && Q.groups) {
     crushCount++; car.label = crushCount;
-    say(String(crushCount), { rate: 1.0 });
+    say(LINE.num(crushCount), { rate: 1.0 });
   }
 }
 
@@ -1171,7 +1204,7 @@ function update(dt) {
 
   if (state === 'question') {
     idleT += dt;
-    if (!idleSaid && idleT > 14 && !speaking() && !countAlong) { idleSaid = true; say(Q.speech); }
+    if (!idleSaid && idleT > 14 && !speaking() && !countAlong) { idleSaid = true; say(Q.line, { device: Q.speech }); }
     if (countAlong) {
       if (!countAlong.started) { if (!speaking()) { countAlong.started = true; countAlong.t = 0.5; } }
       else {
@@ -1179,8 +1212,8 @@ function update(dt) {
         if (countAlong.t >= 0.75) {
           countAlong.t = 0;
           const o = countAlong.order;
-          if (countAlong.i < o.length) { const n = ++countAlong.i; o[n - 1].label = n; SFX.tick(); say(String(n), { rate: 1.0 }); }
-          else { countAlong = null; idleT = 0; say(Q.kind === 'add' ? `So... ${Q.a} plus ${Q.b} is...?` : 'So... how many cars?'); }
+          if (countAlong.i < o.length) { const n = ++countAlong.i; o[n - 1].label = n; SFX.tick(); say(LINE.num(n), { rate: 1.0 }); }
+          else { countAlong = null; idleT = 0; say(Q.kind === 'add' ? LINE.soAdd(Q.a, Q.b) : LINE.soCount()); }
         }
       }
     }
@@ -1610,12 +1643,12 @@ cv.addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
 $('jumpBtn').addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
 $('jumpBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
 document.addEventListener('keydown', e => { if (e.key === ' ' && (state === 'stunt' || state === 'stuntIntro' || state === 'race' || state === 'raceIntro') && document.activeElement !== $('jumpBtn')) { e.preventDefault(); jump(); } });
-$('replay').addEventListener('click', () => { initAudio(); if (Q) { idleT = 0; say(Q.speech, { interrupt: true }); } });
+$('replay').addEventListener('click', () => { initAudio(); if (Q) { idleT = 0; say(Q.line, { interrupt: true, device: Q.speech }); } });
 function setQuiet(q) {
   settings.quiet = q; saveSettings(); initAudio();
-  if (q && synth) synth.cancel();
+  if (q) hush();
   syncSfx();
-  if (!q) { SFX.honk(); say('Talking mode!', { interrupt: true }); }
+  if (!q) { SFX.honk(); say(LINE.talking(), { interrupt: true }); }
   // A question already on screen switches to the matching style right away.
   if (Q && state === 'question' && Q.mode && (Q.kind === 'big' || Q.kind === 'words')) startQuestion();
 }
@@ -1631,7 +1664,7 @@ function syncSfx() {
   if (!soundOn()) { setEngine(0); lastEngine = -1; }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { if (ac) ac.suspend(); if (synth) synth.cancel(); }
+  if (document.hidden) { if (ac) ac.suspend(); hush(); }
   else if (ac) ac.resume();
 });
 
@@ -1648,12 +1681,12 @@ gear.addEventListener('contextmenu', e => e.preventDefault());
 const SK = ['count', 'add', 'big', 'words'];
 const SK_NAMES = { count: 'Counting cars', add: 'Adding', big: 'Big numbers', words: 'Reading words' };
 function openParent() {
-  paused = true; if (synth) synth.cancel(); if (ac) setEngine(0), lastEngine = -1;
+  paused = true; hush(); if (ac) setEngine(0), lastEngine = -1;
   $('kidName').value = settings.name;
   SK.forEach(k => { $('sk-' + k).checked = !!settings.skills[k]; });
   $('countMax').value = String(settings.countMax); $('addMax').value = String(settings.addMax);
   $('bigMax').value = String(settings.bigMax); $('wordLevel').value = String(settings.wordLevel);
-  $('quietMode').checked = settings.quiet; $('sfxOn').checked = settings.sfx; $('voiceRate').value = String(settings.rate);
+  $('quietMode').checked = settings.quiet; $('sfxOn').checked = settings.sfx; $('recVoice').checked = settings.recVoice; $('voiceRate').value = String(settings.rate);
   $('readStage').value = String(progress.readStage); $('autoRead').checked = settings.autoRead;
   $('raceEvery').value = String(settings.raceEvery);
   renderWordList(); renderStats();
@@ -1673,7 +1706,8 @@ $('voiceSel').addEventListener('change', e => {
 });
 function testVoice() {
   const was = settings.quiet; settings.quiet = false;
-  say(`Find the word... ${sw('the')}! ${spell('the')}... ${sw('the')}! Great job!`, { interrupt: true });
+  initAudio();
+  say([LINE.findWord('the'), LINE.spellWord('the'), LINE.praise(3)], { interrupt: true, device: `Find the word... ${sw('the')}! ${spell('the')}... ${sw('the')}! Great job!` });
   settings.quiet = was;
 }
 $('testVoice').addEventListener('click', testVoice);
@@ -1687,7 +1721,7 @@ function renderStats() {
 $('parentForm').addEventListener('input', e => {
   if (e.target.id === 'voiceSel') return;
   settings.name = $('kidName').value.trim().slice(0, 20);
-  settings.rate = +$('voiceRate').value; settings.sfx = $('sfxOn').checked;
+  settings.rate = +$('voiceRate').value; settings.sfx = $('sfxOn').checked; settings.recVoice = $('recVoice').checked;
   if ($('quietMode').checked !== settings.quiet) setQuiet($('quietMode').checked); else syncSfx();
   SK.forEach(k => { settings.skills[k] = $('sk-' + k).checked; });
   if (!SK.some(k => settings.skills[k])) { settings.skills.count = true; $('sk-count').checked = true; }
@@ -1725,7 +1759,11 @@ requestAnimationFrame(frame);
 
 // Offline: save the game on this device the first time it opens.
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Finish saving any voice clips this device is still missing.
+    navigator.serviceWorker.ready.then(r => { if (r.active) r.active.postMessage('fill-voice'); });
+  });
 }
 </script>
 
