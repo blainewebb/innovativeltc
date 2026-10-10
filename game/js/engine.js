@@ -717,6 +717,8 @@ export function expectedDrillDamage(rng, mastery, runes, level, samples = 48) {
   return Math.max(1, sum / n);
 }
 
+export const WORLD_PRESSURE = 1.35;
+
 export function spawnEnemy(rng, depth, opts = {}) {
   const { boss = false, elite = false, runes = ['+', '-'], level = 1, playerMaxHp = 50,
           ceiling = null, armorBase = null, duel = false, season = null } = opts;
@@ -746,7 +748,11 @@ export function spawnEnemy(rng, depth, opts = {}) {
      blows are heavy. Parrying one is clearly worth the answer; missing one
      hurts. Without this a duel is the safest floor in the run, because a
      fluent player blunts every hit and the fight carries no threat at all. */
-  const share = Math.min(0.07, 0.03 + depth * 0.002)
+  /* The walkable world lets a kid do everything on a floor (trainers' relics,
+     the healer, quests), where the old menu was one thing per floor; the
+     soak bot then cleared every run. Enemies hit 20% harder to keep a careful
+     player under some pressure. */
+  const share = WORLD_PRESSURE * Math.min(0.07, 0.03 + depth * 0.002)
     * (boss ? 1.3 : elite ? 1.15 : 1)
     /* Nearly every duel turn is an attack now that jam and shield are gone,
        where an ordinary boss attacks on about half its turns. The multiplier
@@ -809,6 +815,12 @@ export function enemyAct(enemy, player, rng) {
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
   enemy.intentIndex += 1;
   const events = [];
+  // A move like Vine Wrap costs it this turn entirely.
+  if (enemy.skipNext) {
+    enemy.skipNext = false;
+    events.push({ type: 'skip', text: `${enemy.name} is tangled up and can't move!` });
+    return { intent, events };
+  }
 
   switch (intent.type) {
     case 'attack':
@@ -816,7 +828,12 @@ export function enemyAct(enemy, player, rng) {
       const block = player.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
       // typeEdge is the enemy's matchup against whoever the player is fighting with.
-      const raw = Math.round((enemy.enraged ? intent.dmg * 2 : intent.dmg) * (enemy.typeEdge || 1));
+      const raw = Math.round((enemy.enraged ? intent.dmg * 2 : intent.dmg) * (enemy.typeEdge || 1) * weakness(enemy));
+      if (player.guard) {
+        player.guard = false;
+        events.push({ type: 'blocked', text: `Your shield blocks ${enemy.name}'s attack!` });
+        break;
+      }
       const dmg = Math.max(1, raw - block);
       player.hp -= dmg;
       events.push({ type: 'damage', amount: dmg, text: `${enemy.name} hits you for ${dmg}.` });
@@ -845,11 +862,20 @@ export function enemyAct(enemy, player, rng) {
   return { intent, events };
 }
 
+/** A cursed enemy hits softer for a few attacks; each call uses one up. */
+function weakness(enemy, spend = true) {
+  const w = enemy.weak;
+  if (!w) return 1;
+  if (spend) { w.hits -= 1; if (w.hits <= 0) enemy.weak = null; }
+  return w.mult;
+}
+
 /** The one-turn warning the player plans against. */
 export function describeIntent(enemy) {
+  if (enemy.skipNext) return { icon: '\u{1F33F}', text: 'Tangled: skips its next move' };
   const intent = enemy.intents[enemy.intentIndex % enemy.intents.length];
   // Matches enemyAct exactly, so the warning is the number that lands.
-  const hit = n => Math.round((enemy.enraged ? n * 2 : n) * (enemy.typeEdge || 1));
+  const hit = n => Math.round((enemy.enraged ? n * 2 : n) * (enemy.typeEdge || 1) * weakness(enemy, false));
   switch (intent.type) {
     case 'attack': return { icon: '\u{1F5E1}\uFE0F', text: `Attack for ${hit(intent.dmg)}` };
     case 'bigAttack': return { icon: '\u{1F4A5}', text: `BIG attack for ${hit(intent.dmg)}` };

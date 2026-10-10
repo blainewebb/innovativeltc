@@ -19,7 +19,8 @@ import { RIDDLES, SKILLS, RELICS, WARDS, RESISTS, GRADES, GRADE_BY_ID,
          SEASONAL_MONSTERS, ALL_MONSTERS, seasonFor } from '../js/data.js';
 import { CHARACTERS, CHARACTER_BY_ID, ownedIds, teamOf, leadOf, matchup, catchChance, seasonProgress,
          TROPHIES, checkTrophies, TEAM_SIZE, EVOLVE_AT, STAGE_POWER, EVO_CHAINS, formOf, stageName,
-         earnedStage, stageOf, pendingEvolutions, evolve, addXp, evolveProgress } from '../js/collection.js';
+         earnedStage, stageOf, pendingEvolutions, evolve, addXp, evolveProgress,
+         MOVES, movesOf, applyMove, spendBoost, ENERGY_MAX } from '../js/collection.js';
 import { newProfile } from '../js/storage.js';
 import { generateArea, areaIsSound, pathTo, objectAt, walkableAt, W as WW, H as WH } from '../js/world.js';
 
@@ -1581,6 +1582,60 @@ test('the same seed lays out the same area', () => {
   assert.deepEqual(one.tiles, two.tiles);
   assert.deepEqual(one.objects, two.objects);
   assert.ok(objectAt(one, one.gate.x, one.gate.y), 'the gate sits on its tile');
+});
+
+/* ------------------------------------------------------------- moves -- */
+test('every type has three moves, learned one per evolution stage', () => {
+  for (const [type, list] of Object.entries(MOVES)) {
+    assert.equal(list.length, 3, type);
+    assert.ok(list[0].cost < list[2].cost, `${type}: the third move costs more than the first`);
+    assert.ok(list.every(m => m.cost <= ENERGY_MAX && m.name && m.text), type);
+  }
+  const p = newProfile('Kid', '\u{1F98A}');
+  assert.equal(movesOf(p, CHARACTER_BY_ID.fox).length, 1);
+  p.stages = { fox: 3 };
+  assert.deepEqual(movesOf(p, CHARACTER_BY_ID.fox).map(m => m.id), ['ember', 'flame', 'inferno']);
+});
+
+test('moves do what they say', () => {
+  const foe = () => ({ hp: 100, maxHp: 100, shield: 7 });
+  const me = () => ({ hp: 20, maxHp: 50 });
+  const byId = id => Object.values(MOVES).flat().find(m => m.id === id);
+  let a = me(), b = foe();
+  assert.equal(applyMove(byId('flame'), a, b, 'fire', 'light').dmg, 12);
+  assert.equal(b.hp, 88);
+  b = foe();
+  assert.equal(applyMove(byId('flame'), a, b, 'fire', 'grass').dmg, 18, 'type matchups count for moves too');
+  a = me(); applyMove(byId('rain'), a, foe(), 'water', 'fire');
+  assert.equal(a.hp, 26, 'heals 12% of max');
+  a = { hp: 48, maxHp: 50 }; assert.equal(applyMove(byId('regrow'), a, foe(), 'grass', 'fire').heal, 2, 'never past full');
+  a = me(); b = foe(); applyMove(byId('leech'), a, b, 'grass', 'light');
+  assert.equal(b.hp, 92); assert.equal(a.hp, 28, 'drain heals what it takes');
+  a = me(); applyMove(byId('tempest'), a, foe(), 'storm', 'light');
+  assert.deepEqual(spendBoost(a), { mult: 1.25, pierce: false });
+  assert.deepEqual(spendBoost(a), { mult: 1.25, pierce: false });
+  assert.deepEqual(spendBoost(a), { mult: 1, pierce: false }, 'two hits, then gone');
+  b = foe(); applyMove(byId('shine'), me(), b, 'light', 'fire'); assert.equal(b.shield, 0);
+});
+
+test('enemies respect shields, tangles and curses', () => {
+  const rng = makeRng(3);
+  const e = spawnEnemy(rng, 3, { level: 3, playerMaxHp: 50 });
+  e.intents = [{ type: 'attack', dmg: 10 }];
+  const p = { hp: 50, relics: [], guard: true };
+  enemyAct(e, p, rng);
+  assert.equal(p.hp, 50, 'a shield blocks the whole hit');
+  assert.equal(p.guard, false, 'and is used up');
+  e.skipNext = true;
+  assert.match(describeIntent(e).text, /Tangled/);
+  const r = enemyAct(e, p, rng);
+  assert.equal(p.hp, 50); assert.equal(r.events[0].type, 'skip');
+  e.weak = { mult: 0.5, hits: 1 };
+  assert.match(describeIntent(e).text, /5/, 'the warning shows the softer hit');
+  enemyAct(e, p, rng);
+  assert.equal(p.hp, 45, 'a curse halves the hit');
+  enemyAct(e, p, rng);
+  assert.equal(p.hp, 35, 'and wears off');
 });
 
 console.log(`${passed} engine tests passed`);

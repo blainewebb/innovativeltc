@@ -16,7 +16,8 @@ import { RUNES, RELICS, GRADES, GRADE_BY_ID, VERSION,
          FLOORS_PER_AVATAR, TYPES, typeMult, seasonFor, MONSTER_BY_ID } from './data.js';
 import { CHARACTERS, CHARACTER_BY_ID, TEAM_SIZE, ownedIds, leadOf, teamOf, matchup,
          catchChance, seasonProgress, TROPHIES, checkTrophies,
-         formOf, addXp, pendingEvolutions, evolve, evolveProgress } from './collection.js';
+         formOf, addXp, pendingEvolutions, evolve, evolveProgress,
+         ENERGY_MAX, MOVES, movesOf, applyMove, spendBoost } from './collection.js';
 import * as store from './storage.js';
 import { W as WORLD_W, H as WORLD_H, generateArea, walkableAt, objectAt, ONCE } from './world.js';
 import { sfx, setEnabled, isEnabled } from './sfx.js';
@@ -207,6 +208,7 @@ function screenHub() {
         </div>
         ${nextLevelHtml()}
         <button class="btn primary big" id="startRun">Start a run</button>
+        ${data.profiles.length > 1 ? '<button class="btn big" id="versusBtn">\u2694\uFE0F Battle a friend</button>' : ''}
         ${profile.records.wins ? `<button class="btn big" id="startEndless">Endless run</button>
         <p class="muted tiny center">Cleared the Deep ${profile.records.wins} time${profile.records.wins === 1 ? '' : 's'}. Best endless floor: ${profile.records.bestEndless || 0}.</p>` : ''}
         <div class="row">
@@ -222,6 +224,8 @@ function screenHub() {
   if (endlessBtn) endlessBtn.onclick = () => { sfx.tap(); beginRun(true); };
   $('#looksBtn').onclick = () => { sfx.tap(); screenLooks(screenHub); };
   $('#bookBtn').onclick = () => { sfx.tap(); screenLooks(screenHub); };
+  const vb = $('#versusBtn');
+  if (vb) vb.onclick = () => { sfx.tap(); screenVersusPick(); };
   $('#trophyBtn').onclick = () => { sfx.tap(); screenTrophies(screenHub); };
   $('#switchBtn').onclick = () => { data.activeId = null; persist(); screenProfiles(); };
   $('#soundBtn').onclick = () => {
@@ -274,6 +278,8 @@ function levelUpLine() {
 function beginRun(endless = false) {
   run = newRun(Date.now() % 2147483647, profile, endless);
   run.area = generateArea(run.rng, run.depth, run.floorNodes);
+  // Gold won battling a friend is spent on the next run.
+  if (profile.meta.bankGold) { run.player.gold += profile.meta.bankGold; profile.meta.bankGold = 0; }
   profile.records.runs += 1;
   persist();
   screenWorld();
@@ -817,6 +823,11 @@ function startBattle(enemy, reward) {
     battle.log = [`${enemy.name} challenges you to a duel. Answer, or be hit.`];
   }
   applyFighter();
+  // Energy is the run's, not the fight's: a short early fight would otherwise
+  // end before a single move could be afforded.
+  run.player.energy = run.player.energy || 0;
+  run.player.guard = false;
+  run.player.boost = null;
   const o = TYPES[enemy.type];
   if (reward.trainer) battle.log[0] = `${reward.trainer.art} ${reward.trainer.name} sent out ${enemy.name}!`;
   else if (reward.wild) battle.log[0] = `A wild ${enemy.name} appeared!`;
@@ -856,8 +867,99 @@ function switchFighter(id) {
   if (intent) { const it = describeIntent(battle.enemy); intent.textContent = `Next: ${it.icon} ${it.text}`; }
   $$('.tchip').forEach(b => b.classList.toggle('on', b.dataset.fighter === next.id));
   battle.log.push(`Go, ${form(next).char} ${esc(form(next).name)}! ${matchupText(false)}`);
+  refreshMovesBtn();
   const log = $('.log');
   if (log) log.innerHTML = battle.log.slice(-2).map(l => `<div>${l}</div>`).join('');
+}
+
+/* ---------------------------------------------------------------- moves */
+/* The battle log shares its row with the moves button: a row of its own
+   would push the keypad off a phone screen. */
+function logRow() {
+  return `<div class="log-row"><div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>${movesBtnHtml()}</div>`;
+}
+
+function movesBtnHtml() {
+  const known = movesOf(profile, battle.fighter);
+  const ready = known.some(m => m.cost <= run.player.energy);
+  return `<button class="moves-btn ${ready ? 'ready' : ''}" id="movesBtn" title="Special moves">
+    <span>\u2728</span><b>${run.player.energy || 0}</b><small>\u26A1 energy</small></button>`;
+}
+
+function refreshMovesBtn() {
+  const b = $('#movesBtn');
+  if (b) { b.outerHTML = movesBtnHtml(); wireMoves(); }
+}
+
+function wireMoves() {
+  const b = $('#movesBtn');
+  if (b) b.onclick = ev => {
+    ev.stopPropagation();
+    if (app.dataset.busy) return;
+    const f = battle.fighter;
+    openMoves({ name: form(f).name, type: f.type, known: movesOf(profile, f).length, energy: run.player.energy || 0, onUse: useMove });
+  };
+}
+
+/* A sheet over the keypad listing the fighter's moves. Moves it has not
+   learned yet are shown too, with when they come, so evolving has a pull. */
+function openMoves({ name, type, known, energy, onUse }) {
+  closeMoves();
+  const all = MOVES[type] || MOVES.light;
+  const sheet = document.createElement('div');
+  sheet.className = 'moves-sheet';
+  sheet.innerHTML = `
+    <div class="ms-head"><b>${TYPES[type].icon} ${esc(name)}'s moves</b><span>\u26A1 ${energy} energy</span>
+      <button class="ms-x" aria-label="Close">\u2715</button></div>
+    <p class="ms-note">Every right answer gives 1 energy. Using a move does not use up your turn.</p>
+    ${all.map((m, i) => {
+      const learned = i < known;
+      const can = learned && energy >= m.cost;
+      return `<button class="ms-move ${can ? '' : 'off'}" ${can ? `data-mv="${i}"` : 'disabled'}>
+        <span class="ms-name">${learned ? '' : '\u{1F512} '}${m.name}</span>
+        <span class="ms-cost">\u26A1 ${m.cost}</span>
+        <small>${learned ? m.text : `Learned at evolution stage ${i + 1}.`}</small>
+      </button>`;
+    }).join('')}`;
+  app.appendChild(sheet);
+  sheet.querySelector('.ms-x').onclick = () => { sfx.tap(); closeMoves(); };
+  sheet.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => onUse(all[Number(b.dataset.mv)]));
+}
+
+function closeMoves() { app.querySelectorAll('.moves-sheet').forEach(x => x.remove()); }
+
+function useMove(mv) {
+  const p = run.player, e = battle.enemy, f = battle.fighter;
+  if ((run.player.energy || 0) < mv.cost || app.dataset.busy) return;
+  closeMoves();
+  run.player.energy -= mv.cost;
+  const out = applyMove(mv, p, e, f.type, e.type);
+  const bits = [];
+  if (out.dmg) bits.push(`${out.dmg} damage${effNote(f.type, e.type)}`);
+  if (out.heal) bits.push(`healed ${out.heal}`);
+  if (mv.fx.guard) bits.push('the next attack will be blocked');
+  if (mv.fx.boost) bits.push(mv.fx.hits > 1 ? `next ${mv.fx.hits} hits powered up` : 'next hit powered up');
+  if (mv.fx.skip) bits.push(`${e.name} will skip its next move`);
+  if (mv.fx.curse) bits.push(`${e.name} is weakened`);
+  if (mv.fx.unshield) bits.push('shields broken');
+  battle.log.push(`\u2728 ${esc(form(f).name)} used <b>${mv.name}</b>! ${bits.join(', ')}.`);
+  sfx.crit();
+  const foe = $('#foeSprite'), hero = $('#heroSprite');
+  if (out.dmg) { shake(foe, true); popNumber(foe, `-${out.dmg}`, 'crit'); setBar('foeHp', e.hp, e.maxHp); }
+  if (out.heal) { popNumber(hero, `+${out.heal}`, 'heal'); setBar('heroHp', p.hp, p.maxHp); }
+  if (!out.dmg && hero) anim(hero, [{ filter: 'drop-shadow(0 0 0 #fff)' }, { filter: 'drop-shadow(0 0 16px #ffe14a)' }, { filter: 'drop-shadow(0 0 0 #fff)' }], { duration: 420 });
+  persist();
+  if (e.hp <= 0) {
+    stopDrillTimer();
+    return playFx([{ type: 'faint', who: 'foe' }], nextTurn);
+  }
+  // A built turn can simply redraw; a timed question must not, or its clock restarts.
+  if (battle.mode === 'build') return renderBattle();
+  const log = $('.log');
+  if (log) log.innerHTML = battle.log.slice(-2).map(l => `<div>${l}</div>`).join('');
+  const intent = $('.ibox.foe .intent');
+  if (intent) { const it = describeIntent(e); intent.textContent = `Next: ${it.icon} ${it.text}`; }
+  refreshMovesBtn();
 }
 
 /* The matchup in words, Pokemon style. Goes in the battle log at the start
@@ -1229,7 +1331,7 @@ function renderBattle() {
       ${topBar({ inBattle: true })}
       ${fieldHtml()}
 
-      <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
+      ${logRow()}
 
       <div class="expr-area">
         <div class="expr">
@@ -1267,6 +1369,7 @@ function renderBattle() {
   };
   const st = $('#strike'); if (st) st.onclick = submitStrike;
   wireTeam();
+  wireMoves();
 }
 
 function onTile(i) {
@@ -1347,11 +1450,12 @@ function submitStrike() {
   }
 
   /* Correct. Work out what the number actually did. */
+  const boost = spendBoost(p);
   const { damage, warded, resisted, capped } = computeDamage({
-    result, op, ward: e.ward, resist: e.resist, resistAt: e.resistAt,
-    armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: battle.firstHit,
-    // An evolved fighter hits a little harder, on top of the type matchup.
-    typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power,
+    result, op, ward: e.ward, resist: boost.pierce ? 'none' : e.resist, resistAt: e.resistAt,
+    armor: boost.pierce ? 0 : e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: battle.firstHit,
+    // An evolved fighter hits a little harder, on top of the type matchup and any move boost.
+    typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power * boost.mult,
   });
 
   let beat;
@@ -1393,8 +1497,11 @@ function tally(correct, ms) {
   const r = profile.records;
   r.bestStreak = Math.max(r.bestStreak || 0, run.player.combo);
   if (correct && ms < 3000) r.fastAnswers = (r.fastAnswers || 0) + 1;
-  // Every right answer helps whoever is fighting evolve.
-  if (correct) addXp(profile, battle.fighter.id);
+  // Every right answer helps whoever is fighting evolve, and charges a move.
+  if (correct) {
+    addXp(profile, battle.fighter.id);
+    run.player.energy = Math.min(ENERGY_MAX, (run.player.energy || 0) + 1);
+  }
 }
 
 /* Roll to catch the monster just beaten. The chance is the fight's maths.
@@ -1457,6 +1564,8 @@ function enemyAction() {
     if (ev.type === 'shield') { battle.shieldTurns = 3; beats.push({ type: 'foeBuff', kind: 'shield', text: ev.text }); }
     if (ev.type === 'armor') beats.push({ type: 'foeBuff', kind: 'armor', text: ev.text });
     if (ev.type === 'heal') beats.push({ type: 'foeBuff', kind: 'heal', text: ev.text, amount: intent.amount, hp: e.hp, max: e.maxHp });
+    if (ev.type === 'skip') beats.push({ type: 'foeBuff', kind: 'skip', text: ev.text });
+    if (ev.type === 'blocked') beats.push({ type: 'parry', leak: 0 });
   }
   return beats;
 }
@@ -1552,7 +1661,7 @@ function renderDrill() {
       ${topBar({ inBattle: true })}
       ${fieldHtml()}
 
-      <div class="log">${battle.log.slice(-2).map(l => `<div>${l}</div>`).join('')}</div>
+      ${logRow()}
 
       ${battle.allDrills ? '<div class="duel-banner">\u2694\uFE0F BOSS DUEL</div>' : ''}
       ${fightTimerHtml()}
@@ -1587,6 +1696,7 @@ function renderDrill() {
   const go = $('#answer');
   if (go) go.onclick = () => resolveDrill(battle.typed);
   wireTeam();
+  wireMoves();
 
   startDrillTimer();
 }
@@ -1649,11 +1759,17 @@ function resolveDrill(text) {
     if (pending.dmg) {
       const block = p.relics.map(id => RELIC_BY_ID[id]).filter(Boolean)
         .reduce((sum, r) => sum + (r.block || 0), 0);
-      const raw = Math.round((e.enraged ? pending.dmg * 2 : pending.dmg) * (e.typeEdge || 1));
-      const leak = Math.max(1, Math.round(raw * PARRY_LEAK) - block);
-      p.hp -= leak;
-      battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
-      beats.push({ type: 'parry', leak, hp: p.hp, max: p.maxHp });
+      const raw = Math.round((e.enraged ? pending.dmg * 2 : pending.dmg) * (e.typeEdge || 1) * (e.weak ? e.weak.mult : 1));
+      if (p.guard) {
+        p.guard = false;
+        battle.log.push('Your shield takes the whole blow.');
+        beats.push({ type: 'parry', leak: 0 });
+      } else {
+        const leak = Math.max(1, Math.round(raw * PARRY_LEAK) - block);
+        p.hp -= leak;
+        battle.log.push(`You turn the blow aside, but ${leak} still gets through.`);
+        beats.push({ type: 'parry', leak, hp: p.hp, max: p.maxHp });
+      }
     } else {
       beats.push({ type: 'parry', leak: 0 });
     }
@@ -1669,10 +1785,11 @@ function resolveDrill(text) {
        turn keeps the high ceiling. A riposte also ignores shields, so a
        shielded enemy cannot make drills a dead turn. */
     const result = d.kind === 'text' ? battle.askedDamage : d.answer;
+    const boost = spendBoost(p);
     const { damage } = computeDamage({
       result, op: d.op || '+', ward: 'none', resist: 'none', resistAt: 0,
-      armor: e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
-      typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power,
+      armor: boost.pierce ? 0 : e.armor, relics: p.relics, combo: p.combo, ms, isFirstHit: false,
+      typeMult: typeMult(battle.fighter.type, e.type) * form(battle.fighter).power * boost.mult,
     });
     e.hp -= damage;
     p.combo += 1;
@@ -1795,6 +1912,270 @@ function winBattle() {
   };
 }
 
+/* ============================================================== versus === */
+/* Two heroes on one device, taking turns. Each answers a problem at THEIR
+   OWN level, on a clock set from their own speed, so brothers years apart
+   battle evenly: neither ever sees the other's problems. A right answer
+   attacks the other's team (types, evolution and moves all count, and a
+   quicker answer hits harder); a wrong one misses and shows the answer.
+   A cover screen hides everything while the device is passed. Answers go on
+   each kid's own report card, right answers help their own characters
+   evolve, and the winner gets a trophy and gold for their next run. Nothing
+   is taken from the loser. */
+const VS_HP = 80;
+const VS_BASE = 10;
+const VS_PRIZE_GOLD = 15;
+let vs = null;
+
+function vsPlayer(prof) {
+  const team = teamOf(prof);
+  return { prof, team, fighter: team[0], hp: VS_HP, maxHp: VS_HP, energy: 0,
+           guard: false, boost: null, skipNext: false, weak: null, right: 0, wrong: 0 };
+}
+
+function screenVersusPick() {
+  const others = data.profiles.filter(p => p.id !== profile.id);
+  render(`
+    <div class="screen center">
+      <div class="panel">
+        <h2>⚔️ Battle a friend</h2>
+        <p class="muted center">${esc(profile.name)}'s team against another hero on this device. You take turns, and each of you gets problems at your own level, so it's a fair fight.</p>
+        <div class="profile-list">
+          ${others.map(o => `<button class="profile-card" data-vs="${o.id}">
+            <span class="pa">${formOf(o, teamOf(o)[0]).char}</span>
+            <span class="pn">${esc(o.name)}</span>
+            <span class="pd">${teamOf(o).map(c => formOf(o, c).char).join(' ')}</span>
+          </button>`).join('')}
+        </div>
+        <button class="btn ghost" id="back">Back</button>
+      </div>
+    </div>`);
+  $$('[data-vs]').forEach(b => b.onclick = () => {
+    sfx.tap();
+    const other = data.profiles.find(p => p.id === b.dataset.vs);
+    vs = { p: [vsPlayer(profile), vsPlayer(other)], turn: Math.random() < 0.5 ? 0 : 1,
+           rng: makeRng(Date.now() % 2147483647), log: [] };
+    vsCover();
+  });
+  $('#back').onclick = () => { sfx.tap(); screenHub(); };
+}
+
+const vsMe = () => vs.p[vs.turn];
+const vsOpp = () => vs.p[1 - vs.turn];
+
+/* Between turns: nothing on screen but whose turn it is. */
+function vsCover() {
+  const me = vsMe();
+  const f = formOf(me.prof, me.fighter);
+  render(`
+    <div class="screen center vs-cover">
+      <div class="panel">
+        <p class="muted center">Pass the device to</p>
+        <h2 class="center">${esc(me.prof.name)}</h2>
+        <div class="big-art huge">${f.char}</div>
+        <div class="vs-score">${vs.p.map(x => `<span>${esc(x.prof.name)} <b>❤️ ${Math.max(0, x.hp)}</b></span>`).join('<i>vs</i>')}</div>
+        ${vs.log.length ? `<p class="center muted vs-last">${vs.log[vs.log.length - 1]}</p>` : ''}
+        <button class="btn primary big" id="vsReady">I'm ready!</button>
+      </div>
+    </div>`);
+  $('#vsReady').onclick = () => { sfx.tap(); vsTurn(); };
+}
+
+function vsTurn() {
+  const me = vsMe();
+  const level = difficultyLevel(me.prof.mastery, me.prof.grade);
+  const runes = unlockedOps(me.prof.mastery, me.prof.grade);
+  const d = pickDrill(vs.rng, me.prof.mastery, runes, level)
+    || { kind: 'arith', a: 3, op: '+', b: 4, answer: 7, skill: 'add_small', fact: factKey(3, '+', 4) };
+  vs.drill = d;
+  vs.allowance = drillAllowanceMs(me.prof.mastery, d);
+  vs.start = performance.now();
+  vs.typed = '';
+  renderVs();
+}
+
+function renderVs() {
+  const me = vsMe(), opp = vsOpp(), d = vs.drill;
+  const mf = formOf(me.prof, me.fighter), of = formOf(opp.prof, opp.fighter);
+  const known = movesOf(me.prof, me.fighter);
+  const ready = known.some(m => m.cost <= me.energy);
+  render(`
+    <div class="screen battle drill vs-screen">
+      <div class="topbar"><span>⚔️ ${esc(me.prof.name)}'s turn</span>
+        ${me.team.length > 1 ? `<span class="team-chips">${me.team.map(c => `<button class="tchip ${c.id === me.fighter.id ? 'on' : ''} ${matchup(c.type, opp.fighter.type).edge}" data-vsf="${c.id}">
+          <span class="tc">${formOf(me.prof, c).char}</span><span class="tt">${TYPES[c.type].icon}</span></button>`).join('')}</span>` : ''}</div>
+      <div class="field">
+        <div class="ibox foe">
+          <div class="nm"><span>${TYPES[opp.fighter.type].icon} ${esc(opp.prof.name)}: ${esc(of.name)}</span></div>
+          ${hpBar('foeHp', opp.hp, opp.maxHp)}
+          <div class="intent">${opp.guard ? '\u{1F6E1}️ Shielded' : opp.skipNext ? '\u{1F33F} Tangled' : `⚡ ${opp.energy} energy`}</div>
+        </div>
+        <div class="plat foe"></div>
+        <div class="sprite foe evo${of.stage} t-${of.type}" id="foeSprite">${of.char}</div>
+        <div class="plat hero"></div>
+        <div class="sprite hero evo${mf.stage} t-${mf.type}" id="heroSprite">${mf.char}</div>
+        <div class="ibox hero">
+          <div class="nm"><span>${TYPES[me.fighter.type].icon} ${esc(me.prof.name)}: ${esc(mf.name)}${stars(mf.stage)}</span></div>
+          ${hpBar('heroHp', me.hp, me.maxHp)}
+        </div>
+      </div>
+      <div class="log-row"><div class="log"><div>${matchupLine(me, opp)}</div><div>Answer right to attack. Faster hits harder!</div></div>
+        <button class="moves-btn ${ready ? 'ready' : ''}" id="movesBtn"><span>✨</span><b>${me.energy}</b><small>⚡ energy</small></button></div>
+      <div class="drill-group">
+        <div class="timer" id="timerbar"><span style="width:100%"></span></div>
+        ${d.kind === 'text' ? `
+          <p class="asked">${esc(d.prompt)}</p>
+          <div class="drill-problem"><span class="answer ${vs.typed ? 'filled' : ''}">${vs.typed || '_'}</span></div>` : `
+          <div class="drill-problem">
+            <span class="dp">${d.a}</span><span class="dp op">${RUNES[d.op].glyph}</span><span class="dp">${d.b}</span>
+            <span class="eq">=</span><span class="answer ${vs.typed ? 'filled' : ''}">${vs.typed || '_'}</span>
+          </div>`}
+      </div>
+      ${keypadHtml({ submitId: 'vsGo', submitLabel: 'ATTACK', ready: !!vs.typed, extras: d.kind === 'text' })}
+    </div>`);
+  $$('.key').forEach(b => b.onclick = () => { vs.typed = typeInto(vs.typed, b.dataset.k); sfx.tap(); renderVs(); });
+  $('#vsGo').onclick = () => vsAnswer(vs.typed);
+  $$('[data-vsf]').forEach(b => b.onclick = () => {
+    const c = me.team.find(x => x.id === b.dataset.vsf);
+    if (c && c.id !== me.fighter.id) { me.fighter = c; sfx.tap(); renderVs(); }
+  });
+  $('#movesBtn').onclick = ev => {
+    ev.stopPropagation();
+    openMoves({ name: mf.name, type: me.fighter.type, known: known.length, energy: me.energy, onUse: vsUseMove });
+  };
+  stopDrillTimer();
+  drillTimer = setInterval(() => {
+    const bar = app.querySelector('#timerbar span');
+    if (!bar || !vs) return stopDrillTimer();
+    const left = vs.allowance - (performance.now() - vs.start);
+    const pct = Math.max(0, left / vs.allowance * 100);
+    bar.style.width = `${pct}%`;
+    bar.classList.toggle('low', pct < 33);
+    if (left <= 0) { stopDrillTimer(); vsAnswer(null); }
+  }, 80);
+}
+
+function matchupLine(me, opp) {
+  const m = matchup(me.fighter.type, opp.fighter.type);
+  const t = TYPES[me.fighter.type], o = TYPES[opp.fighter.type];
+  return m.edge === 'strong' ? `<b class="good">${t.icon} beats ${o.icon}: super effective!</b>`
+    : m.edge === 'clash' ? `<b>${t.icon} vs ${o.icon}: super effective both ways!</b>`
+    : m.edge === 'weak' || m.edge === 'risky' ? `<b class="bad">${o.icon} ${o.name} is strong against you.</b> Switch?`
+    : `${t.icon} vs ${o.icon}: an even match.`;
+}
+
+function vsUseMove(mv) {
+  const me = vsMe(), opp = vsOpp();
+  if (me.energy < mv.cost) return;
+  closeMoves();
+  me.energy -= mv.cost;
+  const out = applyMove(mv, me, opp, me.fighter.type, opp.fighter.type);
+  vs.log.push(`✨ ${esc(me.prof.name)} used <b>${mv.name}</b>!${out.dmg ? ` ${out.dmg} damage.` : ''}${out.heal ? ` Healed ${out.heal}.` : ''}`);
+  sfx.crit();
+  if (out.dmg) { shake($('#foeSprite'), true); popNumber($('#foeSprite'), `-${out.dmg}`, 'crit'); setBar('foeHp', opp.hp, opp.maxHp); }
+  if (out.heal) { popNumber($('#heroSprite'), `+${out.heal}`, 'heal'); setBar('heroHp', me.hp, me.maxHp); }
+  if (opp.hp <= 0) { stopDrillTimer(); return setTimeout(() => vsWin(me, opp), reducedMotion() ? 0 : 700); }
+  // Redraw the move button and status without restarting the clock.
+  const btn = $('#movesBtn');
+  if (btn) btn.querySelector('b').textContent = me.energy;
+  btn?.classList.toggle('ready', movesOf(me.prof, me.fighter).some(m => m.cost <= me.energy));
+  const st = $('.ibox.foe .intent');
+  if (st) st.textContent = opp.guard ? '\u{1F6E1}️ Shielded' : opp.skipNext ? '\u{1F33F} Tangled' : `⚡ ${opp.energy} energy`;
+  const log = $('.log');
+  if (log) log.innerHTML = `<div>${vs.log[vs.log.length - 1]}</div><div>Now answer to attack!</div>`;
+}
+
+function vsAnswer(text) {
+  if (app.dataset.busy) return;
+  stopDrillTimer();
+  const me = vsMe(), opp = vsOpp(), d = vs.drill;
+  const ms = Math.round(performance.now() - vs.start);
+  const correct = text !== null && checkAnswer(text, d.answer).ok;
+  recordAttempt(me.prof.mastery, { skill: d.skill, fact: d.fact, correct, ms });
+  const day = store.todayEntry(me.prof);
+  if (correct) day.correct += 1; else day.wrong += 1;
+  const shown = formatAnswer(d.answer);
+  let dmg = 0, line;
+  if (correct) {
+    me.right += 1;
+    me.energy = Math.min(ENERGY_MAX, me.energy + 1);
+    addXp(me.prof, me.fighter.id);
+    const boost = spendBoost(me);
+    const speed = 1 + 0.5 * Math.max(0, 1 - ms / vs.allowance);
+    let weak = 1;
+    if (me.weak) { weak = me.weak.mult; me.weak.hits -= 1; if (me.weak.hits <= 0) me.weak = null; }
+    dmg = Math.max(1, Math.round(VS_BASE * typeMult(me.fighter.type, opp.fighter.type)
+      * formOf(me.prof, me.fighter).power * boost.mult * speed * weak));
+    if (opp.guard) { opp.guard = false; dmg = 0; line = `${esc(opp.prof.name)}'s shield blocked ${esc(me.prof.name)}'s attack!`; }
+    else if (me.skipNext) { me.skipNext = false; dmg = 0; line = `${esc(me.prof.name)} was tangled and the attack missed!`; }
+    else line = `${esc(me.prof.name)} got it right and hit for <b>${dmg}</b>!${effNote(me.fighter.type, opp.fighter.type)}`;
+    opp.hp -= dmg;
+  } else {
+    me.wrong += 1;
+    line = text === null ? `${esc(me.prof.name)} ran out of time. The answer was <b>${shown}</b>.`
+                         : `${esc(me.prof.name)} missed! The answer was <b>${shown}</b>.`;
+  }
+  vs.log.push(line);
+  persist();
+  const foe = $('#foeSprite');
+  const log = $('.log');
+  if (log) log.innerHTML = `<div>${line}</div>`;
+  if (dmg) { shake(foe, true); popNumber(foe, `-${dmg}`, 'hit'); setBar('foeHp', opp.hp, opp.maxHp); sfx.hit(); }
+  else if (!correct) sfx.wrong(); else sfx.hurt();
+  app.dataset.busy = '1';
+  const gen = fxGen;
+  setTimeout(() => {
+    if (gen !== fxGen) return;
+    delete app.dataset.busy;
+    if (opp.hp <= 0) return vsWin(me, opp);
+    vs.turn = 1 - vs.turn;
+    vsCover();
+  }, reducedMotion() ? 0 : 1200);
+}
+
+function vsWin(winner, loser) {
+  const r = winner.prof.records;
+  r.versusWins = (r.versusWins || 0) + 1;
+  winner.prof.meta.bankGold = (winner.prof.meta.bankGold || 0) + VS_PRIZE_GOLD;
+  const trophies = checkTrophies(winner.prof, difficultyLevel(winner.prof.mastery, winner.prof.grade));
+  checkTrophies(loser.prof, difficultyLevel(loser.prof.mastery, loser.prof.grade));
+  persist();
+  sfx.win();
+  const wf = formOf(winner.prof, winner.fighter);
+  render(`
+    <div class="screen center win-scene done">
+      <div class="stage">
+        <div class="vbanner">${esc(winner.prof.name).toUpperCase()} WINS!</div>
+        <div class="vplat"></div>
+        <div class="vhero">${charSpan(wf)}</div>
+      </div>
+      <div class="panel win vpanel">
+        <ul class="run-stats">
+          ${vs.p.map(x => `<li><b>${esc(x.prof.name)}</b>: ${x.right} right &middot; ${x.wrong} wrong</li>`).join('')}
+        </ul>
+        <p class="reward">\u{1FA99} ${esc(winner.prof.name)} gets +${VS_PRIZE_GOLD} gold on their next run.</p>
+        ${trophyLines(trophies)}
+        <p class="muted tiny center">Every answer went on each of your report cards, and right answers helped your characters evolve.</p>
+        <div class="row">
+          <button class="btn primary" id="rematch">Rematch</button>
+          <button class="btn ghost" id="home">Back to camp</button>
+        </div>
+      </div>
+    </div>`);
+  const a = vs.p[0].prof, b = vs.p[1].prof;
+  const after = next => evolveFor(a, () => evolveFor(b, next));
+  $('#rematch').onclick = () => { sfx.tap(); after(() => { vs = { p: [vsPlayer(a), vsPlayer(b)], turn: Math.random() < 0.5 ? 0 : 1, rng: makeRng(Date.now() % 2147483647), log: [] }; vsCover(); }); };
+  $('#home').onclick = () => { sfx.tap(); after(() => { vs = null; screenHub(); }); };
+}
+
+/* Evolutions belong to whichever hero earned them, which in versus is not
+   always the one signed in. */
+function evolveFor(prof, next) {
+  const keep = profile;
+  profile = prof;
+  withEvolutions(() => { profile = keep; next(); });
+}
+
 /* ============================================================ evolving === */
 /* After a fight, anything whose right answers earned a new stage evolves, one
    at a time, on a screen of its own, the way every kid who has played Pokemon
@@ -1824,6 +2205,7 @@ function screenEvolve(ev, done) {
         <p class="evo-what">What? <b>${esc(before.name)}</b> is evolving!</p>
         <p class="evo-done"><b>${esc(before.name)}</b> evolved into <b>${esc(after.name)}</b>! ${stars(after.stage)}</p>
         <p class="muted center evo-done">${TYPES[c.type].icon} Hits ${boost}% harder than when it started.${after.stage < 3 ? ' One more evolution to go.' : ' Fully evolved!'}</p>
+        <p class="center evo-done evo-move">\u2728 New move learned: <b>${(MOVES[c.type] || MOVES.light)[after.stage - 1].name}</b>! <small>${(MOVES[c.type] || MOVES.light)[after.stage - 1].text}</small></p>
         <button class="btn primary evo-done" id="evoOk">Awesome!</button>
       </div>
     </div>`);
@@ -2503,7 +2885,7 @@ document.addEventListener('keydown', ev => {
   let btn = null;
   if (/^[0-9]$/.test(ev.key)) btn = app.querySelector(`.key[data-k="${ev.key}"]`);
   else if (ev.key === 'Backspace') btn = app.querySelector('.key[data-k="back"]');
-  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #next, #cont, #evoOk');
+  else if (ev.key === 'Enter') btn = app.querySelector('#strike:not([disabled]), #answer:not([disabled]), #go:not([disabled]), #vsGo:not([disabled]), #vsReady, #next, #cont, #evoOk');
   if (btn && !btn.disabled) { ev.preventDefault(); btn.click(); }
 });
 

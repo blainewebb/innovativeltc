@@ -145,6 +145,87 @@ export function evolve(profile, id) {
   profile.stages[id] = Math.min(MAX_STAGE, stageOf(profile, id) + 1);
 }
 
+/* ---------------------------------------------------------------- moves --
+   Special moves, three per type. A character knows the first from the start,
+   learns the second when it evolves and the third at full evolution. Right
+   answers fill an energy bar; a move spends it. Using one is a free action,
+   so the turn still goes to a problem: the maths stays the main event and
+   the move is the reward for it. */
+export const ENERGY_MAX = 10;
+
+export const MOVES = {
+  fire: [
+    { id: 'ember', name: 'Ember Boost', cost: 6, text: 'Your next hit does +30%.', fx: { boost: 1.3 } },
+    { id: 'flame', name: 'Flame Burst', cost: 8, text: 'Blast the foe for an eighth of its health.', fx: { burst: 0.12 } },
+    { id: 'inferno', name: 'Inferno', cost: 10, text: 'Your next hit does +60%.', fx: { boost: 1.6 } },
+  ],
+  water: [
+    { id: 'rain', name: 'Healing Rain', cost: 6, text: 'Heal a little health.', fx: { heal: 0.12 } },
+    { id: 'tidal', name: 'Tidal Shield', cost: 8, text: 'Block the next attack completely.', fx: { guard: true } },
+    { id: 'tsunami', name: 'Tsunami', cost: 10, text: 'Crash into the foe for a seventh of its health.', fx: { burst: 0.15 } },
+  ],
+  grass: [
+    { id: 'vine', name: 'Vine Wrap', cost: 6, text: 'The foe is tangled and skips its next attack.', fx: { skip: true } },
+    { id: 'leech', name: 'Leech Seed', cost: 8, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.08, drain: true } },
+    { id: 'regrow', name: 'Regrowth', cost: 10, text: 'Heal a good chunk of health.', fx: { heal: 0.22 } },
+  ],
+  storm: [
+    { id: 'static', name: 'Static Shock', cost: 6, text: 'Your next hit ignores armor and resists.', fx: { boost: 1, pierce: true } },
+    { id: 'thunder', name: 'Thunderbolt', cost: 8, text: 'Zap the foe for an eighth of its health.', fx: { burst: 0.12 } },
+    { id: 'tempest', name: 'Tempest', cost: 10, text: 'Your next two hits do +25%.', fx: { boost: 1.25, hits: 2 } },
+  ],
+  light: [
+    { id: 'shine', name: 'Shine', cost: 6, text: 'Breaks any shield and heals a little.', fx: { unshield: true, heal: 0.06 } },
+    { id: 'barrier', name: 'Barrier', cost: 8, text: 'Block the next attack completely.', fx: { guard: true } },
+    { id: 'beam', name: 'Radiant Beam', cost: 10, text: 'Strike the foe for a seventh of its health.', fx: { burst: 0.15 } },
+  ],
+  shadow: [
+    { id: 'sneak', name: 'Shadow Sneak', cost: 6, text: 'Your next hit ignores armor and resists, +15%.', fx: { boost: 1.15, pierce: true } },
+    { id: 'drain', name: 'Dark Drain', cost: 8, text: 'Drain some of the foe’s health into yours.', fx: { burst: 0.1, drain: true } },
+    { id: 'curse', name: 'Curse', cost: 10, text: 'The foe hits softer for its next three attacks.', fx: { curse: 0.6, curseHits: 3 } },
+  ],
+};
+export const MOVE_BY_ID = Object.fromEntries(Object.values(MOVES).flat().map(m => [m.id, m]));
+
+/** The moves a character knows: one per stage it has evolved to. */
+export function movesOf(profile, c) {
+  return (MOVES[c.type] || MOVES.light).slice(0, stageOf(profile, c.id));
+}
+
+/* Apply a move. `me` and `foe` are anything with hp and maxHp (the run's
+   player and an enemy, or two versus players); the rest of the state lives
+   on them as flags the battle code reads: guard, boost, skipNext, weak.
+   Returns what happened, for the log and the animation. */
+export function applyMove(mv, me, foe, myType, foeType) {
+  const f = mv.fx, out = { dmg: 0, heal: 0 };
+  if (f.burst) {
+    out.dmg = Math.max(1, Math.round(foe.maxHp * f.burst * typeMult(myType, foeType)));
+    foe.hp -= out.dmg;
+    if (f.drain) out.heal += out.dmg;
+  }
+  if (f.heal) out.heal += Math.round(me.maxHp * f.heal);
+  if (out.heal) {
+    const before = me.hp;
+    me.hp = Math.min(me.maxHp, me.hp + out.heal);
+    out.heal = me.hp - before;
+  }
+  if (f.guard) me.guard = true;
+  if (f.boost) me.boost = { mult: f.boost, hits: f.hits || 1, pierce: !!f.pierce };
+  if (f.skip) foe.skipNext = true;
+  if (f.unshield) foe.shield = 0;
+  if (f.curse) foe.weak = { mult: f.curse, hits: f.curseHits || 3 };
+  return out;
+}
+
+/** Use up one hit of a boost; returns { mult, pierce } for this hit. */
+export function spendBoost(me) {
+  const b = me.boost;
+  if (!b) return { mult: 1, pierce: false };
+  b.hits -= 1;
+  if (b.hits <= 0) me.boost = null;
+  return { mult: b.mult, pierce: b.pierce };
+}
+
 /* -------------------------------------------------------------- catching --
    A win is a chance to catch the monster, and the chance is the math: the
    better the fight went, the likelier it joins. A flawless fight is close to
@@ -203,6 +284,7 @@ export const TROPHIES = [
   { id: 'negatives',   icon: '\u{1F977}', name: 'Negative Ninja',      text: '5 negative number questions right.',   test: c => correctIn(c.m, 'integers') >= 5 },
   { id: 'powers',      icon: '\u{1F680}', name: 'Power Player',        text: '5 powers right.',                      test: c => correctIn(c.m, 'exponents') >= 5 },
   { id: 'solve_x',     icon: '\u{1F5FA}️', name: 'X Marks the Spot', text: '5 solve-for-x questions right.',   test: c => correctIn(c.m, 'solve_x') >= 5 },
+  { id: 'champion',    icon: '\u{1F94A}', name: 'Champion',            text: 'Win a battle against a friend.',       test: c => (c.r.versusWins || 0) >= 1 },
   { id: 'level5',      icon: '\u{1F9D7}', name: 'Climber',             text: 'Reach challenge level 5.',             test: c => c.level >= 5 },
   { id: 'level7',      icon: '\u{1F3D4}️', name: 'Mountaineer',   text: 'Reach challenge level 7.',             test: c => c.level >= 7 },
   { id: 'level9',      icon: '\u{1F31F}', name: 'Summit',              text: 'Reach challenge level 9.',             test: c => c.level >= 9 },

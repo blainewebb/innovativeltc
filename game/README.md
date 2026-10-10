@@ -352,8 +352,12 @@ decorations.
 
 **Balance.** On the old menu a kid picked one thing per floor; in the world
 they can do all of it, which means more healing and more prizes. The healer
-was cut from 50% to 25% of max health to compensate (see the numbers in the
-balance note below).
+was cut from 50% to 25% of max health, but a later soak run with the bot
+using no special moves still cleared 35 of 35 runs (an earlier ~80% had been
+flattered by the bot wandering into extra grass fights). Enemies now hit 35%
+harder (`WORLD_PRESSURE` in engine.js). With moves in use, the soak bot
+clears 82% with no grade set (31/38) and 81% at 8th grade (29/36), about
+where the game sat before the world.
 
 ## Types, catching and the team
 
@@ -409,6 +413,54 @@ snowing snowman). Everything else keeps its picture and gets a new name
 by type (Ember Newt to Blaze Newt to Inferno Newt; Fox to Blaze Fox), a
 glow in its type's colour, and stars. The team screen shows a bar of right
 answers toward the next stage.
+
+## Special moves
+
+Every type has three moves; a character knows the first from the start,
+learns the second when it evolves and the third at full evolution. Right
+answers give 1 energy each (up to 10) and a move costs 6, 8 or 10. Energy carries from fight to fight for the whole run: an early wild monster often falls in four or five answers, so energy that reset each fight meant almost no moves on the first floors. Using one
+is a free action, so the turn still goes to a problem: the maths is the fuel
+and the move is the reward. The energy button sits beside the battle log,
+glows when a move is affordable, and opens a list with locked moves shown
+and when they are learned.
+
+| Type | Stage 1 (6 energy) | Stage 2 (8) | Stage 3 (10) |
+| --- | --- | --- | --- |
+| Fire | Ember Boost: next hit +30% | Flame Burst: 12% of the foe's health | Inferno: next hit +60% |
+| Water | Healing Rain: heal 12% | Tidal Shield: block the next attack | Tsunami: 15% of the foe's health |
+| Grass | Vine Wrap: foe skips its next move | Leech Seed: drain 8% | Regrowth: heal 22% |
+| Storm | Static Shock: next hit ignores armor and resists | Thunderbolt: 12% of the foe's health | Tempest: next two hits +25% |
+| Light | Shine: break shields, heal 6% | Barrier: block the next attack | Radiant Beam: 15% of the foe's health |
+| Shadow | Shadow Sneak: next hit pierces, +15% | Dark Drain: drain 10% | Curse: foe hits 40% softer for 3 attacks |
+
+The first version (costs 3 to 5, bursts of a fifth to a quarter, heals of a
+fifth to a third) had the soak bot clearing 97% of runs, against about 80%
+without moves. Cutting every move back alone still left it at 91 to 100%:
+the problem was how often, not how strong. Two moves a fight meant two
+blocked attacks, which halved the damage taken. Costs of 6, 8 and 10 make it
+about one a fight, a moment rather than a habit.
+
+Damage moves use the type chart too. The evolution screen announces the new
+move.
+
+## Battle a friend
+
+With two or more heroes on a device, camp shows **Battle a friend**. The two
+teams take turns on the one device; a cover screen ("Pass the device to
+Max") hides everything between turns. Each turn is one problem at **that
+kid's own level**, on a clock set from **their own** speed, so brothers years
+apart are an even match. A right answer attacks for 10, times the type
+matchup, evolution power, any move boost, and up to +50% for answering
+quickly; a wrong one misses and shows the answer. Both start on 80 health.
+Moves, team switching and energy all work as in a run.
+
+Every answer goes on that kid's report card and right answers help their
+characters evolve. The winner gets the Champion trophy and 15 gold added to
+their next run. Nothing is taken from the loser.
+
+It is one device only. Two devices would need an online service to connect
+them (sign-ins, a server, possibly a monthly cost), which the game does not
+have and does not need for anything else.
 
 ## Seasons
 

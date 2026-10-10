@@ -252,6 +252,15 @@ try {
         console.error(`  MISS: ${line.slice(0, 160)}`);
       }
     }
+    // Spend energy on a move whenever one is ready, the way a kid would.
+    if (!process.env.NOMOVES && await page.$('#movesBtn.ready') && !(await page.$('#app[data-busy]'))) {
+      await page.click('#movesBtn');
+      const mv = await page.$$('.ms-move[data-mv]');
+      if (mv.length) { await mv[mv.length - 1].click(); seen.add('move'); }
+      else if (await page.$('.ms-x')) await page.click('.ms-x');
+      await page.waitForSelector('#app:not([data-busy])', { timeout: 5000 }).catch(() => {});
+      continue;
+    }
     const board = (await page.$('.drill-problem')) || (await page.$('.hand')) ? await readBoard() : null;
 
     if (board && board.asked) {                        // a written question
@@ -354,6 +363,7 @@ try {
   // Twelve heroes across sixty floors, so several runs must produce some.
   ok('heroes are earned along the way', seen.has('avatar-earned'), [...seen].join(','));
   ok('walked the world', seen.has('map'));
+  if (!process.env.NOMOVES) ok('used a special move', seen.has('move'));
   ok('fought a trainer', seen.has('trainer'), [...seen].join(','));
   ok('a trainer sent out a second monster', seen.has('trainer-next'), [...seen].join(','));
   ok('saw a victory screen', seen.has('victory'));

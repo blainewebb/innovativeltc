@@ -933,3 +933,46 @@ body[data-season="harvest"] .wt.t-tall { background: #8f6a28; }
 body[data-season="halloween"] .wt.t-ground, body[data-season="halloween"] .wt.t-tree { background: #4f6a3a; }
 body[data-season="halloween"] .wt.t-tall { background: #3a4f2a; }
 @media (prefers-reduced-motion: reduce) { .hero-w { transition: none; } }
+
+/* ---------------------------------------------------------------- moves */
+.log-row { display: flex; gap: 6px; align-items: stretch; flex: none; }
+.log-row .log { flex: 1; min-width: 0; }
+.moves-btn {
+  flex: none; width: 62px; display: grid; place-items: center; align-content: center; gap: 0;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink);
+  font: inherit; cursor: pointer; padding: 2px;
+}
+.moves-btn span { font-size: 1rem; line-height: 1; }
+.moves-btn b { font-size: 1.05rem; line-height: 1.1; }
+.moves-btn small { font-size: .5rem; color: var(--muted); }
+.moves-btn.ready { border-color: var(--gold); box-shadow: 0 0 12px rgba(245,192,74,.45); }
+@media (prefers-reduced-motion: no-preference) { .moves-btn.ready span { animation: msPulse 1.2s ease-in-out infinite; } }
+@keyframes msPulse { 50% { transform: scale(1.35); } }
+.moves-sheet {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 40;
+  width: min(560px, 100%); max-height: 70vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 16px 16px 0 0;
+  padding: 12px 12px max(14px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0,0,0,.5);
+  display: grid; gap: 8px;
+}
+.ms-head { display: flex; align-items: center; gap: 8px; }
+.ms-head span { margin-left: auto; color: var(--gold); font-weight: 800; }
+.ms-x { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: inherit; cursor: pointer; }
+.ms-note { margin: 0; font-size: .74rem; color: var(--muted); }
+.ms-move {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left;
+  padding: 10px 12px; border-radius: 12px; border: 2px solid var(--gold-dk); background: #2f2a45; color: var(--ink);
+  font: inherit; cursor: pointer;
+}
+.ms-move.off { border-color: var(--line); background: var(--bg); opacity: .6; cursor: default; }
+.ms-name { font-weight: 800; }
+.ms-cost { font-size: .8rem; }
+.ms-move small { grid-column: 1 / -1; color: var(--muted); font-size: .76rem; }
+.evo-move small { display: block; color: var(--muted); font-size: .76rem; }
+
+/* --------------------------------------------------------------- versus */
+.vs-score { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 6px 0 12px; font-size: .95rem; }
+.vs-score i { color: var(--muted); font-style: normal; font-weight: 800; }
+.vs-last { font-size: .86rem; }
+.vs-screen .topbar span:first-child { color: var(--gold); }
+#versusBtn { margin-top: 8px; }
