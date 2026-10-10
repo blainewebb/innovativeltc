@@ -20,12 +20,17 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* The page itself never scrolls; #app does when a screen runs long. On iPad
+   a scrolled page could stay shifted up after a shorter screen replaced it,
+   until someone dragged it back. touch-action stops a quick double tap on
+   the keypad from zooming the page. */
 html, body {
-  margin: 0; padding: 0; height: 100%;
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
   background: var(--bg);
   color: var(--ink);
   font-family: ui-rounded, "Nunito", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 body {
@@ -35,7 +40,7 @@ body {
   background-attachment: fixed;
 }
 
-#app { min-height: 100%; display: flex; flex-direction: column; }
+#app { height: 100%; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 
 .screen {
   flex: 1; display: flex; flex-direction: column;
@@ -870,6 +875,10 @@ body[data-season="winter"] .field:not(.boss) {
   grid-template-columns: repeat(11, var(--t)); grid-template-rows: repeat(13, var(--t));
   border-radius: 12px; overflow: hidden; border: 2px solid var(--line);
   touch-action: none; user-select: none;
+}
+/* In a Safari tab 100vh counts the space behind the toolbar; dvh is what shows. */
+@supports (height: 100dvh) {
+  .world { --t: min(calc((100vw - 24px) / 11), calc((100dvh - 330px) / 13), 44px); }
 }
 .wt {
   position: relative; display: grid; place-items: center;

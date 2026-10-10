@@ -894,6 +894,30 @@ try {
   ok('out of season there is no banner', !(await seasonPage.$('.season-banner')));
   await seasonPage.close();
 
+  /* ---- iPad: the page never scrolls, and each screen starts at the top ---- */
+  const pad = await b.newPage({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', hasTouch: true });
+  pad.on('pageerror', e => errors.push(e.message));
+  await pad.goto(URL, { waitUntil: 'networkidle' });
+  await pad.fill('#newName', 'Pad');
+  await pad.click('#createProfile');
+  await pad.waitForSelector('#startRun');
+  const pageScroll = () => pad.evaluate(() => document.scrollingElement.scrollHeight - innerHeight);
+  await pad.click('#trophyBtn');
+  await pad.waitForSelector('.trophy');
+  const long = await pad.evaluate(() => { const a = document.getElementById('app'); return a.scrollHeight > a.clientHeight; });
+  ok('a long screen scrolls inside the game, not the page', long && (await pageScroll()) <= 0);
+  // Scroll whatever will scroll, the way a thumb would, then leave the screen.
+  await pad.evaluate(() => { document.getElementById('app').scrollTop = 99999; document.scrollingElement.scrollTop = 99999; });
+  await pad.evaluate(() => document.getElementById('done').click());
+  await pad.waitForSelector('#startRun');
+  const top = await pad.evaluate(() => [document.getElementById('app').scrollTop, Math.round(scrollY)]);
+  ok('the next screen starts at the top', top[0] === 0 && top[1] === 0, top.join(','));
+  await pad.click('#startRun');
+  await pad.waitForSelector('#world');
+  const worldFits = await pad.evaluate(() => { const a = document.getElementById('app'); return a.scrollHeight <= a.clientHeight; });
+  ok('the world fits an iPad held sideways', worldFits && (await pageScroll()) <= 0);
+  await pad.close();
+
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {
   failed++;
