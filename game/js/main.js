@@ -49,7 +49,11 @@ const stars = n => (n > 1 ? `<span class="stars">${'\u2605'.repeat(n - 1)}</span
 /** The picture with its evolution glow, in the character's type colour. */
 const charSpan = (f, cls = '') => `<span class="ch ${cls} evo${f.stage} t-${f.type}">${f.char}</span>`;
 
-function render(html) { stopDrillTimer(); fxGen += 1; delete app.dataset.busy; app.innerHTML = html; }
+function render(html) {
+  stopDrillTimer(); fxGen += 1; delete app.dataset.busy; app.innerHTML = html;
+  // Every new screen starts at the top (see the html, body rule in styles.css).
+  app.scrollTop = 0; window.scrollTo(0, 0);
+}
 function persist() { store.save(data); }
 
 /* Count playing time honestly: a ticking clock only while a run is live. */
