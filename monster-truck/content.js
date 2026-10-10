@@ -32,7 +32,7 @@ const TRUCKS = [
 const PRAISE = ['Yes!', 'You got it!', 'Awesome!', 'Great job!', 'Super smash!', 'Way to go!', 'Nailed it!'];
 // Names with recorded cheers. A name typed in settings that isn't here is still used
 // by the device voice, but the recorded voice cheers without it.
-const NAMES = [];
+const NAMES = ['Draper'];
 const ORD = ['', 'first', 'second', 'third', 'fourth'];
 
 // Every spoken line. The text is the clip's key; voice/manifest.json maps it to a file.
