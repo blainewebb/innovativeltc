@@ -299,7 +299,7 @@
           <option value="clihcp">CLI — Home Care Plus</option>
           <option value="clirc">CLI — Recovery Care (ID, MT, UT, VA)</option>
           <option value="clihr">CLI — Home Recovery Care (TX)</option>
-          <option value="medico">Medico — Essential Care (STC)</option>
+          <option value="medico">Medico — Essential Care (TX)</option>
         </select>
       </label>
       <span class="badge" id="carrierBadge">✓ NGL · verified rates</span>
@@ -350,7 +350,7 @@
         <option value="clihcp">CLI — Home Care Plus</option>
         <option value="clirc">CLI — Recovery Care</option>
         <option value="clihr">CLI — Home Recovery Care (TX)</option>
-        <option value="medico">Medico — Essential Care (STC)</option>
+        <option value="medico">Medico — Essential Care (TX)</option>
       </select></div>
       <div class="field"><label>Health rating</label><select id="qc_health"></select></div>
       <div class="field"><label>Inflation</label><select id="qc_infl"></select></div>
@@ -855,7 +855,7 @@
   <div class="card" id="medcard" hidden>
     <div class="cs-head">
       <h2 style="margin:0 0 2px">Medico <span style="color:var(--muted);font-weight:600;font-size:.9rem">Essential Care Plus / Essential Care</span></h2>
-      <p class="hint" style="margin:0">Medico Insurance Company (a Wellabe company) · short-term care — a home health care base plan with an optional facility care rider. Issue ages 18–89 (one rate for 18–54), unisex. Not long-term care insurance.</p>
+      <p class="hint" style="margin:0">Medico Insurance Company (a Wellabe company) · short-term care — a home health care base plan with an optional facility care rider. Rates loaded for <b>Texas</b> only. Issue ages 18–89 (one rate for 18–54), unisex. Not long-term care insurance.</p>
     </div>
     <div class="riders" style="margin:4px 0 8px"><label title="Essential Care Plus is for applicants who answer every health question no. Essential Care is the alternative when any of questions 7–11 is answered yes — lower maximums and a 20-day waiting period only."><input type="checkbox" id="med_ess" onchange="medSyncPlan()"> <span><b>Essential Care</b> — answered yes to any of health questions 7–11 (home care up to $150/day, facility up to $250/day, 20-day wait only)</span></label></div>
     <div class="grid">
@@ -3905,6 +3905,7 @@ window.MED=(function(){
   const planOf=o=>(o&&o.plan==='essential')?'essential':'plus';
   function quote(o){
     const pk=planOf(o), P=PLAN[pk], R=MEDICO_RATES[pk], age=+o.age, k=age<55?'18':String(age);
+    if(String(o.state||'TX').toUpperCase()!=='TX') throw new Error('Medico Essential Care rates are loaded for Texas only.');
     if(!(age>=18&&age<=89)) throw new Error('Medico Essential Care issues ages 18–89.');
     const d=+o.hhcDaily||0, bi=BPS.indexOf(+o.hhcBP), ep=+o.hhcEP||0;
     if(!(d>=10&&d<=P.hhcMax) || d%10) throw new Error(P.name+' home health care is $10–$'+P.hhcMax+'/day in $10 steps.');
@@ -4272,7 +4273,7 @@ function setCarrier(c){
   if($('rccard')) $('rccard').hidden = CARRIER!=='clirc';
   if($('hrcard')) $('hrcard').hidden = CARRIER!=='clihr';
   if($('medcard')) $('medcard').hidden = CARRIER!=='medico';
-  $('carrierBadge').textContent = CARRIER==='medico' ? '✓ Medico · Essential Care (STC)' : CARRIER==='clihr' ? '✓ CLI · Home Recovery Care (TX)' : CARRIER==='clirc' ? '✓ CLI · Recovery Care (ID, MT, UT, VA)' : CARRIER==='clihcp' ? '✓ CLI · Home Care Plus (AL, AR, AZ, CO, DE, GA, IA, ID, IL, IN, KY, LA, MI, MO, MS, MT, NC, ND, NE, NH, NM, NV, OH, OK, OR, PA, RI, SC, SD, TN, TX, UT, VA, WI, WV, WY)' : CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, LA, MD, MI, MO, NE, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, TX, WV, WI)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
+  $('carrierBadge').textContent = CARRIER==='medico' ? '✓ Medico · Essential Care (TX)' : CARRIER==='clihr' ? '✓ CLI · Home Recovery Care (TX)' : CARRIER==='clirc' ? '✓ CLI · Recovery Care (ID, MT, UT, VA)' : CARRIER==='clihcp' ? '✓ CLI · Home Care Plus (AL, AR, AZ, CO, DE, GA, IA, ID, IL, IN, KY, LA, MI, MO, MS, MT, NC, ND, NE, NH, NM, NV, OH, OK, OR, PA, RI, SC, SD, TN, TX, UT, VA, WI, WV, WY)' : CARRIER==='nwm' ? '✓ Northwestern Mutual · QuietCare (TX)' : CARRIER==='aetna' ? '✓ CLI · Recovery Care Choice (AZ, AR, CO, CT, DE, GA, IN, IA, KY, LA, MD, MI, MO, NE, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, TX, WV, WI)' : cs ? '✓ CareScout · verified rates' : om ? '✓ Manhattan Life · OmniFlex™ STC' : moo ? '✓ Mutual of Omaha · MutualCare Secure (TX)' : mooc ? '✓ Mutual of Omaha · MutualCare Custom (TX)' : '✓ NGL · verified rates';
   shortenCarrierBadge();
   if(ngl){ setMode(MODE); }
   else {
@@ -4689,7 +4690,7 @@ function medMoreSummary(){ const n=['med_adc','med_lim','med_rop'].filter(id=>($
   if($('med_moretoggle')) $('med_moretoggle').textContent=open?'− Fewer options':'＋ More options';
   if($('med_moresum')) $('med_moresum').textContent=(n?n+' added':'none added')+(open?'':' — adult day care, limited benefit, return of premium'); }
 function medToggleMore(force){ const box=$('med_more'); if(!box) return; box.hidden=(force==null)?!box.hidden:!force; medMoreSummary(); }
-function medInit(){ const s=$('med_state'); if(s && !s.options.length){ s.innerHTML=US_STATES.map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join(''); s.value='TX'; }
+function medInit(){ const s=$('med_state'); if(s && !s.options.length){ s.innerHTML='<option value="TX">Texas</option>'; s.value='TX'; }   // Texas rates only
   medSyncPlan(); if($('med_more')) medMoreSummary(); }
 function medRun(){ try{
   const o=medOpts(); const q=MED.quote(o);
@@ -5925,7 +5926,7 @@ function qcConvert(op, target, state){
   if(target==='clihcp'){ const wk=Math.min(1500,Math.max(150,Math.round(c.mb/30*7/150)*150)), weeks=nearestVal(c.years*52, HCP.WEEKS);
     return {carrier:'clihcp', state:st||'TX', age, mode, hcWeekly:wk, hcWeeks:weeks, hcEP:0, hospitalDaily:HCP.hasHosp(st||'TX')?cliHospMin(CLI_HCP_HOSP_MIN,st||'TX'):0, ambulanceUnits:0, cancerUnits:0}; }
   if(target==='medico'){ const d=Math.min(300,Math.max(10,Math.round(c.mb/30/10)*10));
-    return {carrier:'medico', state:st||'TX', age, mode, payBy:'bank', plan:'plus', hhcDaily:d, hhcBP:nearestVal(c.years*360, MED.BPS), hhcEP:0, inflation:c.pct>0, facility:true, facDaily:Math.min(500,Math.max(100,d)), adc:false, limited:false, limDaily:100, limBP:180, rop:false, tobacco:false, household:0, multiPolicy:false}; }
+    return {carrier:'medico', state:'TX', age, mode, payBy:'bank', plan:'plus', hhcDaily:d, hhcBP:nearestVal(c.years*360, MED.BPS), hhcEP:0, inflation:c.pct>0, facility:true, facDaily:Math.min(500,Math.max(100,d)), adc:false, limited:false, limDaily:100, limBP:180, rop:false, tobacco:false, household:0, multiPolicy:false}; }
   if(target==='moo') return {carrier:'moo', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:Math.min(12000,Math.max(1500,Math.round(c.mb/100)*100)), years:nearestVal(c.years,[2,3,4]), elimination:90, inflation:canonToMooCode(c.pct,c.term), mode};
   if(target==='mooc'){ const yrs=nearestVal(c.years,[2,3,4,5,6]), mb=Math.min(15000,Math.max(1500,Math.round(c.mb/50)*50));
     return {carrier:'mooc', state:st||'TX', spousal:c.spousal, age, gender, uwClass:'Select', monthlyBenefit:mb, years:yrs, policyLimit:mb*12*yrs, elimination:90, inflTerm:c.pct>0?canonToMoocTerm(c.term):'none', inflPct:c.pct>0?nearestVal(c.pct,MOOC_PCTS):0, mode, alfReduction:100, hhcReduction:100, proHHC:false, hhcWaiver:false, nfsbp:false, rop:'none'}; }
@@ -6902,7 +6903,7 @@ function carrierStates(c){ const all=US_STATES.map(x=>x[0]);
     case 'clihcp': return Object.keys(CLI_HCP_STATES);
     case 'clirc': return Object.keys(CLI_RC_SETS);
     case 'clihr': return Object.keys(CLI_HR_SETS);
-    case 'medico': return null;   // the rate guides list no states — shown everywhere until availability is loaded
+    case 'medico': return ['TX'];   // Texas rate guides only
   } return null; }
 function carrierOffers(c, st){ if(!st) return true; const l=carrierStates(c); return !l || l.indexOf(st)>=0; }
 // Hide the carriers that don't sell in the picked state (header carrier menu + Quick Commands carrier menu).
